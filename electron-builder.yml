@@ -1,32 +1,38 @@
+# electron-builder.yml
 appId: com.globalradio.app
 productName: 全球电台
 directories:
   output: release
+
 files:
   - dist/**/*
   - electron/**/*
-  - '!node_modules/**/*'
+
 extraResources:
   - from: electron/
     to: electron/
     filter:
-      - '**/*'
+      - "**/*"
+
 win:
   target:
     - nsis
     - portable
   icon: public/favicon.ico
+
 mac:
   target:
     - dmg
     - zip
   icon: public/icon.icns
+
 linux:
   target:
     - AppImage
     - deb
   icon: public/icon.png
   category: AudioVideo
+
 nsis:
   oneClick: false
   perMachine: true
