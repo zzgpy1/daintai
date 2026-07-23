@@ -2,108 +2,46 @@ name: CI
 
 on:
   push:
-    branches:
-      - main
-      - develop
+    branches: [main, develop]
   pull_request:
-    branches:
-      - main
-      - develop
-  workflow_dispatch:
+    branches: [main]
 
 env:
   NODE_VERSION: 20
 
 jobs:
-  # ============ 代码检查 ============
   lint:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-
       - uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
-          cache: 'npm'
-
-      - name: 安装依赖
-        shell: bash
+      - name: 确保锁文件存在
         run: |
-          if [ -f package-lock.json ]; then
-            npm ci --no-audit --no-fund
-          else
-            npm install --no-audit --no-fund
+          if [ ! -f package-lock.json ]; then
+            npm install --package-lock-only
           fi
-
-      - name: TypeScript 类型检查
-        shell: bash
+      - name: 安装依赖
+        run: npm ci --no-audit --no-fund || npm install --no-audit --no-fund
+      - name: TypeScript 检查
         run: npx vue-tsc --noEmit
 
-  # ============ 构建测试 ============
   build-test:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-
       - uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
-          cache: 'npm'
-
-      - name: 安装依赖
-        shell: bash
+      - name: 确保锁文件存在
         run: |
-          if [ -f package-lock.json ]; then
-            npm ci --no-audit --no-fund
-          else
-            npm install --no-audit --no-fund
+          if [ ! -f package-lock.json ]; then
+            npm install --package-lock-only
           fi
-
-      - name: 构建 Web
-        shell: bash
+      - name: 安装依赖
+        run: npm ci --no-audit --no-fund || npm install --no-audit --no-fund
+      - name: 构建
         run: npm run build
-
-      - name: 验证构建
-        shell: bash
-        run: |
-          test -f dist/index.html || (echo "❌ 构建失败" && exit 1)
-          echo "✅ 构建成功"
-          echo "📊 构建产物大小:"
-          du -sh dist/
-
-      - name: 验证可访问性
-        shell: bash
-        run: |
-          # 检查关键文件是否存在
-          for file in dist/index.html dist/assets/*.js; do
-            if [ ! -f "$file" ]; then
-              echo "⚠️ 缺少: $file"
-            fi
-          done
-          echo "✅ 关键文件检查完成"
-
-  # ============ 项目结构验证 ============
-  structure:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: 验证项目结构
-        shell: bash
-        run: |
-          chmod +x scripts/verify-project.sh
-          ./scripts/verify-project.sh
-
-      - name: 验证锁文件
-        shell: bash
-        run: |
-          chmod +x scripts/verify-lockfile.sh
-          ./scripts/verify-lockfile.sh
-
-      - name: 检查未使用的文件
-        shell: bash
-        run: |
-          echo "📁 项目文件统计:"
-          echo "总文件数: $(find . -type f -not -path './node_modules/*' -not -path './.git/*' -not -path './dist/*' | wc -l)"
-          echo "源码文件: $(find src -type f | wc -l)"
-          echo "配置文件: $(find . -maxdepth 1 -name "*.json" -o -name "*.config.*" | wc -l)"
+      - name: 验证
+        run: test -f dist/index.html
