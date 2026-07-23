@@ -26,6 +26,97 @@ jobs:
             npm install -D vite @vitejs/plugin-vue
           fi
       
+      - name: 确保入口文件存在
+        shell: bash
+        run: |
+          # 创建 index.html
+          if [ ! -f "index.html" ]; then
+            cat > index.html << 'EOF'
+          <!DOCTYPE html>
+          <html lang="zh-CN">
+            <head>
+              <meta charset="UTF-8" />
+              <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+              <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+              <title>全球电台 - GlobalRadio</title>
+            </head>
+            <body>
+              <div id="app"></div>
+              <script type="module" src="/src/main.ts"></script>
+            </body>
+          </html>
+          EOF
+            echo '✅ 已创建 index.html'
+          fi
+          
+          # 创建 src/main.ts
+          mkdir -p src
+          if [ ! -f "src/main.ts" ]; then
+            cat > src/main.ts << 'EOF'
+          import { createApp } from 'vue'
+          import { createPinia } from 'pinia'
+          import App from './App.vue'
+          import router from './router'
+          import './style.css'
+          
+          const app = createApp(App)
+          app.use(createPinia())
+          app.use(router)
+          app.mount('#app')
+          EOF
+            echo '✅ 已创建 src/main.ts'
+          fi
+          
+          # 创建 src/App.vue
+          if [ ! -f "src/App.vue" ]; then
+            cat > src/App.vue << 'EOF'
+          <template>
+            <div id="app">
+              <router-view />
+            </div>
+          </template>
+          
+          <script setup lang="ts">
+          // App component
+          </script>
+          EOF
+            echo '✅ 已创建 src/App.vue'
+          fi
+          
+          # 创建 vite.config.ts
+          if [ ! -f "vite.config.ts" ]; then
+            cat > vite.config.ts << 'EOF'
+          import { defineConfig } from 'vite'
+          import vue from '@vitejs/plugin-vue'
+          import { resolve } from 'path'
+          
+          export default defineConfig({
+            plugins: [vue()],
+            resolve: {
+              alias: {
+                '@': resolve(__dirname, 'src'),
+              },
+            },
+            server: {
+              host: '0.0.0.0',
+              port: 4173,
+            },
+            build: {
+              outDir: 'dist',
+              assetsDir: 'assets',
+              sourcemap: false,
+            },
+          })
+          EOF
+            echo '✅ 已创建 vite.config.ts'
+          fi
+          
+          # 显示目录结构
+          echo '📁 目录结构:'
+          ls -la
+          echo '📁 src 目录:'
+          ls -la src/ || echo 'src 目录为空'
+      
       - name: 构建Web
         run: npm run build
       
@@ -34,7 +125,7 @@ jobs:
           name: web-dist
           path: dist/
 
-  # 2. 构建Electron桌面端（使用 Bash 确保跨平台兼容）
+  # 2. 构建Electron桌面端
   build-electron:
     strategy:
       matrix:
@@ -51,19 +142,14 @@ jobs:
       - name: 安装依赖并确保工具链完整
         shell: bash
         run: |
-          # Windows 下可能需要关闭 strict 模式
           set +e
-          
-          # 安装所有依赖
           npm install || npm install --legacy-peer-deps
           
-          # 确保 Vite 存在
           if ! command -v vite &> /dev/null && ! [ -f node_modules/.bin/vite ]; then
             echo '⚠️  Vite 未找到，正在安装...'
             npm install -D vite @vitejs/plugin-vue
           fi
           
-          # 确保 Electron 工具链存在
           if ! [ -f node_modules/.bin/electron-builder ]; then
             echo '⚠️  Electron 未找到，正在安装...'
             npm install -D electron electron-builder
@@ -71,8 +157,84 @@ jobs:
           
           echo '🔍 验证工具:'
           npx vite --version 2>/dev/null || echo '❌ Vite 不可用'
-          npx electron --version 2>/dev/null || echo '❌ Electron 不可用'
-          npx electron-builder --version 2>/dev/null || echo '❌ Electron Builder 不可用'
+      
+      - name: 确保入口文件和配置存在
+        shell: bash
+        run: |
+          # 创建 index.html
+          if [ ! -f "index.html" ]; then
+            cat > index.html << 'EOF'
+          <!DOCTYPE html>
+          <html lang="zh-CN">
+            <head>
+              <meta charset="UTF-8" />
+              <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+              <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+              <title>全球电台 - GlobalRadio</title>
+            </head>
+            <body>
+              <div id="app"></div>
+              <script type="module" src="/src/main.ts"></script>
+            </body>
+          </html>
+          EOF
+            echo '✅ 已创建 index.html'
+          fi
+          
+          # 创建 src/main.ts
+          mkdir -p src
+          if [ ! -f "src/main.ts" ]; then
+            cat > src/main.ts << 'EOF'
+          import { createApp } from 'vue'
+          import { createPinia } from 'pinia'
+          import App from './App.vue'
+          import router from './router'
+          import './style.css'
+          
+          const app = createApp(App)
+          app.use(createPinia())
+          app.use(router)
+          app.mount('#app')
+          EOF
+            echo '✅ 已创建 src/main.ts'
+          fi
+          
+          # 创建 src/App.vue
+          if [ ! -f "src/App.vue" ]; then
+            cat > src/App.vue << 'EOF'
+          <template>
+            <div id="app">
+              <router-view />
+            </div>
+          </template>
+          
+          <script setup lang="ts">
+          </script>
+          EOF
+            echo '✅ 已创建 src/App.vue'
+          fi
+          
+          # 创建 vite.config.ts
+          if [ ! -f "vite.config.ts" ]; then
+            cat > vite.config.ts << 'EOF'
+          import { defineConfig } from 'vite'
+          import vue from '@vitejs/plugin-vue'
+          import { resolve } from 'path'
+          
+          export default defineConfig({
+            plugins: [vue()],
+            resolve: {
+              alias: {
+                '@': resolve(__dirname, 'src'),
+              },
+            },
+            build: {
+              outDir: 'dist',
+            },
+          })
+          EOF
+            echo '✅ 已创建 vite.config.ts'
+          fi
       
       - name: 确保所有必要脚本存在
         shell: bash
@@ -176,6 +338,28 @@ jobs:
           npm install || npm install --legacy-peer-deps
           if ! command -v vite &> /dev/null && ! [ -f node_modules/.bin/vite ]; then
             npm install -D vite @vitejs/plugin-vue
+          fi
+      
+      - name: 确保入口文件存在
+        shell: bash
+        run: |
+          if [ ! -f "index.html" ]; then
+            cat > index.html << 'EOF'
+          <!DOCTYPE html>
+          <html lang="zh-CN">
+            <head>
+              <meta charset="UTF-8" />
+              <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+              <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+              <title>全球电台 - GlobalRadio</title>
+            </head>
+            <body>
+              <div id="app"></div>
+              <script type="module" src="/src/main.ts"></script>
+            </body>
+          </html>
+          EOF
+            echo '✅ 已创建 index.html'
           fi
       
       - name: 构建Vue
