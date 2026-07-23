@@ -1,9 +1,11 @@
+// electron/main.js
 const { app, BrowserWindow, Menu, shell } = require('electron');
 const path = require('path');
 const fs = require('fs');
 
 let mainWindow;
 
+// 获取 preload 脚本路径（支持开发和生产环境）
 function getPreloadPath() {
   const possiblePaths = [
     path.join(__dirname, 'preload.js'),
@@ -20,10 +22,13 @@ function getPreloadPath() {
   return path.join(__dirname, 'preload.js');
 }
 
+// 获取 index.html 路径
 function getIndexPath() {
   if (app.isPackaged) {
+    // 生产环境：从 app.asar 中读取
     return `file://${path.join(__dirname, '../dist/index.html')}`;
   }
+  // 开发环境：使用 Vite 预览服务
   return 'http://localhost:4173';
 }
 
@@ -56,22 +61,27 @@ function createWindow() {
     }
   });
 
+  // 外部链接用默认浏览器打开
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {
     shell.openExternal(url);
     return { action: 'deny' };
   });
 
+  // 隐藏默认菜单
   Menu.setApplicationMenu(null);
 }
 
+// 应用准备就绪
 app.whenReady().then(createWindow);
 
+// 所有窗口关闭时退出（macOS 除外）
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') {
     app.quit();
   }
 });
 
+// macOS 点击 dock 图标时重新创建窗口
 app.on('activate', () => {
   if (BrowserWindow.getAllWindows().length === 0) {
     createWindow();
