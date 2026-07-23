@@ -10,15 +10,21 @@
       </div>
     </header>
 
-    <div class="py-6 space-y-8 pb-24 md:pb-28">
+    <div class="container-responsive py-6 space-y-8 pb-24 md:pb-28">
       <!-- 快速操作 -->
       <section>
         <div class="grid grid-cols-2 gap-4 mobile:grid-cols-2 desktop:grid-cols-4">
-          <button @click="loadRandomStations" class="relative overflow-hidden ios-card p-6 text-center hover:shadow-ios-lg transition-all active:scale-95 bg-gradient-to-br from-ios-blue to-purple-600 text-white border-0">
+          <button
+            @click="loadRandomStations"
+            class="relative overflow-hidden ios-card p-6 text-center hover:shadow-ios-lg transition-all active:scale-95 bg-gradient-to-br from-ios-blue to-purple-600 text-white border-0"
+          >
             <p class="font-semibold text-white text-lg mb-1">{{ t('home.randomDiscover') }}</p>
             <p class="text-sm text-white/80">{{ t('home.exploreNew') }}</p>
           </button>
-          <button @click="$router.push('/search')" class="ios-card p-6 text-center hover:shadow-ios-lg transition-all active:scale-95">
+          <button
+            @click="$router.push('/search')"
+            class="ios-card p-6 text-center hover:shadow-ios-lg transition-all active:scale-95"
+          >
             <p class="font-medium text-ios-dark-gray dark:text-dark-text">{{ t('nav.search') }}</p>
           </button>
         </div>
@@ -28,12 +34,24 @@
       <section>
         <div class="flex items-center justify-between mb-4">
           <h2 class="text-xl font-semibold text-ios-dark-gray dark:text-dark-text">{{ t('home.musicStations') }}</h2>
-          <button @click="refreshTopStations" class="p-2 rounded-full bg-gradient-to-r from-ios-blue to-purple-500 text-white">
-            <span class="text-sm">刷新</span>
+          <button
+            @click="refreshTopStations"
+            class="px-3 py-1.5 rounded-full bg-gradient-to-r from-ios-blue to-purple-500 text-white text-sm hover:opacity-90 transition-opacity"
+          >
+            {{ t('home.refresh') }}
           </button>
         </div>
-        <div class="space-y-3">
-          <StationCard v-for="station in topStations" :key="station.stationuuid" :station="station" @play="playStation" @favorite="toggleFavorite" />
+        <div v-if="isLoading" class="space-y-3">
+          <StationSkeleton v-for="i in 5" :key="i" />
+        </div>
+        <div v-else class="space-y-3">
+          <StationCard
+            v-for="station in topStations"
+            :key="station.stationuuid"
+            :station="station"
+            @play="playStation"
+            @favorite="toggleFavorite"
+          />
         </div>
       </section>
     </div>
@@ -47,6 +65,7 @@ import { useRadioStore } from '@/stores/radio'
 import { useLanguageStore } from '@/stores/language'
 import type { RadioStation } from '@/types/radio'
 import StationCard from '@/components/StationCard.vue'
+import StationSkeleton from '@/components/StationSkeleton.vue'
 import ThemeToggle from '@/components/ThemeToggle.vue'
 import LanguageToggle from '@/components/LanguageToggle.vue'
 
@@ -56,6 +75,7 @@ const languageStore = useLanguageStore()
 const { t } = languageStore
 
 const topStations = ref<RadioStation[]>([])
+const isLoading = ref(true)
 
 const playStation = (station: RadioStation) => {
   playerStore.playStation(station)
@@ -70,11 +90,15 @@ const loadRandomStations = async () => {
 }
 
 const refreshTopStations = async () => {
+  isLoading.value = true
   await radioStore.loadTopStations({ force: true })
+  topStations.value = radioStore.topStations.slice(0, 10)
+  isLoading.value = false
 }
 
 onMounted(async () => {
   await radioStore.loadTopStations()
   topStations.value = radioStore.topStations.slice(0, 10)
+  isLoading.value = false
 })
 </script>
