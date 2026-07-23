@@ -29,7 +29,6 @@ jobs:
       - name: 创建完整的Vue项目文件
         shell: bash
         run: |
-          # 创建 index.html
           cat > index.html << 'EOF'
           <!DOCTYPE html>
           <html lang="zh-CN">
@@ -46,37 +45,27 @@ jobs:
           </html>
           EOF
           
-          # 创建 src 目录结构
           mkdir -p src/router src/stores src/views src/components src/utils src/types
           
-          # 创建 src/main.ts
           cat > src/main.ts << 'EOF'
           import { createApp } from 'vue'
           import { createPinia } from 'pinia'
           import App from './App.vue'
           import router from './router'
           import './style.css'
-          
           const app = createApp(App)
           app.use(createPinia())
           app.use(router)
           app.mount('#app')
           EOF
           
-          # 创建 src/App.vue
           cat > src/App.vue << 'EOF'
-          <template>
-            <div id="app">
-              <router-view />
-            </div>
-          </template>
+          <template><div id="app"><router-view /></div></template>
           <script setup lang="ts"></script>
           EOF
           
-          # 创建 src/router/index.ts
           cat > src/router/index.ts << 'EOF'
           import { createRouter, createWebHistory } from 'vue-router'
-          
           const routes = [
             { path: '/', name: 'Home', component: () => import('@/views/Home.vue') },
             { path: '/search', name: 'Search', component: () => import('@/views/Search.vue') },
@@ -85,78 +74,40 @@ jobs:
             { path: '/settings', name: 'Settings', component: () => import('@/views/Settings.vue') },
             { path: '/station/:uuid', name: 'StationDetail', component: () => import('@/views/StationDetail.vue') },
           ]
-          
-          const router = createRouter({
-            history: createWebHistory(),
-            routes,
-            scrollBehavior() { return { top: 0 } }
-          })
-          
+          const router = createRouter({ history: createWebHistory(), routes, scrollBehavior() { return { top: 0 } } })
           export default router
           EOF
           
-          # 创建所有视图组件
           cat > src/views/Home.vue << 'EOF'
-          <template>
-            <div class="home">
-              <h1>全球电台</h1>
-              <p>欢迎使用全球电台</p>
-            </div>
-          </template>
+          <template><div class="home"><h1>全球电台</h1><p>欢迎使用全球电台</p></div></template>
           <script setup lang="ts"></script>
           EOF
           
           cat > src/views/Search.vue << 'EOF'
-          <template>
-            <div class="search">
-              <h1>搜索电台</h1>
-              <p>搜索功能开发中...</p>
-            </div>
-          </template>
+          <template><div class="search"><h1>搜索电台</h1><p>搜索功能开发中...</p></div></template>
           <script setup lang="ts"></script>
           EOF
           
           cat > src/views/History.vue << 'EOF'
-          <template>
-            <div class="history">
-              <h1>播放历史</h1>
-              <p>历史记录功能开发中...</p>
-            </div>
-          </template>
+          <template><div class="history"><h1>播放历史</h1><p>历史记录功能开发中...</p></div></template>
           <script setup lang="ts"></script>
           EOF
           
           cat > src/views/Favorites.vue << 'EOF'
-          <template>
-            <div class="favorites">
-              <h1>我的收藏</h1>
-              <p>收藏功能开发中...</p>
-            </div>
-          </template>
+          <template><div class="favorites"><h1>我的收藏</h1><p>收藏功能开发中...</p></div></template>
           <script setup lang="ts"></script>
           EOF
           
           cat > src/views/Settings.vue << 'EOF'
-          <template>
-            <div class="settings">
-              <h1>设置</h1>
-              <p>设置功能开发中...</p>
-            </div>
-          </template>
+          <template><div class="settings"><h1>设置</h1><p>设置功能开发中...</p></div></template>
           <script setup lang="ts"></script>
           EOF
           
           cat > src/views/StationDetail.vue << 'EOF'
-          <template>
-            <div class="station-detail">
-              <h1>电台详情</h1>
-              <p>电台详情功能开发中...</p>
-            </div>
-          </template>
+          <template><div class="station-detail"><h1>电台详情</h1><p>电台详情功能开发中...</p></div></template>
           <script setup lang="ts"></script>
           EOF
           
-          # 创建样式文件
           cat > src/style.css << 'EOF'
           * { margin: 0; padding: 0; box-sizing: border-box; }
           body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background-color: #f2f2f7; color: #1c1c1e; }
@@ -165,32 +116,18 @@ jobs:
           h1 { font-size: 24px; margin-bottom: 10px; }
           EOF
           
-          # 创建 vite.config.ts
           cat > vite.config.ts << 'EOF'
           import { defineConfig } from 'vite'
           import vue from '@vitejs/plugin-vue'
           import { resolve } from 'path'
-          
           export default defineConfig({
             plugins: [vue()],
-            resolve: {
-              alias: {
-                '@': resolve(__dirname, 'src'),
-              },
-            },
-            server: {
-              host: '0.0.0.0',
-              port: 4173,
-            },
-            build: {
-              outDir: 'dist',
-              assetsDir: 'assets',
-              sourcemap: false,
-            },
+            resolve: { alias: { '@': resolve(__dirname, 'src') } },
+            server: { host: '0.0.0.0', port: 4173 },
+            build: { outDir: 'dist', assetsDir: 'assets', sourcemap: false },
           })
           EOF
           
-          # 创建 TypeScript 配置
           cat > tsconfig.json << 'EOF'
           {
             "compilerOptions": {
@@ -235,8 +172,6 @@ jobs:
           EOF
           
           echo '✅ 所有Vue项目文件创建完成'
-          echo '📁 目录结构:'
-          find src -type f -name "*.vue" -o -name "*.ts" -o -name "*.css" | sort
       
       - name: 构建Web
         run: npm run build
@@ -332,34 +267,33 @@ jobs:
           export default router
           EOF
           
-          # 创建所有视图组件
           cat > src/views/Home.vue << 'EOF'
-          <template><div class="home"><h1>全球电台</h1><p>欢迎使用全球电台</p></div></template>
+          <template><div><h1>全球电台</h1><p>欢迎使用全球电台</p></div></template>
           <script setup lang="ts"></script>
           EOF
           
           cat > src/views/Search.vue << 'EOF'
-          <template><div class="search"><h1>搜索电台</h1><p>搜索功能开发中...</p></div></template>
+          <template><div><h1>搜索电台</h1><p>搜索功能开发中...</p></div></template>
           <script setup lang="ts"></script>
           EOF
           
           cat > src/views/History.vue << 'EOF'
-          <template><div class="history"><h1>播放历史</h1><p>历史记录功能开发中...</p></div></template>
+          <template><div><h1>播放历史</h1><p>历史记录功能开发中...</p></div></template>
           <script setup lang="ts"></script>
           EOF
           
           cat > src/views/Favorites.vue << 'EOF'
-          <template><div class="favorites"><h1>我的收藏</h1><p>收藏功能开发中...</p></div></template>
+          <template><div><h1>我的收藏</h1><p>收藏功能开发中...</p></div></template>
           <script setup lang="ts"></script>
           EOF
           
           cat > src/views/Settings.vue << 'EOF'
-          <template><div class="settings"><h1>设置</h1><p>设置功能开发中...</p></div></template>
+          <template><div><h1>设置</h1><p>设置功能开发中...</p></div></template>
           <script setup lang="ts"></script>
           EOF
           
           cat > src/views/StationDetail.vue << 'EOF'
-          <template><div class="station-detail"><h1>电台详情</h1><p>电台详情功能开发中...</p></div></template>
+          <template><div><h1>电台详情</h1><p>电台详情功能开发中...</p></div></template>
           <script setup lang="ts"></script>
           EOF
           
@@ -367,8 +301,6 @@ jobs:
           * { margin: 0; padding: 0; box-sizing: border-box; }
           body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background-color: #f2f2f7; color: #1c1c1e; }
           #app { min-height: 100vh; }
-          .home, .search, .history, .favorites, .settings, .station-detail { padding: 20px; text-align: center; }
-          h1 { font-size: 24px; margin-bottom: 10px; }
           EOF
           
           cat > vite.config.ts << 'EOF'
@@ -469,6 +401,99 @@ jobs:
           EOF
           
           echo '✅ 所有文件创建完成'
+      
+      # 🔧 关键修复：强制修正 package.json 的 Electron 配置
+      - name: 强制修正 package.json 的 Electron 打包配置
+        shell: bash
+        run: |
+          node -e "
+            const fs = require('fs');
+            const pkg = JSON.parse(fs.readFileSync('package.json', 'utf8'));
+            
+            // 确保主入口指向 electron/main.js
+            pkg.main = 'electron/main.js';
+            
+            // 确保 scripts 正确
+            if (!pkg.scripts) pkg.scripts = {};
+            pkg.scripts.build = 'npx vite build';
+            pkg.scripts['electron:build'] = 'npm run build && npx electron-builder';
+            pkg.scripts['electron:dev'] = 'npm run build && npx electron .';
+            
+            // 完整的 build 配置
+            pkg.build = {
+              appId: 'com.globalradio.app',
+              productName: '全球电台',
+              directories: {
+                output: 'release'
+              },
+              files: [
+                'dist/**/*',
+                'electron/**/*'
+              ],
+              extraResources: [
+                {
+                  from: 'electron',
+                  to: 'electron',
+                  filter: ['**/*']
+                }
+              ],
+              linux: {
+                target: ['AppImage', 'deb'],
+                icon: 'public/icon.png',
+                category: 'Audio'
+              },
+              mac: {
+                target: ['dmg', 'zip'],
+                icon: 'public/icon.icns',
+                category: 'public.app-category.music'
+              },
+              win: {
+                target: ['nsis', 'portable'],
+                icon: 'public/favicon.ico'
+              },
+              nsis: {
+                oneClick: false,
+                allowToChangeInstallationDirectory: true,
+                createDesktopShortcut: true,
+                createStartMenuShortcut: true
+              }
+            };
+            
+            fs.writeFileSync('package.json', JSON.stringify(pkg, null, 2));
+            console.log('✅ 已强制修正 package.json 的 Electron 配置');
+            console.log('📋 关键配置:');
+            console.log('  - main:', pkg.main);
+            console.log('  - build.files:', pkg.build.files);
+          "
+      
+      # 🔧 关键修复：强制修正 capacitor.config.ts
+      - name: 强制修正 capacitor.config.ts
+        shell: bash
+        run: |
+          if [ -f "capacitor.config.ts" ]; then
+            sed -i "s/webDir: 'www'/webDir: 'dist'/g" capacitor.config.ts
+            sed -i 's/"webDir": "www"/"webDir": "dist"/g' capacitor.config.ts
+            echo '✅ 已修正 capacitor.config.ts 中的 webDir'
+            cat capacitor.config.ts | grep -i webdir || echo '⚠️ 未找到 webDir 配置'
+          else
+            echo '⚠️ capacitor.config.ts 不存在，正在创建...'
+            cat > capacitor.config.ts << 'EOF'
+          import { CapacitorConfig } from '@capacitor/cli';
+          const config: CapacitorConfig = {
+            appId: 'com.globalradio.app',
+            appName: '全球电台',
+            webDir: 'dist',
+            server: { androidScheme: 'https' },
+            plugins: {
+              SplashScreen: { launchShowDuration: 800, backgroundColor: "#1a365d" },
+              StatusBar: { style: "dark", backgroundColor: "#1a365d" }
+            },
+            android: { allowMixedContent: true, captureInput: true }
+          };
+          export default config;
+          EOF
+            echo '✅ 已创建 capacitor.config.ts'
+          fi
       
       - name: 确保所有必要脚本存在
         shell: bash
@@ -659,6 +684,34 @@ jobs:
           
           echo '✅ 所有Vue项目文件创建完成'
       
+      # 🔧 关键修复：强制修正 capacitor.config.ts
+      - name: 强制修正 capacitor.config.ts
+        shell: bash
+        run: |
+          if [ -f "capacitor.config.ts" ]; then
+            sed -i "s/webDir: 'www'/webDir: 'dist'/g" capacitor.config.ts
+            sed -i 's/"webDir": "www"/"webDir": "dist"/g' capacitor.config.ts
+            echo '✅ 已修正 capacitor.config.ts 中的 webDir'
+          else
+            echo '⚠️ capacitor.config.ts 不存在，正在创建...'
+            cat > capacitor.config.ts << 'EOF'
+          import { CapacitorConfig } from '@capacitor/cli';
+          const config: CapacitorConfig = {
+            appId: 'com.globalradio.app',
+            appName: '全球电台',
+            webDir: 'dist',
+            server: { androidScheme: 'https' },
+            plugins: {
+              SplashScreen: { launchShowDuration: 800, backgroundColor: "#1a365d" },
+              StatusBar: { style: "dark", backgroundColor: "#1a365d" }
+            },
+            android: { allowMixedContent: true, captureInput: true }
+          };
+          export default config;
+          EOF
+            echo '✅ 已创建 capacitor.config.ts'
+          fi
+      
       - name: 构建Vue
         run: npm run build
       
@@ -667,9 +720,14 @@ jobs:
       
       - name: 构建APK
         run: |
-          cd android
-          chmod +x gradlew
-          ./gradlew assembleRelease
+          if [ -d "android" ] && [ -f "android/gradlew" ]; then
+            cd android
+            chmod +x gradlew
+            ./gradlew assembleRelease
+          else
+            echo '⚠️ Android 目录或 gradlew 文件不存在，跳过构建'
+            exit 1
+          fi
       
       - uses: actions/upload-artifact@v4
         with:
