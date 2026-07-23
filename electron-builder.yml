@@ -3,13 +3,13 @@ appId: com.globalradio.app
 productName: 全球电台
 directories:
   output: release
-  buildResources: build
 
-# 关键：指定入口文件
+# 关键：明确指定要打包的文件
 files:
   - dist/**/*
   - electron/**/*
 
+# 确保入口文件被包含
 extraResources:
   - from: electron/
     to: electron/
