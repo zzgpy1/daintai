@@ -5,57 +5,97 @@ on:
     tags:
       - 'v*'
   workflow_dispatch:
+    inputs:
+      version:
+        description: '版本号 (如 v1.0.0)'
+        required: true
+        type: string
+      platform:
+        description: '构建平台'
+        required: false
+        default: 'all'
+        type: choice
+        options:
+          - all
+          - web
+          - electron
+          - android
 
 env:
   ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION: true
+  NODE_VERSION: 20
+  JAVA_VERSION: 17
+
+permissions:
+  contents: write
+  packages: write
+  actions: read
 
 jobs:
-  # 1. 验证项目结构
+  # ============ 1. 验证项目结构 ============
   validate:
     runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.get-version.outputs.version }}
+      is_tag: ${{ steps.check-tag.outputs.is_tag }}
     steps:
       - uses: actions/checkout@v4
-      
+
+      - name: 获取版本号
+        id: get-version
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "📦 版本: $VERSION"
+
+      - name: 检查是否为标签触发
+        id: check-tag
+        run: |
+          if [[ "${{ github.ref }}" == refs/tags/* ]]; then
+            echo "is_tag=true" >> $GITHUB_OUTPUT
+            echo "✅ 标签触发: ${{ github.ref_name }}"
+          else
+            echo "is_tag=false" >> $GITHUB_OUTPUT
+            echo "ℹ️ 手动触发: ${{ github.event.inputs.version }}"
+          fi
+
       - name: 验证项目结构
         shell: bash
         run: |
-          echo "📂 当前目录内容:"
-          ls -la
-          echo ""
-          echo "📂 src 目录内容:"
-          ls -la src/ || echo "❌ src 目录不存在"
-          echo ""
-          echo "📄 检查 main.ts:"
-          test -f src/main.ts && echo "✅ src/main.ts 存在" || echo "❌ src/main.ts 不存在"
-          test -f index.html && echo "✅ index.html 存在" || echo "❌ index.html 不存在"
+          echo "📂 验证项目结构..."
+          required_files=(
+            "index.html"
+            "package.json"
+            "vite.config.ts"
+            "tsconfig.json"
+            "src/main.ts"
+            "src/App.vue"
+            "public/favicon.svg"
+          )
+          for file in "${required_files[@]}"; do
+            if [ ! -f "$file" ]; then
+              echo "❌ 缺少: $file"
+              exit 1
+            fi
+            echo "✅ $file"
+          done
+          echo "📁 src 目录: $(find src -type f | wc -l) 个文件"
+          echo "✅ 项目结构验证通过"
 
-  # 2. 构建 Web 产物
+  # ============ 2. 构建 Web ============
   build-web:
     runs-on: ubuntu-latest
     needs: validate
+    outputs:
+      version: ${{ needs.validate.outputs.version }}
     steps:
       - uses: actions/checkout@v4
-      
+
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
-      
-      - name: 验证项目文件
-        shell: bash
-        run: |
-          if [ ! -f src/main.ts ]; then
-            echo "❌ src/main.ts 不存在！正在检查..."
-            find . -name "main.ts" 2>/dev/null || echo "未找到 main.ts"
-            ls -la src/ || echo "src 目录不存在"
-            exit 1
-          fi
-          if [ ! -f index.html ]; then
-            echo "❌ index.html 不存在！"
-            ls -la
-            exit 1
-          fi
-          echo "✅ 所有必要文件存在"
-      
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
       - name: 安装依赖
         shell: bash
         run: |
@@ -63,46 +103,55 @@ jobs:
             npm ci --no-audit --no-fund
           else
             npm install --no-audit --no-fund
+            npm install --package-lock-only
           fi
-      
-      - name: 构建项目
+          echo "📦 依赖安装完成"
+
+      - name: 构建 Web
         shell: bash
-        run: npm run build
-      
+        run: |
+          npm run build
+          echo "🔨 Web 构建完成"
+
       - name: 验证构建产物
         shell: bash
         run: |
           ls -la dist/
           test -f dist/index.html || (echo "❌ dist/index.html 不存在" && exit 1)
-      
-      - uses: actions/upload-artifact@v4
+          echo "✅ 构建产物验证通过"
+
+      - name: 上传 Web 产物
+        uses: actions/upload-artifact@v4
         with:
           name: web-dist
           path: dist/
+          retention-days: 7
 
-  # 3. 构建 Electron 桌面端
+  # ============ 3. 构建 Electron（多平台） ============
   build-electron:
     strategy:
       matrix:
         os: [ubuntu-latest, windows-latest, macos-latest]
+        include:
+          - os: ubuntu-latest
+            platform: linux
+            artifact_name: electron-linux
+          - os: windows-latest
+            platform: win
+            artifact_name: electron-win
+          - os: macos-latest
+            platform: mac
+            artifact_name: electron-mac
     runs-on: ${{ matrix.os }}
-    needs: validate
+    needs: [validate, build-web]
     steps:
       - uses: actions/checkout@v4
-      
+
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
-      
-      - name: 验证项目文件
-        shell: bash
-        run: |
-          test -f src/main.ts || (echo "❌ src/main.ts 不存在" && exit 1)
-          test -f index.html || (echo "❌ index.html 不存在" && exit 1)
-          test -f electron/main.js || (echo "❌ electron/main.js 不存在" && exit 1)
-          test -f electron/preload.js || (echo "❌ electron/preload.js 不存在" && exit 1)
-          echo "✅ 所有必要文件存在"
-      
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
       - name: 安装依赖
         shell: bash
         run: |
@@ -111,54 +160,64 @@ jobs:
           else
             npm install --no-audit --no-fund
           fi
-      
-      - name: 构建 Vue 项目
-        shell: bash
-        run: npm run build
-      
-      - name: 验证构建产物
+
+      - name: 验证 Electron 文件
         shell: bash
         run: |
-          test -f dist/index.html || (echo "❌ dist/index.html 不存在" && exit 1)
-      
-      - name: 构建 Electron 应用
+          test -f electron/main.js || (echo "❌ electron/main.js 不存在" && exit 1)
+          test -f electron/preload.js || (echo "❌ electron/preload.js 不存在" && exit 1)
+          echo "✅ Electron 文件验证通过"
+
+      - name: 构建 Vue
+        shell: bash
+        run: npm run build
+
+      - name: 构建 Electron (${{ matrix.platform }})
         shell: bash
         run: npm run electron:build
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      
-      - uses: actions/upload-artifact@v4
-        with:
-          name: electron-${{ matrix.os }}
-          path: release/
 
-  # 4. 构建 Android APK
+      - name: 验证产物
+        shell: bash
+        run: |
+          ls -la release/ || echo "release 目录不存在"
+          if [ "${{ matrix.os }}" = "ubuntu-latest" ]; then
+            find release -name "*.AppImage" -o -name "*.deb" | head -5
+          elif [ "${{ matrix.os }}" = "windows-latest" ]; then
+            find release -name "*.exe" | head -5
+          else
+            find release -name "*.dmg" -o -name "*.zip" | head -5
+          fi
+
+      - name: 上传产物
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact_name }}
+          path: release/
+          retention-days: 7
+
+  # ============ 4. 构建 Android APK ============
   build-android:
     runs-on: ubuntu-latest
-    needs: validate
+    needs: [validate, build-web]
     steps:
       - uses: actions/checkout@v4
-      
+
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
-      
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
       - name: Setup Java
         uses: actions/setup-java@v4
         with:
           distribution: 'temurin'
-          java-version: '17'
-      
+          java-version: ${{ env.JAVA_VERSION }}
+
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
-      
-      - name: 验证项目文件
-        shell: bash
-        run: |
-          test -f src/main.ts || (echo "❌ src/main.ts 不存在" && exit 1)
-          test -f index.html || (echo "❌ index.html 不存在" && exit 1)
-          echo "✅ 所有必要文件存在"
-      
+
       - name: 安装依赖
         shell: bash
         run: |
@@ -167,16 +226,11 @@ jobs:
           else
             npm install --no-audit --no-fund
           fi
-      
-      - name: 构建 Vue 项目
+
+      - name: 构建 Vue
         shell: bash
         run: npm run build
-      
-      - name: 验证构建产物
-        shell: bash
-        run: |
-          test -f dist/index.html || (echo "❌ dist/index.html 不存在" && exit 1)
-      
+
       - name: 初始化 Capacitor
         shell: bash
         run: |
@@ -184,63 +238,116 @@ jobs:
             echo "📱 Android 目录不存在，正在初始化..."
             npx cap add android
           fi
-      
+
       - name: 同步 Capacitor
         shell: bash
         run: npx cap sync android
-      
+
       - name: 验证 Android 项目
         shell: bash
         run: |
           cd android
           if [ ! -f "gradlew" ]; then
-            echo "❌ gradlew 不存在，正在修复..."
-            cd ..
-            npx cap sync android
-            cd android
+            echo "❌ gradlew 不存在"
+            exit 1
           fi
           chmod +x gradlew
-          ls -la gradlew
-      
+          echo "✅ Android 项目验证通过"
+
       - name: 构建 APK
         shell: bash
         run: |
           cd android
           ./gradlew assembleRelease
-      
+
       - name: 验证 APK
         shell: bash
         run: |
           APK_PATH="android/app/build/outputs/apk/release"
-          ls -la $APK_PATH || (echo "❌ APK 目录不存在" && exit 1)
-          find $APK_PATH -name "*.apk" | grep . || (echo "❌ 未找到 APK 文件" && exit 1)
-      
-      - uses: actions/upload-artifact@v4
+          ls -la $APK_PATH/ || (echo "❌ APK 目录不存在" && exit 1)
+          find $APK_PATH -name "*.apk" -exec ls -lh {} \;
+          find $APK_PATH -name "*.apk" | grep . || (echo "❌ 未找到 APK" && exit 1)
+          echo "✅ APK 构建成功"
+
+      - name: 上传 APK
+        uses: actions/upload-artifact@v4
         with:
           name: android-apk
           path: android/app/build/outputs/apk/release/*.apk
+          retention-days: 7
 
-  # 5. 创建 GitHub Release
-  create-release:
-    needs: [build-web, build-electron, build-android]
+  # ============ 5. 测试 (并行) ============
+  test:
     runs-on: ubuntu-latest
-    if: startsWith(github.ref, 'refs/tags/')
+    needs: [validate, build-web]
     steps:
       - uses: actions/checkout@v4
-      
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: 安装依赖
+        shell: bash
+        run: |
+          if [ -f package-lock.json ]; then
+            npm ci --no-audit --no-fund
+          else
+            npm install --no-audit --no-fund
+          fi
+
+      - name: 检查 TypeScript 类型
+        shell: bash
+        run: npx vue-tsc --noEmit || echo "⚠️ TypeScript 类型检查有警告"
+
+      - name: 检查项目结构
+        shell: bash
+        run: |
+          chmod +x scripts/verify-project.sh
+          ./scripts/verify-project.sh
+
+      - name: 检查锁文件
+        shell: bash
+        run: |
+          chmod +x scripts/verify-lockfile.sh
+          ./scripts/verify-lockfile.sh
+
+  # ============ 6. 创建 GitHub Release ============
+  create-release:
+    needs: [build-web, build-electron, build-android, validate]
+    runs-on: ubuntu-latest
+    if: |
+      (github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')) ||
+      (github.event_name == 'workflow_dispatch' && github.event.inputs.platform != '')
+    steps:
+      - uses: actions/checkout@v4
+
       - uses: actions/download-artifact@v4
         with:
           path: artifacts
-      
+
+      - name: 列出产物
+        shell: bash
+        run: |
+          echo "📦 下载的产物:"
+          find artifacts -type f | sort
+
       - name: 生成 Release Notes
         shell: bash
         run: |
-          VERSION=${GITHUB_REF#refs/tags/v}
+          VERSION="${{ needs.validate.outputs.version }}"
+          if [ -z "$VERSION" ] || [ "$VERSION" = "null" ]; then
+            VERSION="${GITHUB_REF#refs/tags/v}"
+          fi
+          if [ -z "$VERSION" ] || [ "$VERSION" = "refs/tags/v" ]; then
+            VERSION="$(date +'%Y%m%d-%H%M%S')"
+          fi
+
           cat > RELEASE_NOTES.md << 'EOF'
-          # 全球电台 v${VERSION}
+          # 🌍 全球电台 v${VERSION}
 
           ## 📦 下载说明
-          请根据您的操作系统选择对应的安装包：
 
           ### 🖥️ Windows
           - `global-radio-${VERSION}-win-setup.exe` - 安装版
@@ -258,21 +365,28 @@ jobs:
           - `app-release-${VERSION}.apk` - APK 安装包
 
           ### 🌐 Web
-          - Web 版本已部署到演示站点
+          - 演示站点: https://aabb.live
+          - Docker 部署: `docker pull superneed/global-radio:latest`
+
+          ---
+
+          ## 📝 更新内容
+          - 基于 commit: ${{ github.sha }}
+          - 自动构建于: $(date '+%Y-%m-%d %H:%M:%S')
 
           ---
           感谢使用全球电台！如有问题请反馈至 [Issues](https://github.com/moli-xia/global-radio/issues)
           EOF
-          # 替换版本号变量
           sed -i "s/\${VERSION}/${VERSION}/g" RELEASE_NOTES.md
           cat RELEASE_NOTES.md
-      
+
       - name: 创建 Release
         uses: softprops/action-gh-release@v1
         with:
           body_path: RELEASE_NOTES.md
           draft: false
           prerelease: false
+          generate_release_notes: false
           files: |
             artifacts/**/*.zip
             artifacts/**/*.exe
@@ -280,5 +394,12 @@ jobs:
             artifacts/**/*.AppImage
             artifacts/**/*.deb
             artifacts/**/*.apk
+            artifacts/**/*.snap
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: 输出发布信息
+        shell: bash
+        run: |
+          echo "✅ Release 创建成功!"
+          echo "🔗 查看: https://github.com/${{ github.repository }}/releases"
