@@ -2,8 +2,14 @@ import { defineConfig } from 'vite'
 import vue from '@vitejs/plugin-vue'
 import { VitePWA } from 'vite-plugin-pwa'
 import { resolve } from 'path'
+import { existsSync } from 'fs'
 
-// https://vitejs.dev/config/
+// 检查 src/main.ts 是否存在
+const hasMainTs = existsSync(resolve(__dirname, 'src/main.ts'));
+if (!hasMainTs) {
+  console.warn('⚠️ src/main.ts 不存在，请确保项目结构正确');
+}
+
 export default defineConfig({
   plugins: [
     vue({
@@ -16,7 +22,6 @@ export default defineConfig({
     }),
     VitePWA({
       registerType: 'autoUpdate',
-      // 确保 PWA 插件能找到入口
       includeAssets: ['favicon.svg', 'icon-192x192.png', 'icon-512x512.png'],
       manifest: {
         name: '全球电台 - GlobalRadio',
@@ -38,31 +43,12 @@ export default defineConfig({
             src: 'icon-512x512.png',
             sizes: '512x512',
             type: 'image/png'
-          },
-          {
-            src: 'icon-512x512.png',
-            sizes: '512x512',
-            type: 'image/png',
-            purpose: 'any maskable'
           }
         ]
       },
       workbox: {
         globPatterns: ['**/*.{js,css,html,ico,png,svg,jpg,jpeg,webp,woff2}'],
-        maximumFileSizeToCacheInBytes: 3000000,
-        runtimeCaching: [
-          {
-            urlPattern: /^https:\/\/.*\.radio-browser\.info\/.*/i,
-            handler: 'CacheFirst',
-            options: {
-              cacheName: 'radio-api-cache',
-              expiration: {
-                maxEntries: 1000,
-                maxAgeSeconds: 60 * 60 * 24 * 7
-              }
-            }
-          }
-        ]
+        maximumFileSizeToCacheInBytes: 3000000
       }
     })
   ],
@@ -91,7 +77,14 @@ export default defineConfig({
           vendor: ['vue', 'vue-router', 'pinia'],
           ui: ['@heroicons/vue', '@headlessui/vue']
         }
-      }
+      },
+      // 确保外部依赖正确解析
+      external: [],
+      plugins: []
     }
+  },
+  // 优化依赖预构建
+  optimizeDeps: {
+    include: ['vue', 'vue-router', 'pinia', 'axios']
   }
 })
