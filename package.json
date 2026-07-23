@@ -1,35 +1,33 @@
-{
-  "scripts": {
-    "electron:dev": "npm run build && electron .",
-    "electron:build": "npm run build && electron-builder",
-    "release:prepare": "node scripts/release-prepare.js",
-    "release:all": "npm run build && npm run electron:build && npm run android:build"
-  },
-  "devDependencies": {
-    "electron": "^28.2.0",
-    "electron-builder": "^24.9.1"
-  },
-  "build": {
-    "appId": "com.globalradio.app",
-    "productName": "全球电台",
-    "directories": {
-      "output": "release"
-    },
-    "files": [
-      "dist/**/*",
-      "electron/**/*"
-    ],
-    "win": {
-      "target": ["nsis", "portable"],
-      "icon": "public/favicon.ico"
-    },
-    "mac": {
-      "target": ["dmg", "zip"],
-      "icon": "public/icon.icns"
-    },
-    "linux": {
-      "target": ["AppImage", "deb"],
-      "icon": "public/icon.png"
-    }
-  }
-}
+- name: 确保 package.json 完整
+  run: |
+    node -e "
+      const fs = require('fs');
+      const pkg = JSON.parse(fs.readFileSync('package.json', 'utf8'));
+      
+      // 确保 devDependencies 包含关键工具
+      if (!pkg.devDependencies) pkg.devDependencies = {};
+      
+      const requiredDevDeps = {
+        'vite': '^5.0.8',
+        '@vitejs/plugin-vue': '^4.5.2',
+        'electron': '^28.0.0',
+        'electron-builder': '^24.9.1',
+        '@capacitor/android': '^5.7.8',
+        '@capacitor/cli': '^5.7.8',
+        '@capacitor/core': '^5.7.8'
+      };
+      
+      let updated = false;
+      for (const [pkgName, version] of Object.entries(requiredDevDeps)) {
+        if (!pkg.devDependencies[pkgName]) {
+          pkg.devDependencies[pkgName] = version;
+          updated = true;
+          console.log('✅ 添加依赖: ' + pkgName + '@' + version);
+        }
+      }
+      
+      if (updated) {
+        fs.writeFileSync('package.json', JSON.stringify(pkg, null, 2));
+        console.log('✅ 已更新 package.json');
+      }
+    "
