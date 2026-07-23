@@ -5,6 +5,7 @@ directories:
 files:
   - dist/**/*
   - electron/**/*
+  - '!node_modules/**/*'
 extraResources:
   - from: electron/
     to: electron/
