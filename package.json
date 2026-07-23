@@ -13,7 +13,7 @@
     "electron:dev": "npm run build && electron .",
     "electron:build": "npm run build && npx electron-builder",
     "android:sync": "npx cap sync android",
-    "android:build": "npm run build && npx cap sync android && cd android && chmod +x gradlew && ./gradlew assembleRelease",
+    "android:build": "npm run build && npx cap add android && npx cap sync android && cd android && chmod +x gradlew && ./gradlew assembleRelease",
     "release": "node scripts/build-all.js",
     "test": "echo \"No tests specified\" && exit 0",
     "lint": "echo \"No linter configured\" && exit 0"
@@ -56,9 +56,6 @@
     },
     "files": [
       "dist/**/*",
-      "!dist/registerSW.js",
-      "!dist/workbox-*.js",
-      "!dist/manifest.webmanifest",
       "electron/**/*"
     ],
     "extraResources": [
