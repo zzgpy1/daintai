@@ -5,20 +5,19 @@ const fs = require('fs');
 let mainWindow;
 
 function getPreloadPath() {
-  // 在开发环境和生产环境中使用不同的路径
-  if (app.isPackaged) {
-    const possiblePaths = [
-      path.join(process.resourcesPath, 'app.asar', 'electron', 'preload.js'),
-      path.join(__dirname, 'preload.js'),
-      path.join(process.cwd(), 'electron', 'preload.js')
-    ];
-    for (const p of possiblePaths) {
-      if (fs.existsSync(p)) {
-        return p;
-      }
+  const possiblePaths = [
+    path.join(__dirname, 'preload.js'),
+    path.join(process.resourcesPath, 'app.asar', 'electron', 'preload.js'),
+    path.join(process.cwd(), 'electron', 'preload.js')
+  ];
+  
+  for (const p of possiblePaths) {
+    if (fs.existsSync(p)) {
+      console.log(`✅ 找到 preload 文件: ${p}`);
+      return p;
     }
-    return path.join(__dirname, 'preload.js');
   }
+  console.warn('⚠️ 未找到 preload 文件，使用默认路径');
   return path.join(__dirname, 'preload.js');
 }
 
@@ -48,6 +47,7 @@ function createWindow() {
   });
 
   const startUrl = getIndexPath();
+  console.log(`📂 加载 URL: ${startUrl}`);
   mainWindow.loadURL(startUrl);
 
   mainWindow.once('ready-to-show', () => {
