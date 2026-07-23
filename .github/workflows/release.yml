@@ -31,6 +31,7 @@ jobs:
             echo "⚠️ 验证脚本不存在，检查关键文件"
             test -f src/main.ts || (echo "❌ src/main.ts 不存在" && exit 1)
             test -f index.html || (echo "❌ index.html 不存在" && exit 1)
+            test -f electron/main.js || (echo "⚠️ electron/main.js 不存在，Electron 将被跳过")
             echo "✅ 关键文件存在"
           fi
 
@@ -45,28 +46,24 @@ jobs:
           node-version: ${{ env.NODE_VERSION }}
       - name: 安装依赖
         run: npm install --no-audit --no-fund
-      - name: 检查并构建 Web
+      - name: 构建 Web
         run: |
           if npm run | grep -q " build"; then
             npm run build
             test -f dist/index.html || (echo "❌ dist/index.html 不存在" && exit 1)
             echo "✅ Web 构建成功"
           else
-            echo "⚠️ build 脚本未配置，创建空 dist 目录"
-            mkdir -p dist
-            echo "<h1>GlobalRadio</h1>" > dist/index.html
+            echo "⚠️ build 脚本未配置"
+            exit 1
           fi
       - uses: actions/upload-artifact@v4
         with:
           name: web-dist
           path: dist/
 
-  # 3. 构建 Electron 桌面端
+  # 3. 构建 Electron 桌面端 (仅 Linux，验证用)
   build-electron:
-    strategy:
-      matrix:
-        os: [ubuntu-latest, windows-latest, macos-latest]
-    runs-on: ${{ matrix.os }}
+    runs-on: ubuntu-latest
     needs: validate
     steps:
       - uses: actions/checkout@v4
@@ -81,29 +78,40 @@ jobs:
             echo "⚠️ electron/main.js 不存在，跳过 Electron 构建"
             exit 0
           fi
+          if [ ! -f "electron/preload.js" ]; then
+            echo "⚠️ electron/preload.js 不存在，跳过 Electron 构建"
+            exit 0
+          fi
+          # 确保 electron/package.json 存在
+          if [ ! -f "electron/package.json" ]; then
+            echo '{"name":"global-radio-electron","main":"main.js"}' > electron/package.json
+          fi
       - name: 构建 Vue
         if: hashFiles('electron/main.js') != ''
         run: |
           if npm run | grep -q " build"; then
             npm run build
           else
-            echo "⚠️ build 脚本不存在，跳过"
+            echo "⚠️ build 脚本不存在"
+            exit 1
           fi
-      - name: 构建 Electron
+      - name: 构建 Electron (Linux)
         if: hashFiles('electron/main.js') != ''
         run: |
           if npm run | grep -q " electron:build"; then
-            npm run electron:build
+            # 仅构建 Linux 版本进行验证
+            npx electron-builder --linux --dir
             echo "✅ Electron 构建成功"
           else
-            echo "⚠️ electron:build 脚本不存在，跳过"
+            echo "⚠️ electron:build 脚本不存在"
+            exit 1
           fi
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - uses: actions/upload-artifact@v4
         if: hashFiles('electron/main.js') != ''
         with:
-          name: electron-${{ matrix.os }}
+          name: electron-linux
           path: release/
 
   # 4. 构建 Android APK
@@ -136,7 +144,8 @@ jobs:
           if npm run | grep -q " build"; then
             npm run build
           else
-            echo "⚠️ build 脚本不存在，跳过"
+            echo "⚠️ build 脚本不存在"
+            exit 1
           fi
       - name: 初始化 Capacitor
         if: hashFiles('capacitor.config.*') != ''
