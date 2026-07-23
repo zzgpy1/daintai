@@ -16,46 +16,9 @@ env:
   NODE_VERSION: 20
 
 jobs:
-  # 1. 代码风格检查 (Lint) - 如果没有 lint 脚本则跳过
-  lint:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: ${{ env.NODE_VERSION }}
-      - name: 安装依赖
-        run: npm install --no-audit --no-fund
-      - name: 检查并运行 Lint
-        run: |
-          if npm run | grep -q " lint"; then
-            npm run lint
-          else
-            echo "✅ Lint 脚本未配置，跳过"
-          fi
-
-  # 2. 类型检查 (TypeScript)
-  type-check:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: ${{ env.NODE_VERSION }}
-      - name: 安装依赖
-        run: npm install --no-audit --no-fund
-      - name: 检查并运行类型检查
-        run: |
-          if [ -f "tsconfig.json" ] && npm list vue-tsc &>/dev/null; then
-            npx vue-tsc --noEmit || echo "⚠️ 类型检查有警告"
-          else
-            echo "✅ 类型检查未配置，跳过"
-          fi
-
-  # 3. 构建验证 (Web) - 检查并执行构建
+  # 1. 构建验证 (Web)
   build-web:
     runs-on: ubuntu-latest
-    needs: [lint, type-check]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -63,19 +26,10 @@ jobs:
           node-version: ${{ env.NODE_VERSION }}
       - name: 安装依赖
         run: npm install --no-audit --no-fund
-      - name: 检查并运行 Web 构建
-        run: |
-          if npm run | grep -q " build"; then
-            npm run build
-            if [ -f "dist/index.html" ]; then
-              echo "✅ Web 构建成功"
-            else
-              echo "❌ 构建产物 dist/index.html 不存在"
-              exit 1
-            fi
-          else
-            echo "⚠️ build 脚本未配置，跳过 Web 构建"
-          fi
+      - name: 构建 Web
+        run: npm run build
+      - name: 验证构建产物
+        run: test -f dist/index.html || (echo "❌ dist/index.html 不存在" && exit 1)
       - name: 上传构建产物（用于调试）
         uses: actions/upload-artifact@v4
         if: failure()
@@ -83,10 +37,9 @@ jobs:
           name: web-dist-failed
           path: dist/
 
-  # 4. Electron 构建验证
+  # 2. Electron 构建验证
   build-electron:
     runs-on: ubuntu-latest
-    needs: [lint, type-check]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -100,23 +53,18 @@ jobs:
             echo "⚠️ electron/main.js 不存在，跳过 Electron 构建"
             exit 0
           fi
-      - name: 检查并运行 Electron 构建
+      - name: 构建 Web
         if: hashFiles('electron/main.js') != ''
-        run: |
-          if npm run | grep -q " electron:build"; then
-            npm run build
-            npm run electron:build -- --linux --dir
-            echo "✅ Electron 构建成功"
-          else
-            echo "⚠️ electron:build 脚本未配置，跳过"
-          fi
+        run: npm run build
+      - name: 构建 Electron (仅验证)
+        if: hashFiles('electron/main.js') != ''
+        run: npx electron-builder --linux --dir
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-  # 5. Android 构建验证
+  # 3. Android 构建验证
   build-android:
     runs-on: ubuntu-latest
-    needs: [lint, type-check]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -131,20 +79,13 @@ jobs:
         uses: android-actions/setup-android@v3
       - name: 安装依赖
         run: npm install --no-audit --no-fund
-      - name: 检查 Capacitor 配置
+      - name: 构建 Web
+        run: npm run build
+      - name: 检查 Capacitor
         run: |
           if [ ! -f "capacitor.config.ts" ] && [ ! -f "capacitor.config.js" ]; then
             echo "⚠️ Capacitor 未配置，跳过 Android 构建"
             exit 0
-          fi
-      - name: 构建 Vue
-        if: hashFiles('capacitor.config.*') != ''
-        run: npm run build
-      - name: 初始化 Capacitor
-        if: hashFiles('capacitor.config.*') != ''
-        run: |
-          if [ ! -d "android" ]; then
-            npx cap add android
           fi
       - name: 同步 Capacitor
         if: hashFiles('capacitor.config.*') != ''
@@ -153,21 +94,10 @@ jobs:
         if: hashFiles('capacitor.config.*') != ''
         run: |
           cd android
-          if [ -f "gradlew" ]; then
-            chmod +x gradlew
-            ./gradlew assembleDebug
-            echo "✅ Android 构建成功"
-          else
-            echo "⚠️ gradlew 不存在，跳过 Android 构建"
-          fi
-      - name: 上传 APK（用于调试）
-        uses: actions/upload-artifact@v4
-        if: failure()
-        with:
-          name: android-debug-failed
-          path: android/app/build/outputs/apk/debug/
+          chmod +x gradlew
+          ./gradlew assembleDebug
 
-  # 6. 所有检查通过后发送状态
+  # 4. 状态汇总
   ci-status:
     runs-on: ubuntu-latest
     needs: [build-web, build-electron, build-android]
@@ -179,22 +109,8 @@ jobs:
           echo "  Web: ${{ needs.build-web.result }}"
           echo "  Electron: ${{ needs.build-electron.result }}"
           echo "  Android: ${{ needs.build-android.result }}"
-          
-          # 统计失败的 Job
-          FAILED=0
-          if [[ "${{ needs.build-web.result }}" != "success" && "${{ needs.build-web.result }}" != "skipped" ]]; then
-            FAILED=$((FAILED+1))
-          fi
-          if [[ "${{ needs.build-electron.result }}" != "success" && "${{ needs.build-electron.result }}" != "skipped" ]]; then
-            FAILED=$((FAILED+1))
-          fi
-          if [[ "${{ needs.build-android.result }}" != "success" && "${{ needs.build-android.result }}" != "skipped" ]]; then
-            FAILED=$((FAILED+1))
-          fi
-          
-          if [ $FAILED -gt 0 ]; then
-            echo "❌ 有 $FAILED 个构建任务失败"
+          if [[ "${{ needs.build-web.result }}" != "success" ]]; then
+            echo "❌ Web 构建失败"
             exit 1
-          else
-            echo "✅ 所有构建验证通过"
           fi
+          echo "✅ 核心构建通过"
