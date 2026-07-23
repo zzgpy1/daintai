@@ -17,16 +17,20 @@ jobs:
         with:
           node-version: ${{ env.NODE_VERSION }}
       - name: 确保锁文件存在
+        shell: bash
         run: |
           if [ ! -f package-lock.json ]; then
             npm install --package-lock-only
           fi
       - name: 安装依赖
+        shell: bash
         run: npm ci --no-audit --no-fund || npm install --no-audit --no-fund
       - name: 构建
+        shell: bash
         run: npm run build
       - name: 验证
-        run: test -f dist/index.html
+        shell: bash
+        run: test -f dist/index.html && echo "✅ 每日构建成功"
       - uses: actions/upload-artifact@v4
         with:
           name: nightly-build
