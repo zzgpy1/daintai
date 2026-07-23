@@ -1,0 +1,49 @@
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+node_modules
+dist
+dist-ssr
+*.local
+
+# Editor directories and files
+.vscode/*
+!.vscode/extensions.json
+.idea
+.DS_Store
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# Environment files
+.env
+.env.local
+.env.*.local
+
+# Build outputs
+release/
+android/app/build/
+*.apk
+*.aab
+
+# Electron
+out/
+
+# Capacitor
+android/.gradle
+android/local.properties
+
+# Testing
+coverage
+
+# Temporary files
+*.tmp
+*.temp
