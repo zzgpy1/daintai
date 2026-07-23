@@ -4,19 +4,18 @@ productName: 全球电台
 directories:
   output: release
 
-# 关键：明确指定要打包的文件
+# 明确指定要打包的文件和目录
 files:
-  - dist/**/*
-  - electron/**/*
-
-# 确保入口文件被包含
-extraResources:
-  - from: electron/
-    to: electron/
+  - from: dist
+    to: dist
+    filter:
+      - "**/*"
+  - from: electron
+    to: electron
     filter:
       - "**/*"
 
-# 强制指定入口
+# 确保入口文件被包含
 extraMetadata:
   main: electron/main.js
 
