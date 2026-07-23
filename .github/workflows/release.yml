@@ -17,10 +17,10 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '22'
-          cache: 'npm'
+          # 注意：这里不启用 cache: 'npm'，因为还没有锁文件
       
-      - name: 安装依赖
-        run: npm ci
+      - name: 安装依赖（自动生成 package-lock.json）
+        run: npm install  # 这个命令会在没有锁文件时生成一个
       
       - name: 构建Web
         run: npm run build
@@ -43,10 +43,9 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '22'
-          cache: 'npm'
       
-      - name: 安装依赖
-        run: npm ci
+      - name: 安装依赖（自动生成 package-lock.json）
+        run: npm install
       
       - name: 构建Vue
         run: npm run build
@@ -74,7 +73,6 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '22'
-          cache: 'npm'
       
       - name: Setup Java
         uses: actions/setup-java@v4
@@ -82,8 +80,8 @@ jobs:
           distribution: 'temurin'
           java-version: '17'
       
-      - name: 安装依赖
-        run: npm ci
+      - name: 安装依赖（自动生成 package-lock.json）
+        run: npm install
       
       - name: 构建Vue
         run: npm run build
