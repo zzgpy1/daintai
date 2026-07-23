@@ -18,35 +18,13 @@ jobs:
         with:
           node-version: '22'
       
-      - name: 安装依赖并确保Vite存在
+      - name: 安装依赖
+        shell: bash
         run: |
-          # 安装所有依赖
           npm install || npm install --legacy-peer-deps
-          
-          # 如果 Vite 缺失，显式安装
           if ! command -v vite &> /dev/null && ! [ -f node_modules/.bin/vite ]; then
-            echo '⚠️  Vite 未找到，正在安装...'
             npm install -D vite @vitejs/plugin-vue
           fi
-          
-          # 验证 Vite 可用
-          echo '🔍 验证 Vite:'
-          npx vite --version || echo '❌ Vite 不可用'
-          echo '📦 已安装的包:'
-          npm list --depth=0 || true
-      
-      - name: 确保构建脚本存在
-        run: |
-          node -e "
-            const fs = require('fs');
-            const pkg = JSON.parse(fs.readFileSync('package.json', 'utf8'));
-            if (!pkg.scripts) pkg.scripts = {};
-            if (!pkg.scripts.build) {
-              pkg.scripts.build = 'npx vite build';
-              fs.writeFileSync('package.json', JSON.stringify(pkg, null, 2));
-              console.log('✅ 已添加 build: npx vite build 脚本');
-            }
-          "
       
       - name: 构建Web
         run: npm run build
@@ -56,7 +34,7 @@ jobs:
           name: web-dist
           path: dist/
 
-  # 2. 构建Electron桌面端
+  # 2. 构建Electron桌面端（使用 Bash 确保跨平台兼容）
   build-electron:
     strategy:
       matrix:
@@ -70,8 +48,12 @@ jobs:
         with:
           node-version: '22'
       
-      - name: 安装依赖并确保Vite存在
+      - name: 安装依赖并确保工具链完整
+        shell: bash
         run: |
+          # Windows 下可能需要关闭 strict 模式
+          set +e
+          
           # 安装所有依赖
           npm install || npm install --legacy-peer-deps
           
@@ -81,40 +63,33 @@ jobs:
             npm install -D vite @vitejs/plugin-vue
           fi
           
-          # 如果是 Electron 构建，确保 electron 和 electron-builder 存在
+          # 确保 Electron 工具链存在
           if ! [ -f node_modules/.bin/electron-builder ]; then
             echo '⚠️  Electron 未找到，正在安装...'
             npm install -D electron electron-builder
           fi
           
           echo '🔍 验证工具:'
-          npx vite --version || echo '❌ Vite 不可用'
-          npx electron --version || echo '❌ Electron 不可用'
-          npx electron-builder --version || echo '❌ Electron Builder 不可用'
-          
-          echo '📦 已安装的包:'
-          npm list --depth=0 || true
+          npx vite --version 2>/dev/null || echo '❌ Vite 不可用'
+          npx electron --version 2>/dev/null || echo '❌ Electron 不可用'
+          npx electron-builder --version 2>/dev/null || echo '❌ Electron Builder 不可用'
       
       - name: 确保所有必要脚本存在
+        shell: bash
         run: |
           node -e "
             const fs = require('fs');
             const pkg = JSON.parse(fs.readFileSync('package.json', 'utf8'));
             if (!pkg.scripts) pkg.scripts = {};
-            if (!pkg.scripts.build) {
-              pkg.scripts.build = 'npx vite build';
-            }
-            if (!pkg.scripts['electron:build']) {
-              pkg.scripts['electron:build'] = 'npm run build && npx electron-builder';
-            }
-            if (!pkg.scripts['electron:dev']) {
-              pkg.scripts['electron:dev'] = 'npm run build && npx electron .';
-            }
+            if (!pkg.scripts.build) pkg.scripts.build = 'npx vite build';
+            if (!pkg.scripts['electron:build']) pkg.scripts['electron:build'] = 'npm run build && npx electron-builder';
+            if (!pkg.scripts['electron:dev']) pkg.scripts['electron:dev'] = 'npm run build && npx electron .';
             fs.writeFileSync('package.json', JSON.stringify(pkg, null, 2));
             console.log('✅ 已确保所有必要脚本存在');
           "
       
-      - name: 创建Electron源文件（如果缺失）
+      - name: 创建Electron源文件（如缺失）
+        shell: bash
         run: |
           mkdir -p electron
           if [ ! -f "electron/main.js" ]; then
@@ -195,28 +170,13 @@ jobs:
           distribution: 'temurin'
           java-version: '17'
       
-      - name: 安装依赖并确保Vite存在
+      - name: 安装依赖
+        shell: bash
         run: |
           npm install || npm install --legacy-peer-deps
           if ! command -v vite &> /dev/null && ! [ -f node_modules/.bin/vite ]; then
-            echo '⚠️  Vite 未找到，正在安装...'
             npm install -D vite @vitejs/plugin-vue
           fi
-          echo '🔍 验证 Vite:'
-          npx vite --version || echo '❌ Vite 不可用'
-      
-      - name: 确保构建脚本存在
-        run: |
-          node -e "
-            const fs = require('fs');
-            const pkg = JSON.parse(fs.readFileSync('package.json', 'utf8'));
-            if (!pkg.scripts) pkg.scripts = {};
-            if (!pkg.scripts.build) {
-              pkg.scripts.build = 'npx vite build';
-              fs.writeFileSync('package.json', JSON.stringify(pkg, null, 2));
-              console.log('✅ 已添加 build 脚本');
-            }
-          "
       
       - name: 构建Vue
         run: npm run build
