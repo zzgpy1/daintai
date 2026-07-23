@@ -1,0 +1,102 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+jobs:
+  # 1. 构建Web产物
+  build-web:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 18
+          cache: 'npm'
+      - run: npm ci
+      - run: npm run build
+      - uses: actions/upload-artifact@v4
+        with:
+          name: web-dist
+          path: dist/
+
+  # 2. 构建Electron桌面端
+  build-electron:
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 18
+          cache: 'npm'
+      - run: npm ci
+      - run: npm run build
+      - name: Prepare release
+        run: node scripts/release-prepare.js
+      - name: Build Electron App
+        run: npm run electron:build
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - uses: actions/upload-artifact@v4
+        with:
+          name: electron-${{ matrix.os }}
+          path: release/
+
+  # 3. 构建Android APK
+  build-android:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 18
+          cache: 'npm'
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+      - run: npm ci
+      - run: npm run build
+      - name: Sync Capacitor
+        run: npx cap sync android
+      - name: Build APK
+        run: |
+          cd android
+          chmod +x gradlew
+          ./gradlew assembleRelease
+      - uses: actions/upload-artifact@v4
+        with:
+          name: android-apk
+          path: android/app/build/outputs/apk/release/*.apk
+
+  # 4. 创建GitHub Release
+  create-release:
+    needs: [build-web, build-electron, build-android]
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/')
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+      - name: List artifacts
+        run: ls -la artifacts/
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
+        with:
+          body_path: RELEASE_NOTES.md
+          files: |
+            artifacts/**/*.zip
+            artifacts/**/*.exe
+            artifacts/**/*.dmg
+            artifacts/**/*.AppImage
+            artifacts/**/*.deb
+            artifacts/**/*.apk
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
