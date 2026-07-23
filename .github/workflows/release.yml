@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
 
 jobs:
-  # 1. 检查并生成锁文件
+  # 0. 准备锁文件（核心修复）
   prepare-lock:
     runs-on: ubuntu-latest
     steps:
@@ -21,6 +21,7 @@ jobs:
           if [ ! -f package-lock.json ]; then
             echo "⚠️ package-lock.json 不存在，正在生成..."
             npm install --package-lock-only
+            echo "✅ package-lock.json 已生成"
           else
             echo "✅ package-lock.json 已存在"
           fi
@@ -30,7 +31,7 @@ jobs:
           name: lockfile
           path: package-lock.json
 
-  # 2. 构建 Web 产物
+  # 1. 构建 Web 产物
   build-web:
     needs: prepare-lock
     runs-on: ubuntu-latest
@@ -51,7 +52,7 @@ jobs:
           name: web-dist
           path: dist/
 
-  # 3. 构建 Electron 桌面端
+  # 2. 构建 Electron 桌面端
   build-electron:
     needs: prepare-lock
     strategy:
@@ -79,7 +80,7 @@ jobs:
           name: electron-${{ matrix.os }}
           path: release/
 
-  # 4. 构建 Android APK
+  # 3. 构建 Android APK
   build-android:
     needs: prepare-lock
     runs-on: ubuntu-latest
@@ -112,7 +113,7 @@ jobs:
           name: android-apk
           path: android/app/build/outputs/apk/release/*.apk
 
-  # 5. 创建 GitHub Release
+  # 4. 创建 GitHub Release
   create-release:
     needs: [build-web, build-electron, build-android]
     runs-on: ubuntu-latest
