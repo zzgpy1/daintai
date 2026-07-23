@@ -18,31 +18,35 @@ jobs:
         with:
           node-version: '22'
       
-      - name: 安装依赖
-        run: npm install
+      - name: 安装依赖并确保Vite存在
+        run: |
+          # 安装所有依赖
+          npm install || npm install --legacy-peer-deps
+          
+          # 如果 Vite 缺失，显式安装
+          if ! command -v vite &> /dev/null && ! [ -f node_modules/.bin/vite ]; then
+            echo '⚠️  Vite 未找到，正在安装...'
+            npm install -D vite @vitejs/plugin-vue
+          fi
+          
+          # 验证 Vite 可用
+          echo '🔍 验证 Vite:'
+          npx vite --version || echo '❌ Vite 不可用'
+          echo '📦 已安装的包:'
+          npm list --depth=0 || true
       
       - name: 确保构建脚本存在
         run: |
-          # 检查是否有 build 脚本，如果没有则添加
-          if ! grep -q '"build"' package.json; then
-            echo '⚠️  package.json 中缺少 build 脚本，正在添加...'
-            # 使用临时文件添加 build 脚本
-            node -e "
-              const fs = require('fs');
-              const pkg = JSON.parse(fs.readFileSync('package.json', 'utf8'));
-              if (!pkg.scripts) pkg.scripts = {};
-              if (!pkg.scripts.build) {
-                pkg.scripts.build = 'vite build';
-                fs.writeFileSync('package.json', JSON.stringify(pkg, null, 2));
-                console.log('✅ 已添加 build: vite build 脚本');
-              }
-            "
-          else
-            echo '✅ build 脚本已存在'
-          fi
-          # 显示当前脚本列表便于调试
-          echo '📋 当前脚本列表:'
-          npm run
+          node -e "
+            const fs = require('fs');
+            const pkg = JSON.parse(fs.readFileSync('package.json', 'utf8'));
+            if (!pkg.scripts) pkg.scripts = {};
+            if (!pkg.scripts.build) {
+              pkg.scripts.build = 'npx vite build';
+              fs.writeFileSync('package.json', JSON.stringify(pkg, null, 2));
+              console.log('✅ 已添加 build: npx vite build 脚本');
+            }
+          "
       
       - name: 构建Web
         run: npm run build
@@ -66,8 +70,30 @@ jobs:
         with:
           node-version: '22'
       
-      - name: 安装依赖
-        run: npm install
+      - name: 安装依赖并确保Vite存在
+        run: |
+          # 安装所有依赖
+          npm install || npm install --legacy-peer-deps
+          
+          # 确保 Vite 存在
+          if ! command -v vite &> /dev/null && ! [ -f node_modules/.bin/vite ]; then
+            echo '⚠️  Vite 未找到，正在安装...'
+            npm install -D vite @vitejs/plugin-vue
+          fi
+          
+          # 如果是 Electron 构建，确保 electron 和 electron-builder 存在
+          if ! [ -f node_modules/.bin/electron-builder ]; then
+            echo '⚠️  Electron 未找到，正在安装...'
+            npm install -D electron electron-builder
+          fi
+          
+          echo '🔍 验证工具:'
+          npx vite --version || echo '❌ Vite 不可用'
+          npx electron --version || echo '❌ Electron 不可用'
+          npx electron-builder --version || echo '❌ Electron Builder 不可用'
+          
+          echo '📦 已安装的包:'
+          npm list --depth=0 || true
       
       - name: 确保所有必要脚本存在
         run: |
@@ -75,27 +101,72 @@ jobs:
             const fs = require('fs');
             const pkg = JSON.parse(fs.readFileSync('package.json', 'utf8'));
             if (!pkg.scripts) pkg.scripts = {};
-            
-            // 确保 build 脚本存在
             if (!pkg.scripts.build) {
-              pkg.scripts.build = 'vite build';
+              pkg.scripts.build = 'npx vite build';
             }
-            
-            // 确保 electron:build 脚本存在
             if (!pkg.scripts['electron:build']) {
-              pkg.scripts['electron:build'] = 'npm run build && electron-builder';
+              pkg.scripts['electron:build'] = 'npm run build && npx electron-builder';
             }
-            
-            // 确保 electron:dev 脚本存在
             if (!pkg.scripts['electron:dev']) {
-              pkg.scripts['electron:dev'] = 'npm run build && electron .';
+              pkg.scripts['electron:dev'] = 'npm run build && npx electron .';
             }
-            
             fs.writeFileSync('package.json', JSON.stringify(pkg, null, 2));
             console.log('✅ 已确保所有必要脚本存在');
           "
-          echo '📋 当前脚本列表:'
-          npm run
+      
+      - name: 创建Electron源文件（如果缺失）
+        run: |
+          mkdir -p electron
+          if [ ! -f "electron/main.js" ]; then
+            cat > electron/main.js << 'EOF'
+          const { app, BrowserWindow, Menu, shell } = require('electron');
+          const path = require('path');
+          
+          let mainWindow;
+          
+          function createWindow() {
+            mainWindow = new BrowserWindow({
+              width: 1200,
+              height: 800,
+              webPreferences: {
+                preload: path.join(__dirname, 'preload.js'),
+                nodeIntegration: false,
+                contextIsolation: true,
+              },
+              icon: path.join(__dirname, '../public/favicon.ico'),
+              show: false,
+            });
+          
+            const isDev = !app.isPackaged;
+            const startUrl = isDev
+              ? 'http://localhost:4173'
+              : `file://${path.join(__dirname, '../dist/index.html')}`;
+          
+            mainWindow.loadURL(startUrl);
+            mainWindow.once('ready-to-show', () => mainWindow.show());
+            mainWindow.webContents.setWindowOpenHandler(({ url }) => {
+              shell.openExternal(url);
+              return { action: 'deny' };
+            });
+            Menu.setApplicationMenu(null);
+          }
+          
+          app.whenReady().then(createWindow);
+          app.on('window-all-closed', () => { if (process.platform !== 'darwin') app.quit(); });
+          app.on('activate', () => { if (BrowserWindow.getAllWindows().length === 0) createWindow(); });
+          EOF
+            echo '✅ 已创建 electron/main.js'
+          fi
+          
+          if [ ! -f "electron/preload.js" ]; then
+            cat > electron/preload.js << 'EOF'
+          const { contextBridge } = require('electron');
+          contextBridge.exposeInMainWorld('electronAPI', {
+            platform: process.platform,
+          });
+          EOF
+            echo '✅ 已创建 electron/preload.js'
+          fi
       
       - name: 构建Electron应用
         run: npm run electron:build
@@ -124,8 +195,15 @@ jobs:
           distribution: 'temurin'
           java-version: '17'
       
-      - name: 安装依赖
-        run: npm install
+      - name: 安装依赖并确保Vite存在
+        run: |
+          npm install || npm install --legacy-peer-deps
+          if ! command -v vite &> /dev/null && ! [ -f node_modules/.bin/vite ]; then
+            echo '⚠️  Vite 未找到，正在安装...'
+            npm install -D vite @vitejs/plugin-vue
+          fi
+          echo '🔍 验证 Vite:'
+          npx vite --version || echo '❌ Vite 不可用'
       
       - name: 确保构建脚本存在
         run: |
@@ -134,7 +212,7 @@ jobs:
             const pkg = JSON.parse(fs.readFileSync('package.json', 'utf8'));
             if (!pkg.scripts) pkg.scripts = {};
             if (!pkg.scripts.build) {
-              pkg.scripts.build = 'vite build';
+              pkg.scripts.build = 'npx vite build';
               fs.writeFileSync('package.json', JSON.stringify(pkg, null, 2));
               console.log('✅ 已添加 build 脚本');
             }
