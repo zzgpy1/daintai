@@ -1,8 +1,11 @@
 # electron-builder.yml
 appId: com.globalradio.app
 productName: 全球电台
+copyright: Copyright © 2024 GlobalRadio
+
 directories:
   output: release
+  buildResources: build
 
 files:
   - dist/**/*
@@ -14,26 +17,91 @@ extraResources:
     filter:
       - "**/*"
 
+# 确保入口文件正确
+extraMetadata:
+  main: electron/main.js
+
 win:
   target:
-    - nsis
-    - portable
+    - target: nsis
+      arch:
+        - x64
+        - ia32
+    - target: portable
+      arch:
+        - x64
   icon: public/favicon.ico
+  publisherName: GlobalRadio
+  certificateFile: ''
+  certificatePassword: ''
 
 mac:
   target:
-    - dmg
-    - zip
+    - target: dmg
+      arch:
+        - x64
+        - arm64
+    - target: zip
+      arch:
+        - x64
+        - arm64
   icon: public/icon.icns
+  category: public.app-category.music
+  hardenedRuntime: true
+  gatekeeperAssess: false
+  entitlements: build/entitlements.mac.plist
+  entitlementsInherit: build/entitlements.mac.plist
 
 linux:
   target:
     - AppImage
     - deb
+    - snap
   icon: public/icon.png
   category: AudioVideo
+  maintainer: GlobalRadio
+  description: 全球电台 - 聆听全球高品质电台
 
 nsis:
   oneClick: false
   perMachine: true
   allowToChangeInstallationDirectory: true
+  createDesktopShortcut: true
+  createStartMenuShortcut: true
+  shortcutName: 全球电台
+  installerIcon: public/favicon.ico
+  uninstallerIcon: public/favicon.ico
+
+dmg:
+  contents:
+    - x: 130
+      y: 220
+    - x: 410
+      y: 220
+      type: link
+      path: /Applications
+
+appImage:
+  artifactName: ${productName}-${version}-linux.${ext}
+
+deb:
+  depends:
+    - gconf2
+    - gconf-service
+    - libnotify4
+    - libappindicator1
+    - libxtst6
+    - libnss3
+
+snap:
+  confinement: classic
+  grade: stable
+  publish:
+    - provider: snapStore
+      channel: stable
+
+publish:
+  - provider: github
+    owner: moli-xia
+    repo: global-radio
+    releaseType: release
