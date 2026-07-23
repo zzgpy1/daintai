@@ -1,8 +1,11 @@
 {
   "name": "global-radio",
-  "private": true,
   "version": "1.0.0",
+  "description": "全球电台 - 跨平台在线电台应用",
+  "author": "GlobalRadio Team",
+  "private": true,
   "type": "module",
+  "main": "electron/main.js",
   "scripts": {
     "dev": "vite",
     "build": "vite build",
@@ -74,6 +77,11 @@
       "target": ["AppImage", "deb"],
       "icon": "public/icon.png",
       "category": "AudioVideo"
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": true,
+      "allowToChangeInstallationDirectory": true
     }
   }
 }
