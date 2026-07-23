@@ -49,19 +49,8 @@ export interface HistoryItem {
   playDuration?: number
 }
 
-export interface RadioSearchParams {
-  name?: string
-  country?: string
-  countrycode?: string
-  state?: string
-  language?: string
-  tag?: string
-  codec?: string
-  bitrateMin?: number
-  bitrateMax?: number
-  order?: 'name' | 'url' | 'homepage' | 'favicon' | 'tags' | 'country' | 'state' | 'language' | 'votes' | 'codec' | 'bitrate' | 'lastcheckok' | 'lastchecktime' | 'clicktimestamp' | 'clickcount' | 'clicktrend' | 'random'
-  reverse?: boolean
-  offset?: number
-  limit?: number
-  hidebroken?: boolean
+export interface ApiResponse<T> {
+  success: boolean
+  data: T
+  source: string
 }
