@@ -26,12 +26,11 @@ jobs:
             npm install -D vite @vitejs/plugin-vue
           fi
       
-      - name: 确保入口文件存在
+      - name: 创建完整的Vue项目文件
         shell: bash
         run: |
           # 创建 index.html
-          if [ ! -f "index.html" ]; then
-            cat > index.html << 'EOF'
+          cat > index.html << 'EOF'
           <!DOCTYPE html>
           <html lang="zh-CN">
             <head>
@@ -46,13 +45,13 @@ jobs:
             </body>
           </html>
           EOF
-            echo '✅ 已创建 index.html'
-          fi
+          echo '✅ 已创建 index.html'
+          
+          # 创建 src 目录
+          mkdir -p src/router src/stores src/views src/components src/utils src/types
           
           # 创建 src/main.ts
-          mkdir -p src
-          if [ ! -f "src/main.ts" ]; then
-            cat > src/main.ts << 'EOF'
+          cat > src/main.ts << 'EOF'
           import { createApp } from 'vue'
           import { createPinia } from 'pinia'
           import App from './App.vue'
@@ -64,12 +63,10 @@ jobs:
           app.use(router)
           app.mount('#app')
           EOF
-            echo '✅ 已创建 src/main.ts'
-          fi
+          echo '✅ 已创建 src/main.ts'
           
           # 创建 src/App.vue
-          if [ ! -f "src/App.vue" ]; then
-            cat > src/App.vue << 'EOF'
+          cat > src/App.vue << 'EOF'
           <template>
             <div id="app">
               <router-view />
@@ -77,15 +74,95 @@ jobs:
           </template>
           
           <script setup lang="ts">
-          // App component
           </script>
           EOF
-            echo '✅ 已创建 src/App.vue'
-          fi
+          echo '✅ 已创建 src/App.vue'
+          
+          # 创建 src/router/index.ts
+          cat > src/router/index.ts << 'EOF'
+          import { createRouter, createWebHistory } from 'vue-router'
+          
+          const routes = [
+            {
+              path: '/',
+              name: 'Home',
+              component: () => import('@/views/Home.vue'),
+            },
+            {
+              path: '/search',
+              name: 'Search',
+              component: () => import('@/views/Search.vue'),
+            },
+            {
+              path: '/history',
+              name: 'History',
+              component: () => import('@/views/History.vue'),
+            },
+            {
+              path: '/favorites',
+              name: 'Favorites',
+              component: () => import('@/views/Favorites.vue'),
+            },
+            {
+              path: '/settings',
+              name: 'Settings',
+              component: () => import('@/views/Settings.vue'),
+            },
+            {
+              path: '/station/:uuid',
+              name: 'StationDetail',
+              component: () => import('@/views/StationDetail.vue'),
+            },
+          ]
+          
+          const router = createRouter({
+            history: createWebHistory(),
+            routes,
+            scrollBehavior() {
+              return { top: 0 }
+            },
+          })
+          
+          export default router
+          EOF
+          echo '✅ 已创建 src/router/index.ts'
+          
+          # 创建 src/style.css
+          cat > src/style.css << 'EOF'
+          * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+          }
+          
+          body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background-color: #f2f2f7;
+            color: #1c1c1e;
+          }
+          
+          #app {
+            min-height: 100vh;
+          }
+          EOF
+          echo '✅ 已创建 src/style.css'
+          
+          # 创建 src/views/Home.vue (占位)
+          cat > src/views/Home.vue << 'EOF'
+          <template>
+            <div class="home">
+              <h1>全球电台</h1>
+              <p>欢迎使用全球电台</p>
+            </div>
+          </template>
+          
+          <script setup lang="ts">
+          </script>
+          EOF
+          echo '✅ 已创建 src/views/Home.vue'
           
           # 创建 vite.config.ts
-          if [ ! -f "vite.config.ts" ]; then
-            cat > vite.config.ts << 'EOF'
+          cat > vite.config.ts << 'EOF'
           import { defineConfig } from 'vite'
           import vue from '@vitejs/plugin-vue'
           import { resolve } from 'path'
@@ -108,14 +185,61 @@ jobs:
             },
           })
           EOF
-            echo '✅ 已创建 vite.config.ts'
-          fi
+          echo '✅ 已创建 vite.config.ts'
           
-          # 显示目录结构
-          echo '📁 目录结构:'
-          ls -la
-          echo '📁 src 目录:'
-          ls -la src/ || echo 'src 目录为空'
+          # 创建 tsconfig.json
+          cat > tsconfig.json << 'EOF'
+          {
+            "compilerOptions": {
+              "target": "ES2020",
+              "useDefineForClassFields": true,
+              "module": "ESNext",
+              "lib": ["ES2020", "DOM", "DOM.Iterable"],
+              "skipLibCheck": true,
+              "moduleResolution": "bundler",
+              "allowImportingTsExtensions": true,
+              "resolveJsonModule": true,
+              "isolatedModules": true,
+              "noEmit": true,
+              "jsx": "preserve",
+              "strict": true,
+              "noUnusedLocals": true,
+              "noUnusedParameters": true,
+              "noFallthroughCasesInSwitch": true,
+              "baseUrl": ".",
+              "paths": {
+                "@/*": ["src/*"]
+              }
+            },
+            "include": ["src/**/*.ts", "src/**/*.d.ts", "src/**/*.tsx", "src/**/*.vue"],
+            "references": [{ "path": "./tsconfig.node.json" }]
+          }
+          EOF
+          echo '✅ 已创建 tsconfig.json'
+          
+          # 创建 tsconfig.node.json
+          cat > tsconfig.node.json << 'EOF'
+          {
+            "compilerOptions": {
+              "composite": true,
+              "skipLibCheck": true,
+              "module": "ESNext",
+              "moduleResolution": "bundler",
+              "allowSyntheticDefaultImports": true
+            },
+            "include": ["vite.config.ts"]
+          }
+          EOF
+          echo '✅ 已创建 tsconfig.node.json'
+          
+          # 创建类型声明文件
+          cat > src/vite-env.d.ts << 'EOF'
+          /// <reference types="vite/client" />
+          EOF
+          echo '✅ 已创建 src/vite-env.d.ts'
+          
+          echo '📁 完整目录结构:'
+          find . -type f -name "*.ts" -o -name "*.vue" -o -name "*.json" -o -name "*.html" -o -name "*.css" | grep -v node_modules | sort
       
       - name: 构建Web
         run: npm run build
@@ -158,12 +282,11 @@ jobs:
           echo '🔍 验证工具:'
           npx vite --version 2>/dev/null || echo '❌ Vite 不可用'
       
-      - name: 确保入口文件和配置存在
+      - name: 创建完整的Vue项目文件和Electron文件
         shell: bash
         run: |
           # 创建 index.html
-          if [ ! -f "index.html" ]; then
-            cat > index.html << 'EOF'
+          cat > index.html << 'EOF'
           <!DOCTYPE html>
           <html lang="zh-CN">
             <head>
@@ -178,13 +301,10 @@ jobs:
             </body>
           </html>
           EOF
-            echo '✅ 已创建 index.html'
-          fi
           
-          # 创建 src/main.ts
-          mkdir -p src
-          if [ ! -f "src/main.ts" ]; then
-            cat > src/main.ts << 'EOF'
+          mkdir -p src/router src/stores src/views src/components src/utils src/types
+          
+          cat > src/main.ts << 'EOF'
           import { createApp } from 'vue'
           import { createPinia } from 'pinia'
           import App from './App.vue'
@@ -196,45 +316,139 @@ jobs:
           app.use(router)
           app.mount('#app')
           EOF
-            echo '✅ 已创建 src/main.ts'
-          fi
           
-          # 创建 src/App.vue
-          if [ ! -f "src/App.vue" ]; then
-            cat > src/App.vue << 'EOF'
+          cat > src/App.vue << 'EOF'
           <template>
             <div id="app">
               <router-view />
             </div>
           </template>
-          
-          <script setup lang="ts">
-          </script>
+          <script setup lang="ts"></script>
           EOF
-            echo '✅ 已创建 src/App.vue'
-          fi
           
-          # 创建 vite.config.ts
-          if [ ! -f "vite.config.ts" ]; then
-            cat > vite.config.ts << 'EOF'
+          cat > src/router/index.ts << 'EOF'
+          import { createRouter, createWebHistory } from 'vue-router'
+          const routes = [
+            { path: '/', name: 'Home', component: () => import('@/views/Home.vue') },
+            { path: '/search', name: 'Search', component: () => import('@/views/Search.vue') },
+            { path: '/history', name: 'History', component: () => import('@/views/History.vue') },
+            { path: '/favorites', name: 'Favorites', component: () => import('@/views/Favorites.vue') },
+            { path: '/settings', name: 'Settings', component: () => import('@/views/Settings.vue') },
+            { path: '/station/:uuid', name: 'StationDetail', component: () => import('@/views/StationDetail.vue') },
+          ]
+          const router = createRouter({ history: createWebHistory(), routes, scrollBehavior() { return { top: 0 } } })
+          export default router
+          EOF
+          
+          cat > src/style.css << 'EOF'
+          * { margin: 0; padding: 0; box-sizing: border-box; }
+          body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background-color: #f2f2f7; color: #1c1c1e; }
+          #app { min-height: 100vh; }
+          EOF
+          
+          cat > src/views/Home.vue << 'EOF'
+          <template><div class="home"><h1>全球电台</h1><p>欢迎使用全球电台</p></div></template>
+          <script setup lang="ts"></script>
+          EOF
+          
+          cat > vite.config.ts << 'EOF'
           import { defineConfig } from 'vite'
           import vue from '@vitejs/plugin-vue'
           import { resolve } from 'path'
-          
           export default defineConfig({
             plugins: [vue()],
-            resolve: {
-              alias: {
-                '@': resolve(__dirname, 'src'),
-              },
-            },
-            build: {
-              outDir: 'dist',
-            },
+            resolve: { alias: { '@': resolve(__dirname, 'src') } },
+            server: { host: '0.0.0.0', port: 4173 },
+            build: { outDir: 'dist', assetsDir: 'assets', sourcemap: false },
           })
           EOF
-            echo '✅ 已创建 vite.config.ts'
-          fi
+          
+          cat > tsconfig.json << 'EOF'
+          {
+            "compilerOptions": {
+              "target": "ES2020",
+              "useDefineForClassFields": true,
+              "module": "ESNext",
+              "lib": ["ES2020", "DOM", "DOM.Iterable"],
+              "skipLibCheck": true,
+              "moduleResolution": "bundler",
+              "allowImportingTsExtensions": true,
+              "resolveJsonModule": true,
+              "isolatedModules": true,
+              "noEmit": true,
+              "jsx": "preserve",
+              "strict": true,
+              "noUnusedLocals": true,
+              "noUnusedParameters": true,
+              "noFallthroughCasesInSwitch": true,
+              "baseUrl": ".",
+              "paths": { "@/*": ["src/*"] }
+            },
+            "include": ["src/**/*.ts", "src/**/*.d.ts", "src/**/*.tsx", "src/**/*.vue"],
+            "references": [{ "path": "./tsconfig.node.json" }]
+          }
+          EOF
+          
+          cat > tsconfig.node.json << 'EOF'
+          {
+            "compilerOptions": {
+              "composite": true,
+              "skipLibCheck": true,
+              "module": "ESNext",
+              "moduleResolution": "bundler",
+              "allowSyntheticDefaultImports": true
+            },
+            "include": ["vite.config.ts"]
+          }
+          EOF
+          
+          cat > src/vite-env.d.ts << 'EOF'
+          /// <reference types="vite/client" />
+          EOF
+          
+          # 创建 Electron 源文件
+          mkdir -p electron
+          cat > electron/main.js << 'EOF'
+          const { app, BrowserWindow, Menu, shell } = require('electron');
+          const path = require('path');
+          let mainWindow;
+          function createWindow() {
+            mainWindow = new BrowserWindow({
+              width: 1200,
+              height: 800,
+              webPreferences: {
+                preload: path.join(__dirname, 'preload.js'),
+                nodeIntegration: false,
+                contextIsolation: true,
+              },
+              icon: path.join(__dirname, '../public/favicon.ico'),
+              show: false,
+            });
+            const isDev = !app.isPackaged;
+            const startUrl = isDev
+              ? 'http://localhost:4173'
+              : `file://${path.join(__dirname, '../dist/index.html')}`;
+            mainWindow.loadURL(startUrl);
+            mainWindow.once('ready-to-show', () => mainWindow.show());
+            mainWindow.webContents.setWindowOpenHandler(({ url }) => {
+              shell.openExternal(url);
+              return { action: 'deny' };
+            });
+            Menu.setApplicationMenu(null);
+          }
+          app.whenReady().then(createWindow);
+          app.on('window-all-closed', () => { if (process.platform !== 'darwin') app.quit(); });
+          app.on('activate', () => { if (BrowserWindow.getAllWindows().length === 0) createWindow(); });
+          EOF
+          
+          cat > electron/preload.js << 'EOF'
+          const { contextBridge } = require('electron');
+          contextBridge.exposeInMainWorld('electronAPI', {
+            platform: process.platform,
+          });
+          EOF
+          
+          echo '✅ 所有文件创建完成'
       
       - name: 确保所有必要脚本存在
         shell: bash
@@ -249,61 +463,6 @@ jobs:
             fs.writeFileSync('package.json', JSON.stringify(pkg, null, 2));
             console.log('✅ 已确保所有必要脚本存在');
           "
-      
-      - name: 创建Electron源文件（如缺失）
-        shell: bash
-        run: |
-          mkdir -p electron
-          if [ ! -f "electron/main.js" ]; then
-            cat > electron/main.js << 'EOF'
-          const { app, BrowserWindow, Menu, shell } = require('electron');
-          const path = require('path');
-          
-          let mainWindow;
-          
-          function createWindow() {
-            mainWindow = new BrowserWindow({
-              width: 1200,
-              height: 800,
-              webPreferences: {
-                preload: path.join(__dirname, 'preload.js'),
-                nodeIntegration: false,
-                contextIsolation: true,
-              },
-              icon: path.join(__dirname, '../public/favicon.ico'),
-              show: false,
-            });
-          
-            const isDev = !app.isPackaged;
-            const startUrl = isDev
-              ? 'http://localhost:4173'
-              : `file://${path.join(__dirname, '../dist/index.html')}`;
-          
-            mainWindow.loadURL(startUrl);
-            mainWindow.once('ready-to-show', () => mainWindow.show());
-            mainWindow.webContents.setWindowOpenHandler(({ url }) => {
-              shell.openExternal(url);
-              return { action: 'deny' };
-            });
-            Menu.setApplicationMenu(null);
-          }
-          
-          app.whenReady().then(createWindow);
-          app.on('window-all-closed', () => { if (process.platform !== 'darwin') app.quit(); });
-          app.on('activate', () => { if (BrowserWindow.getAllWindows().length === 0) createWindow(); });
-          EOF
-            echo '✅ 已创建 electron/main.js'
-          fi
-          
-          if [ ! -f "electron/preload.js" ]; then
-            cat > electron/preload.js << 'EOF'
-          const { contextBridge } = require('electron');
-          contextBridge.exposeInMainWorld('electronAPI', {
-            platform: process.platform,
-          });
-          EOF
-            echo '✅ 已创建 electron/preload.js'
-          fi
       
       - name: 构建Electron应用
         run: npm run electron:build
@@ -340,11 +499,10 @@ jobs:
             npm install -D vite @vitejs/plugin-vue
           fi
       
-      - name: 确保入口文件存在
+      - name: 创建Vue项目文件
         shell: bash
         run: |
-          if [ ! -f "index.html" ]; then
-            cat > index.html << 'EOF'
+          cat > index.html << 'EOF'
           <!DOCTYPE html>
           <html lang="zh-CN">
             <head>
@@ -359,8 +517,101 @@ jobs:
             </body>
           </html>
           EOF
-            echo '✅ 已创建 index.html'
-          fi
+          
+          mkdir -p src/router src/views
+          cat > src/main.ts << 'EOF'
+          import { createApp } from 'vue'
+          import { createPinia } from 'pinia'
+          import App from './App.vue'
+          import router from './router'
+          import './style.css'
+          const app = createApp(App)
+          app.use(createPinia())
+          app.use(router)
+          app.mount('#app')
+          EOF
+          
+          cat > src/App.vue << 'EOF'
+          <template><div id="app"><router-view /></div></template>
+          <script setup lang="ts"></script>
+          EOF
+          
+          cat > src/router/index.ts << 'EOF'
+          import { createRouter, createWebHistory } from 'vue-router'
+          const routes = [
+            { path: '/', name: 'Home', component: () => import('@/views/Home.vue') },
+            { path: '/search', name: 'Search', component: () => import('@/views/Search.vue') },
+            { path: '/history', name: 'History', component: () => import('@/views/History.vue') },
+            { path: '/favorites', name: 'Favorites', component: () => import('@/views/Favorites.vue') },
+            { path: '/settings', name: 'Settings', component: () => import('@/views/Settings.vue') },
+            { path: '/station/:uuid', name: 'StationDetail', component: () => import('@/views/StationDetail.vue') },
+          ]
+          const router = createRouter({ history: createWebHistory(), routes, scrollBehavior() { return { top: 0 } } })
+          export default router
+          EOF
+          
+          cat > src/style.css << 'EOF'
+          * { margin: 0; padding: 0; box-sizing: border-box; }
+          body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background-color: #f2f2f7; color: #1c1c1e; }
+          #app { min-height: 100vh; }
+          EOF
+          
+          cat > src/views/Home.vue << 'EOF'
+          <template><div><h1>全球电台</h1><p>欢迎使用全球电台</p></div></template>
+          <script setup lang="ts"></script>
+          EOF
+          
+          cat > vite.config.ts << 'EOF'
+          import { defineConfig } from 'vite'
+          import vue from '@vitejs/plugin-vue'
+          import { resolve } from 'path'
+          export default defineConfig({
+            plugins: [vue()],
+            resolve: { alias: { '@': resolve(__dirname, 'src') } },
+            build: { outDir: 'dist' },
+          })
+          EOF
+          
+          cat > tsconfig.json << 'EOF'
+          {
+            "compilerOptions": {
+              "target": "ES2020",
+              "module": "ESNext",
+              "lib": ["ES2020", "DOM", "DOM.Iterable"],
+              "skipLibCheck": true,
+              "moduleResolution": "bundler",
+              "allowImportingTsExtensions": true,
+              "resolveJsonModule": true,
+              "isolatedModules": true,
+              "noEmit": true,
+              "jsx": "preserve",
+              "strict": true,
+              "baseUrl": ".",
+              "paths": { "@/*": ["src/*"] }
+            },
+            "include": ["src/**/*.ts", "src/**/*.d.ts", "src/**/*.tsx", "src/**/*.vue"],
+            "references": [{ "path": "./tsconfig.node.json" }]
+          }
+          EOF
+          
+          cat > tsconfig.node.json << 'EOF'
+          {
+            "compilerOptions": {
+              "composite": true,
+              "skipLibCheck": true,
+              "module": "ESNext",
+              "moduleResolution": "bundler",
+              "allowSyntheticDefaultImports": true
+            },
+            "include": ["vite.config.ts"]
+          }
+          EOF
+          
+          cat > src/vite-env.d.ts << 'EOF'
+          /// <reference types="vite/client" />
+          EOF
+          
+          echo '✅ 所有Vue项目文件创建完成'
       
       - name: 构建Vue
         run: npm run build
