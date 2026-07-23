@@ -1,0 +1,57 @@
+name: Nightly Build
+
+on:
+  schedule:
+    - cron: '0 2 * * *'  # 每天 UTC 2:00 (北京时间 10:00)
+  workflow_dispatch:
+
+env:
+  NODE_VERSION: 20
+
+jobs:
+  # ============ 每日构建与测试 ============
+  nightly:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: 安装依赖
+        shell: bash
+        run: |
+          if [ -f package-lock.json ]; then
+            npm ci --no-audit --no-fund
+          else
+            npm install --no-audit --no-fund
+          fi
+
+      - name: 构建 Web
+        shell: bash
+        run: npm run build
+
+      - name: 验证构建
+        shell: bash
+        run: |
+          test -f dist/index.html || (echo "❌ 构建失败" && exit 1)
+          echo "✅ 每日构建成功"
+
+      - name: 上传构建产物
+        uses: actions/upload-artifact@v4
+        with:
+          name: nightly-build
+          path: dist/
+          retention-days: 3
+
+      - name: 发送构建状态（可选）
+        if: always()
+        shell: bash
+        run: |
+          if [ "${{ job.status }}" == "success" ]; then
+            echo "✅ 每日构建成功: $(date)"
+          else
+            echo "❌ 每日构建失败: $(date)"
+          fi
