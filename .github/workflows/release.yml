@@ -12,7 +12,6 @@ on:
         type: string
 
 env:
-  ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION: true
   NODE_VERSION: 20
 
 permissions:
@@ -20,19 +19,18 @@ permissions:
   packages: write
 
 jobs:
-  # ============ 验证和安装依赖 ============
+  # ============ 1. 安装依赖（独立 job） ============
   setup:
     runs-on: ubuntu-latest
     outputs:
       version: ${{ steps.get-version.outputs.version }}
+      cache-hit: ${{ steps.cache.outputs.cache-hit }}
     steps:
       - uses: actions/checkout@v4
 
       - uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
-          # 暂时禁用缓存，避免缓存问题
-          # cache: 'npm'
 
       - name: 获取版本号
         id: get-version
@@ -41,46 +39,18 @@ jobs:
           echo "version=$VERSION" >> $GITHUB_OUTPUT
           echo "📦 版本: $VERSION"
 
-      - name: 验证项目结构
+      - name: 检查 lockfile
         shell: bash
         run: |
-          echo "📂 验证项目文件..."
-          ls -la
-          test -f package.json || (echo "❌ package.json 不存在" && exit 1)
-          test -f src/main.ts || (echo "❌ src/main.ts 不存在" && exit 1)
-          echo "✅ 项目结构验证通过"
+          if [ ! -f package-lock.json ]; then
+            echo "⚠️ package-lock.json 不存在，正在生成..."
+            npm install --package-lock-only --no-audit --no-fund
+          fi
+          echo "✅ package-lock.json 存在: $(ls -la package-lock.json)"
 
-      - name: 🔧 安装依赖（修复版）
-        shell: bash
-        run: |
-          echo "📦 开始安装依赖..."
-          
-          # 清理可能存在的 node_modules
-          rm -rf node_modules package-lock.json || true
-          
-          # 生成新的 lockfile
-          npm install --package-lock-only --no-audit --no-fund
-          
-          # 安装依赖
-          npm install --no-audit --no-fund --legacy-peer-deps
-          
-          # 验证安装
-          echo "✅ 依赖安装完成"
-          echo "📊 已安装的包:"
-          npm list --depth=0 || echo "⚠️ 部分包可能未安装"
-
-      - name: 验证关键依赖
-        shell: bash
-        run: |
-          echo "🔍 验证关键依赖..."
-          test -d node_modules/vite || (echo "❌ vite 未安装" && exit 1)
-          test -d node_modules/@vitejs/plugin-vue || (echo "❌ @vitejs/plugin-vue 未安装" && exit 1)
-          test -d node_modules/vite-plugin-pwa || (echo "❌ vite-plugin-pwa 未安装" && exit 1)
-          test -d node_modules/vue || (echo "❌ vue 未安装" && exit 1)
-          echo "✅ 所有关键依赖验证通过"
-
-      - name: 保存 node_modules 缓存
-        uses: actions/cache/save@v4
+      - name: 缓存 node_modules
+        id: cache
+        uses: actions/cache@v4
         with:
           path: |
             node_modules
@@ -89,7 +59,45 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-node-
 
-  # ============ 构建 Web ============
+      - name: 安装依赖（如果没有缓存）
+        if: steps.cache.outputs.cache-hit != 'true'
+        shell: bash
+        run: |
+          echo "📦 开始安装依赖（无缓存）..."
+          npm ci --no-audit --no-fund --legacy-peer-deps || \
+          npm install --no-audit --no-fund --legacy-peer-deps
+          echo "✅ 依赖安装完成"
+
+      - name: 验证依赖安装
+        shell: bash
+        run: |
+          echo "🔍 验证关键依赖..."
+          
+          # 检查是否安装了 vite
+          if [ ! -d "node_modules/vite" ]; then
+            echo "❌ vite 未安装，尝试重新安装..."
+            npm install vite --no-audit --no-fund --legacy-peer-deps
+          fi
+          
+          # 检查所有关键依赖
+          deps=("vite" "@vitejs/plugin-vue" "vue" "pinia" "vue-router")
+          for dep in "${deps[@]}"; do
+            if [ -d "node_modules/$dep" ]; then
+              echo "✅ $dep"
+            else
+              echo "❌ $dep 未安装"
+            fi
+          done
+          
+          # 最终验证
+          test -d node_modules/vite || (echo "❌ vite 仍然未安装" && exit 1)
+          echo "✅ 所有依赖验证通过"
+          
+          # 显示已安装的包列表
+          echo "📊 已安装的包:"
+          npm list --depth=0 2>/dev/null | head -20
+
+  # ============ 2. 构建 Web ============
   build-web:
     runs-on: ubuntu-latest
     needs: setup
@@ -110,11 +118,11 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-node-
 
-      - name: 验证依赖
+      - name: 确保依赖存在
         shell: bash
         run: |
-          if [ ! -d "node_modules" ]; then
-            echo "⚠️ node_modules 不存在，重新安装..."
+          if [ ! -d "node_modules/vite" ]; then
+            echo "⚠️ node_modules 不存在或损坏，重新安装..."
             npm install --no-audit --no-fund --legacy-peer-deps
           fi
           test -d node_modules/vite || (echo "❌ vite 未安装" && exit 1)
@@ -141,7 +149,7 @@ jobs:
           path: dist/
           retention-days: 7
 
-  # ============ 构建 Electron ============
+  # ============ 3. 构建 Electron ============
   build-electron:
     strategy:
       matrix:
@@ -165,10 +173,10 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-node-
 
-      - name: 验证依赖
+      - name: 确保依赖存在
         shell: bash
         run: |
-          if [ ! -d "node_modules" ]; then
+          if [ ! -d "node_modules/vite" ]; then
             echo "⚠️ node_modules 不存在，重新安装..."
             npm install --no-audit --no-fund --legacy-peer-deps
           fi
@@ -199,7 +207,7 @@ jobs:
           path: release/
           retention-days: 7
 
-  # ============ 构建 Android ============
+  # ============ 4. 构建 Android ============
   build-android:
     runs-on: ubuntu-latest
     needs: setup
@@ -229,10 +237,11 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-node-
 
-      - name: 验证依赖
+      - name: 确保依赖存在
         shell: bash
         run: |
-          if [ ! -d "node_modules" ]; then
+          if [ ! -d "node_modules/vite" ]; then
+            echo "⚠️ node_modules 不存在，重新安装..."
             npm install --no-audit --no-fund --legacy-peer-deps
           fi
           test -d node_modules/vite || (echo "❌ vite 未安装" && exit 1)
@@ -272,7 +281,7 @@ jobs:
           path: android/app/build/outputs/apk/release/*.apk
           retention-days: 7
 
-  # ============ 创建 Release ============
+  # ============ 5. 创建 Release ============
   create-release:
     needs: [setup, build-web, build-electron, build-android]
     runs-on: ubuntu-latest
@@ -290,7 +299,7 @@ jobs:
         shell: bash
         run: |
           echo "📦 下载的产物:"
-          find artifacts -type f | sort || echo "⚠️ 没有找到产物"
+          find artifacts -type f -name "*.apk" -o -name "*.exe" -o -name "*.dmg" -o -name "*.AppImage" 2>/dev/null | sort || echo "⚠️ 没有找到产物"
 
       - name: 生成 Release Notes
         shell: bash
@@ -309,19 +318,19 @@ jobs:
           ## 📦 下载说明
 
           ### 🖥️ Windows
-          - global-radio-${VERSION}-win-setup.exe - 安装版
-          - global-radio-${VERSION}-win-portable.exe - 便携版
+          - global-radio-${VERSION}-win-setup.exe
+          - global-radio-${VERSION}-win-portable.exe
 
           ### 🍎 macOS
-          - global-radio-${VERSION}-mac.dmg - DMG 安装包
-          - global-radio-${VERSION}-mac.zip - ZIP 压缩包
+          - global-radio-${VERSION}-mac.dmg
+          - global-radio-${VERSION}-mac.zip
 
           ### 🐧 Linux
-          - global-radio-${VERSION}-linux.AppImage - AppImage
-          - global-radio-${VERSION}-linux.deb - DEB 安装包
+          - global-radio-${VERSION}-linux.AppImage
+          - global-radio-${VERSION}-linux.deb
 
           ### 📱 Android
-          - app-release-${VERSION}.apk - APK 安装包
+          - app-release-${VERSION}.apk
 
           ---
           感谢使用全球电台！
@@ -334,11 +343,11 @@ jobs:
           draft: false
           prerelease: false
           files: |
-            artifacts/**/*.zip
+            artifacts/**/*.apk
             artifacts/**/*.exe
             artifacts/**/*.dmg
             artifacts/**/*.AppImage
             artifacts/**/*.deb
-            artifacts/**/*.apk
+            artifacts/**/*.zip
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
