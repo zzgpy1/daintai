@@ -1,44 +1,94 @@
 # electron-builder.yml
 appId: com.globalradio.app
 productName: 全球电台
+copyright: Copyright © 2026 GlobalRadio
 directories:
   output: release
+  buildResources: build
 
-# 明确指定要打包的文件和目录
+# 关键：明确指定要打包的文件
 files:
-  - from: dist
-    to: dist
-    filter:
-      - "**/*"
-  - from: electron
-    to: electron
+  - dist/**/*
+  - electron/**/*
+  - package.json
+  - node_modules/**/*
+
+# 排除不必要的文件
+asarUnpack:
+  - "**/*.node"
+
+extraResources:
+  - from: electron/
+    to: electron/
     filter:
       - "**/*"
 
-# 确保入口文件被包含
-extraMetadata:
-  main: electron/main.js
-
+# Windows 配置
 win:
   target:
-    - nsis
-    - portable
+    - target: nsis
+      arch:
+        - x64
+        - ia32
+    - target: portable
+      arch:
+        - x64
   icon: public/favicon.ico
+  publisherName: GlobalRadio
+  certificateFile: ""
+  certificatePassword: ""
 
+# macOS 配置
 mac:
   target:
-    - dmg
-    - zip
+    - target: dmg
+      arch:
+        - x64
+        - arm64
+    - target: zip
+      arch:
+        - x64
+        - arm64
   icon: public/icon.icns
+  category: public.app-category.music
+  hardenedRuntime: true
+  gatekeeperAssess: false
+  entitlements: build/entitlements.mac.plist
+  entitlementsInherit: build/entitlements.mac.plist
 
+# Linux 配置
 linux:
   target:
     - AppImage
     - deb
   icon: public/icon.png
   category: AudioVideo
+  maintainer: GlobalRadio
+  description: 全球电台 - 聆听全球高品质电台
 
+# NSIS 安装程序配置
 nsis:
   oneClick: false
   perMachine: true
   allowToChangeInstallationDirectory: true
+  createDesktopShortcut: true
+  createStartMenuShortcut: true
+  shortcutName: 全球电台
+
+# AppImage 配置
+appImage:
+  artifactName: ${productName}-${version}-linux.${ext}
+
+# Deb 包配置
+deb:
+  artifactName: ${productName}-${version}-linux.${ext}
+
+# 压缩配置
+compress: true
+
+# 发布配置
+publish:
+  - provider: github
+    owner: moli-xia
+    repo: global-radio
+    releaseType: release
