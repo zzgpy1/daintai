@@ -1,73 +1,41 @@
+// electron/main.js
 const { app, BrowserWindow, Menu, shell } = require('electron');
 const path = require('path');
 const fs = require('fs');
 
 let mainWindow;
 
-function getEntryPath() {
-  if (!app.isPackaged) {
-    return {
-      preload: path.join(__dirname, 'preload.js'),
-      index: 'http://localhost:4173'
-    };
-  }
-
-  const resourcePath = process.resourcesPath;
-  const possiblePaths = {
-    preload: [
-      path.join(__dirname, 'preload.js'),
-      path.join(resourcePath, 'app.asar', 'electron', 'preload.js'),
-      path.join(resourcePath, 'electron', 'preload.js'),
-      path.join(process.cwd(), 'electron', 'preload.js')
-    ],
-    index: [
-      path.join(__dirname, '../dist/index.html'),
-      path.join(resourcePath, 'app.asar', 'dist', 'index.html'),
-      path.join(resourcePath, 'dist', 'index.html'),
-      path.join(process.cwd(), 'dist', 'index.html')
-    ]
-  };
-
-  let preloadPath = null;
-  for (const p of possiblePaths.preload) {
+function getPreloadPath() {
+  const possiblePaths = [
+    path.join(__dirname, 'preload.js'),
+    path.join(process.resourcesPath, 'app.asar', 'electron', 'preload.js'),
+    path.join(process.cwd(), 'electron', 'preload.js')
+  ];
+  for (const p of possiblePaths) {
     if (fs.existsSync(p)) {
-      preloadPath = p;
-      console.log(`✅ 找到 preload: ${p}`);
-      break;
+      console.log(`✅ 找到 preload 文件: ${p}`);
+      return p;
     }
   }
-  if (!preloadPath) {
-    preloadPath = path.join(__dirname, 'preload.js');
-  }
+  console.warn('⚠️ 未找到 preload 文件，使用默认路径');
+  return path.join(__dirname, 'preload.js');
+}
 
-  let indexPath = null;
-  for (const p of possiblePaths.index) {
-    if (fs.existsSync(p)) {
-      indexPath = `file://${p}`;
-      console.log(`✅ 找到 index.html: ${p}`);
-      break;
-    }
+function getIndexPath() {
+  if (app.isPackaged) {
+    return `file://${path.join(__dirname, '../dist/index.html')}`;
   }
-  if (!indexPath) {
-    indexPath = `file://${path.join(__dirname, '../dist/index.html')}`;
-  }
-
-  return {
-    preload: preloadPath,
-    index: indexPath
-  };
+  return 'http://localhost:4173';
 }
 
 function createWindow() {
-  const entry = getEntryPath();
-
   mainWindow = new BrowserWindow({
     width: 1200,
     height: 800,
     minWidth: 800,
     minHeight: 600,
     webPreferences: {
-      preload: entry.preload,
+      preload: getPreloadPath(),
       nodeIntegration: false,
       contextIsolation: true,
     },
@@ -78,8 +46,9 @@ function createWindow() {
     backgroundColor: '#1a365d',
   });
 
-  console.log(`📂 加载 URL: ${entry.index}`);
-  mainWindow.loadURL(entry.index);
+  const startUrl = getIndexPath();
+  console.log(`📂 加载 URL: ${startUrl}`);
+  mainWindow.loadURL(startUrl);
 
   mainWindow.once('ready-to-show', () => {
     mainWindow.show();
