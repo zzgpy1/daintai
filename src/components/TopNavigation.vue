@@ -6,8 +6,13 @@
           <span>📻 {{ t('home.title') }}</span>
         </router-link>
         <div class="flex items-center gap-6">
-          <router-link v-for="item in navItems" :key="item.name" :to="item.path" class="text-sm font-medium transition-colors"
-            :class="$route.name === item.name ? 'text-ios-blue' : 'text-ios-gray hover:text-ios-dark-gray dark:text-dark-secondary dark:hover:text-dark-text'">
+          <router-link
+            v-for="item in navItems"
+            :key="item.name"
+            :to="item.path"
+            class="text-sm font-medium transition-colors"
+            :class="$route.name === item.name ? 'text-ios-blue' : 'text-ios-gray hover:text-ios-dark-gray dark:text-dark-secondary dark:hover:text-dark-text'"
+          >
             {{ item.label }}
           </router-link>
         </div>
