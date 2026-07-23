@@ -15,25 +15,44 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      
       - uses: actions/setup-node@v4
         with:
           node-version: 20
-          # 移除 cache 配置，避免缓存路径错误
+      
       - name: 检查并生成 lockfile
+        shell: bash
         run: |
           if [ ! -f package-lock.json ]; then
             echo "⚠️ package-lock.json 不存在，正在生成..."
             npm install --package-lock-only
           fi
           ls -la package-lock.json || echo "❌ package-lock.json 仍然不存在"
-      - name: 安装依赖 (不使用缓存)
-        run: npm ci --no-audit --no-fund
+      
+      - name: 安装依赖
+        shell: bash
+        run: npm ci --no-audit --no-fund || npm install --no-audit --no-fund
+      
+      - name: 验证 index.html 存在
+        shell: bash
+        run: |
+          if [ ! -f index.html ]; then
+            echo "❌ index.html 不存在！"
+            ls -la
+            exit 1
+          fi
+          echo "✅ index.html 存在"
+      
       - name: 构建项目
+        shell: bash
         run: npm run build
+      
       - name: 验证构建产物
+        shell: bash
         run: |
           ls -la dist/
           test -f dist/index.html || (echo "❌ index.html 不存在" && exit 1)
+      
       - uses: actions/upload-artifact@v4
         with:
           name: web-dist
@@ -47,26 +66,47 @@ jobs:
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
+      
       - uses: actions/setup-node@v4
         with:
           node-version: 20
+      
       - name: 检查并生成 lockfile
+        shell: bash
         run: |
           if [ ! -f package-lock.json ]; then
             npm install --package-lock-only
           fi
+      
       - name: 安装依赖
-        run: npm ci --no-audit --no-fund
+        shell: bash
+        run: npm ci --no-audit --no-fund || npm install --no-audit --no-fund
+      
       - name: 验证 Electron 入口文件
+        shell: bash
         run: |
           test -f electron/main.js || (echo "❌ electron/main.js 不存在" && exit 1)
           test -f electron/preload.js || (echo "❌ electron/preload.js 不存在" && exit 1)
+      
+      - name: 验证 index.html 存在
+        shell: bash
+        run: |
+          if [ ! -f index.html ]; then
+            echo "❌ index.html 不存在！"
+            ls -la
+            exit 1
+          fi
+      
       - name: 构建 Vue 项目
+        shell: bash
         run: npm run build
+      
       - name: 构建 Electron 应用
+        shell: bash
         run: npm run electron:build
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      
       - uses: actions/upload-artifact@v4
         with:
           name: electron-${{ matrix.os }}
@@ -77,34 +117,58 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      
       - uses: actions/setup-node@v4
         with:
           node-version: 20
+      
       - name: 检查并生成 lockfile
+        shell: bash
         run: |
           if [ ! -f package-lock.json ]; then
             npm install --package-lock-only
           fi
+      
       - name: Setup Java
         uses: actions/setup-java@v4
         with:
           distribution: 'temurin'
           java-version: '17'
+      
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
+      
       - name: 安装依赖
-        run: npm ci --no-audit --no-fund
+        shell: bash
+        run: npm ci --no-audit --no-fund || npm install --no-audit --no-fund
+      
+      - name: 验证 index.html 存在
+        shell: bash
+        run: |
+          if [ ! -f index.html ]; then
+            echo "❌ index.html 不存在！"
+            ls -la
+            exit 1
+          fi
+      
       - name: 构建 Vue 项目
+        shell: bash
         run: npm run build
-      - name: 初始化 Capacitor (如果需要)
+      
+      - name: 初始化 Capacitor
+        shell: bash
         run: |
           if [ ! -d "android" ]; then
             echo "📱 Android 目录不存在，正在初始化..."
             npx cap add android
           fi
+      
       - name: 同步 Capacitor
+        shell: bash
         run: npx cap sync android
+      
       - name: 验证 Android 项目
+        shell: bash
         run: |
           cd android
           if [ ! -f "gradlew" ]; then
@@ -115,15 +179,20 @@ jobs:
           fi
           chmod +x gradlew
           ls -la gradlew
+      
       - name: 构建 APK
+        shell: bash
         run: |
           cd android
           ./gradlew assembleRelease
+      
       - name: 验证 APK
+        shell: bash
         run: |
           APK_PATH="android/app/build/outputs/apk/release"
           ls -la $APK_PATH || (echo "❌ APK 目录不存在" && exit 1)
           find $APK_PATH -name "*.apk" | grep . || (echo "❌ 未找到 APK 文件" && exit 1)
+      
       - uses: actions/upload-artifact@v4
         with:
           name: android-apk
@@ -136,13 +205,16 @@ jobs:
     if: startsWith(github.ref, 'refs/tags/')
     steps:
       - uses: actions/checkout@v4
+      
       - uses: actions/download-artifact@v4
         with:
           path: artifacts
+      
       - name: 生成 Release Notes
+        shell: bash
         run: |
           VERSION=${GITHUB_REF#refs/tags/v}
-          cat > RELEASE_NOTES.md << EOF
+          cat > RELEASE_NOTES.md << 'EOF'
           # 全球电台 v${VERSION}
 
           ## 📦 下载说明
@@ -169,7 +241,10 @@ jobs:
           ---
           感谢使用全球电台！如有问题请反馈至 [Issues](https://github.com/moli-xia/global-radio/issues)
           EOF
+          # 替换版本号变量
+          sed -i "s/\${VERSION}/${VERSION}/g" RELEASE_NOTES.md
           cat RELEASE_NOTES.md
+      
       - name: 创建 Release
         uses: softprops/action-gh-release@v1
         with:
