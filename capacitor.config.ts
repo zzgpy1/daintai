@@ -3,7 +3,7 @@ import { CapacitorConfig } from '@capacitor/cli';
 const config: CapacitorConfig = {
   appId: 'com.globalradio.app',
   appName: '全球电台',
-  webDir: 'dist',  // 关键：将 'www' 改为 'dist'
+  webDir: 'dist',
   server: {
     androidScheme: 'https'
   },
@@ -12,30 +12,17 @@ const config: CapacitorConfig = {
       launchShowDuration: 800,
       backgroundColor: "#1a365d",
       androidScaleType: "CENTER_CROP",
-      showSpinner: false,
-      spinnerColor: "#00bcd4",
-      androidSpinnerStyle: "small",
-      iosSpinnerStyle: "small"
+      showSpinner: false
     },
     StatusBar: {
       style: "dark",
       backgroundColor: "#1a365d"
-    },
-    App: {
-      disabledLaunchAnimation: false
-    },
-    Haptics: {
-      enabled: true
-    },
-    Keyboard: {
-      resize: "body"
     }
   },
   android: {
     allowMixedContent: true,
     captureInput: true,
-    webContentsDebuggingEnabled: false,
-    appendUserAgent: 'RadioApp/1.0'
+    webContentsDebuggingEnabled: false
   }
 };
 
