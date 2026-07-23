@@ -5,6 +5,11 @@ on:
     tags:
       - 'v*'
   workflow_dispatch:
+    inputs:
+      version:
+        description: '版本号 (如 v1.0.0)'
+        required: true
+        type: string
 
 env:
   ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION: true
@@ -15,161 +20,310 @@ permissions:
   packages: write
 
 jobs:
+  # ============ 1. 验证项目结构 ============
   validate:
     runs-on: ubuntu-latest
-    outputs:
-      version: ${{ steps.get-version.outputs.version }}
     steps:
       - uses: actions/checkout@v4
-      - name: 获取版本号
-        id: get-version
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: 安装依赖（验证用）
         shell: bash
-        run: echo "version=$(node -p "require('./package.json').version")" >> $GITHUB_OUTPUT
+        run: |
+          npm install --no-audit --no-fund
+          npm install --package-lock-only
+
       - name: 验证项目结构
         shell: bash
         run: |
-          chmod +x scripts/verify-project.sh
-          ./scripts/verify-project.sh
+          echo "📂 验证项目结构..."
+          required_files=(
+            "index.html"
+            "package.json"
+            "vite.config.ts"
+            "src/main.ts"
+            "src/App.vue"
+            "electron/main.js"
+            "electron/preload.js"
+          )
+          for file in "${required_files[@]}"; do
+            if [ ! -f "$file" ]; then
+              echo "❌ 缺少: $file"
+              exit 1
+            fi
+            echo "✅ $file"
+          done
+          echo "✅ 项目结构验证通过"
 
+      - name: 验证 Vite 可执行
+        shell: bash
+        run: |
+          npx vite --version || echo "⚠️ Vite 未安装，将在构建步骤安装"
+          echo "✅ 验证完成"
+
+  # ============ 2. 构建 Web ============
   build-web:
     runs-on: ubuntu-latest
     needs: validate
     steps:
       - uses: actions/checkout@v4
+
       - uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
-      - name: 确保锁文件存在
-        shell: bash
-        run: |
-          if [ ! -f package-lock.json ]; then
-            echo "⚠️  package-lock.json 不存在，正在生成..."
-            npm install --package-lock-only
-          fi
-          echo "✅ 锁文件已就绪"
+
       - name: 安装依赖
         shell: bash
-        run: npm ci --no-audit --no-fund || npm install --no-audit --no-fund
-      - name: 构建
+        run: |
+          # 先尝试使用 package-lock.json
+          if [ -f package-lock.json ]; then
+            echo "📦 使用 package-lock.json 安装..."
+            npm ci --no-audit --no-fund || npm install --no-audit --no-fund
+          else
+            echo "📦 package-lock.json 不存在，直接安装..."
+            npm install --no-audit --no-fund
+            npm install --package-lock-only
+          fi
+          # 验证 vite 是否安装
+          echo "🔍 验证 Vite..."
+          npx vite --version || (echo "❌ Vite 未安装" && exit 1)
+          echo "✅ 依赖安装完成"
+
+      - name: 构建 Web
         shell: bash
-        run: npm run build
+        run: |
+          echo "🔨 开始构建..."
+          npx vite build
+          echo "✅ Web 构建完成"
+
       - name: 验证构建产物
         shell: bash
-        run: test -f dist/index.html || (echo "❌ 构建失败" && exit 1)
-      - uses: actions/upload-artifact@v4
+        run: |
+          ls -la dist/
+          test -f dist/index.html || (echo "❌ dist/index.html 不存在" && exit 1)
+          echo "✅ 构建产物验证通过"
+          echo "📊 产物大小: $(du -sh dist/ | cut -f1)"
+
+      - name: 上传 Web 产物
+        uses: actions/upload-artifact@v4
         with:
           name: web-dist
           path: dist/
+          retention-days: 7
 
+  # ============ 3. 构建 Electron ============
   build-electron:
     strategy:
       matrix:
         os: [ubuntu-latest, windows-latest, macos-latest]
+        include:
+          - os: ubuntu-latest
+            platform: linux
+          - os: windows-latest
+            platform: win
+          - os: macos-latest
+            platform: mac
     runs-on: ${{ matrix.os }}
-    needs: validate
+    needs: [validate, build-web]
     steps:
       - uses: actions/checkout@v4
+
       - uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
-      - name: 确保锁文件存在
-        shell: bash
-        run: |
-          if [ ! -f package-lock.json ]; then
-            npm install --package-lock-only
-          fi
+
       - name: 安装依赖
         shell: bash
-        run: npm ci --no-audit --no-fund || npm install --no-audit --no-fund
+        run: |
+          if [ -f package-lock.json ]; then
+            echo "📦 使用 package-lock.json 安装..."
+            npm ci --no-audit --no-fund || npm install --no-audit --no-fund
+          else
+            echo "📦 package-lock.json 不存在，直接安装..."
+            npm install --no-audit --no-fund
+          fi
+          echo "🔍 验证 Vite..."
+          npx vite --version || (echo "❌ Vite 未安装" && exit 1)
+          echo "✅ 依赖安装完成"
+
+      - name: 验证 Electron 文件
+        shell: bash
+        run: |
+          test -f electron/main.js || (echo "❌ electron/main.js 不存在" && exit 1)
+          test -f electron/preload.js || (echo "❌ electron/preload.js 不存在" && exit 1)
+          echo "✅ Electron 文件验证通过"
+
       - name: 构建 Vue
         shell: bash
-        run: npm run build
-      - name: 构建 Electron
+        run: |
+          echo "🔨 构建 Vue..."
+          npx vite build
+          echo "✅ Vue 构建完成"
+
+      - name: 构建 Electron (${{ matrix.platform }})
         shell: bash
-        run: npm run electron:build
+        run: |
+          echo "🔨 构建 Electron..."
+          npx electron-builder
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      - uses: actions/upload-artifact@v4
-        with:
-          name: electron-${{ matrix.os }}
-          path: release/
 
+      - name: 验证产物
+        shell: bash
+        run: |
+          echo "📦 Electron 产物:"
+          ls -la release/ || echo "release 目录不存在"
+          if [ -d "release" ]; then
+            find release -type f -name "*.AppImage" -o -name "*.deb" -o -name "*.exe" -o -name "*.dmg" -o -name "*.zip" 2>/dev/null | head -10
+          fi
+
+      - name: 上传产物
+        uses: actions/upload-artifact@v4
+        with:
+          name: electron-${{ matrix.platform }}
+          path: release/
+          retention-days: 7
+
+  # ============ 4. 构建 Android ============
   build-android:
     runs-on: ubuntu-latest
-    needs: validate
+    needs: [validate, build-web]
     steps:
       - uses: actions/checkout@v4
+
       - uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
+
       - name: Setup Java
         uses: actions/setup-java@v4
         with:
           distribution: 'temurin'
           java-version: '17'
+
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
-      - name: 确保锁文件存在
-        shell: bash
-        run: |
-          if [ ! -f package-lock.json ]; then
-            npm install --package-lock-only
-          fi
+
       - name: 安装依赖
         shell: bash
-        run: npm ci --no-audit --no-fund || npm install --no-audit --no-fund
+        run: |
+          if [ -f package-lock.json ]; then
+            npm ci --no-audit --no-fund || npm install --no-audit --no-fund
+          else
+            npm install --no-audit --no-fund
+          fi
+          npx vite --version || (echo "❌ Vite 未安装" && exit 1)
+          echo "✅ 依赖安装完成"
+
       - name: 构建 Vue
         shell: bash
-        run: npm run build
+        run: |
+          echo "🔨 构建 Vue..."
+          npx vite build
+          echo "✅ Vue 构建完成"
+
       - name: 初始化 Capacitor
         shell: bash
         run: |
           if [ ! -d "android" ]; then
+            echo "📱 Android 目录不存在，正在初始化..."
             npx cap add android
           fi
+
       - name: 同步 Capacitor
         shell: bash
         run: npx cap sync android
+
+      - name: 验证 Android 项目
+        shell: bash
+        run: |
+          cd android
+          if [ ! -f "gradlew" ]; then
+            echo "❌ gradlew 不存在"
+            exit 1
+          fi
+          chmod +x gradlew
+          echo "✅ Android 项目验证通过"
+
       - name: 构建 APK
         shell: bash
         run: |
           cd android
-          chmod +x gradlew
           ./gradlew assembleRelease
-      - uses: actions/upload-artifact@v4
+
+      - name: 验证 APK
+        shell: bash
+        run: |
+          APK_PATH="android/app/build/outputs/apk/release"
+          ls -la $APK_PATH/ || (echo "❌ APK 目录不存在" && exit 1)
+          find $APK_PATH -name "*.apk" -exec ls -lh {} \;
+          find $APK_PATH -name "*.apk" | grep . || (echo "❌ 未找到 APK" && exit 1)
+          echo "✅ APK 构建成功"
+
+      - name: 上传 APK
+        uses: actions/upload-artifact@v4
         with:
           name: android-apk
           path: android/app/build/outputs/apk/release/*.apk
+          retention-days: 7
 
+  # ============ 5. 创建 Release ============
   create-release:
     needs: [build-web, build-electron, build-android]
     runs-on: ubuntu-latest
-    if: startsWith(github.ref, 'refs/tags/')
+    if: startsWith(github.ref, 'refs/tags/') || github.event_name == 'workflow_dispatch'
     steps:
       - uses: actions/checkout@v4
+
       - uses: actions/download-artifact@v4
         with:
           path: artifacts
+
+      - name: 列出产物
+        shell: bash
+        run: |
+          echo "📦 下载的产物:"
+          find artifacts -type f | sort
+
       - name: 生成 Release Notes
         shell: bash
         run: |
-          VERSION="${{ needs.validate.outputs.version }}"
-          cat > RELEASE_NOTES.md << EOF
+          VERSION=$(node -p "require('./package.json').version")
+          cat > RELEASE_NOTES.md << 'EOF'
           # 🌍 全球电台 v${VERSION}
 
           ## 📦 下载说明
-          - Windows: \`global-radio-${VERSION}-win-setup.exe\`
-          - macOS: \`global-radio-${VERSION}-mac.dmg\`
-          - Linux: \`global-radio-${VERSION}-linux.AppImage\`
-          - Android: \`app-release-${VERSION}.apk\`
+
+          ### 🖥️ Windows
+          - `global-radio-${VERSION}-win-setup.exe` - 安装版
+          - `global-radio-${VERSION}-win-portable.exe` - 便携版
+
+          ### 🍎 macOS
+          - `global-radio-${VERSION}-mac.dmg` - DMG 安装包
+          - `global-radio-${VERSION}-mac.zip` - ZIP 压缩包
+
+          ### 🐧 Linux
+          - `global-radio-${VERSION}-linux.AppImage` - AppImage
+          - `global-radio-${VERSION}-linux.deb` - DEB 安装包
+
+          ### 📱 Android
+          - `app-release-${VERSION}.apk` - APK 安装包
 
           ---
           感谢使用全球电台！
           EOF
+          sed -i "s/\${VERSION}/${VERSION}/g" RELEASE_NOTES.md
+          cat RELEASE_NOTES.md
+
       - name: 创建 Release
         uses: softprops/action-gh-release@v1
         with:
           body_path: RELEASE_NOTES.md
+          draft: false
+          prerelease: false
           files: |
             artifacts/**/*.zip
             artifacts/**/*.exe
