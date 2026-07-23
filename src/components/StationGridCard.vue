@@ -56,4 +56,6 @@ const handlePlay = () => {
 }
 
 const toggleFavorite = () => {
- 
+  emit('favorite', props.station)
+}
+</script>
