@@ -45,9 +45,8 @@ jobs:
             </body>
           </html>
           EOF
-          echo '✅ 已创建 index.html'
           
-          # 创建 src 目录
+          # 创建 src 目录结构
           mkdir -p src/router src/stores src/views src/components src/utils src/types
           
           # 创建 src/main.ts
@@ -63,7 +62,6 @@ jobs:
           app.use(router)
           app.mount('#app')
           EOF
-          echo '✅ 已创建 src/main.ts'
           
           # 创建 src/App.vue
           cat > src/App.vue << 'EOF'
@@ -72,82 +70,32 @@ jobs:
               <router-view />
             </div>
           </template>
-          
-          <script setup lang="ts">
-          </script>
+          <script setup lang="ts"></script>
           EOF
-          echo '✅ 已创建 src/App.vue'
           
           # 创建 src/router/index.ts
           cat > src/router/index.ts << 'EOF'
           import { createRouter, createWebHistory } from 'vue-router'
           
           const routes = [
-            {
-              path: '/',
-              name: 'Home',
-              component: () => import('@/views/Home.vue'),
-            },
-            {
-              path: '/search',
-              name: 'Search',
-              component: () => import('@/views/Search.vue'),
-            },
-            {
-              path: '/history',
-              name: 'History',
-              component: () => import('@/views/History.vue'),
-            },
-            {
-              path: '/favorites',
-              name: 'Favorites',
-              component: () => import('@/views/Favorites.vue'),
-            },
-            {
-              path: '/settings',
-              name: 'Settings',
-              component: () => import('@/views/Settings.vue'),
-            },
-            {
-              path: '/station/:uuid',
-              name: 'StationDetail',
-              component: () => import('@/views/StationDetail.vue'),
-            },
+            { path: '/', name: 'Home', component: () => import('@/views/Home.vue') },
+            { path: '/search', name: 'Search', component: () => import('@/views/Search.vue') },
+            { path: '/history', name: 'History', component: () => import('@/views/History.vue') },
+            { path: '/favorites', name: 'Favorites', component: () => import('@/views/Favorites.vue') },
+            { path: '/settings', name: 'Settings', component: () => import('@/views/Settings.vue') },
+            { path: '/station/:uuid', name: 'StationDetail', component: () => import('@/views/StationDetail.vue') },
           ]
           
           const router = createRouter({
             history: createWebHistory(),
             routes,
-            scrollBehavior() {
-              return { top: 0 }
-            },
+            scrollBehavior() { return { top: 0 } }
           })
           
           export default router
           EOF
-          echo '✅ 已创建 src/router/index.ts'
           
-          # 创建 src/style.css
-          cat > src/style.css << 'EOF'
-          * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-          }
-          
-          body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            background-color: #f2f2f7;
-            color: #1c1c1e;
-          }
-          
-          #app {
-            min-height: 100vh;
-          }
-          EOF
-          echo '✅ 已创建 src/style.css'
-          
-          # 创建 src/views/Home.vue (占位)
+          # 创建所有视图组件
           cat > src/views/Home.vue << 'EOF'
           <template>
             <div class="home">
@@ -155,11 +103,67 @@ jobs:
               <p>欢迎使用全球电台</p>
             </div>
           </template>
-          
-          <script setup lang="ts">
-          </script>
+          <script setup lang="ts"></script>
           EOF
-          echo '✅ 已创建 src/views/Home.vue'
+          
+          cat > src/views/Search.vue << 'EOF'
+          <template>
+            <div class="search">
+              <h1>搜索电台</h1>
+              <p>搜索功能开发中...</p>
+            </div>
+          </template>
+          <script setup lang="ts"></script>
+          EOF
+          
+          cat > src/views/History.vue << 'EOF'
+          <template>
+            <div class="history">
+              <h1>播放历史</h1>
+              <p>历史记录功能开发中...</p>
+            </div>
+          </template>
+          <script setup lang="ts"></script>
+          EOF
+          
+          cat > src/views/Favorites.vue << 'EOF'
+          <template>
+            <div class="favorites">
+              <h1>我的收藏</h1>
+              <p>收藏功能开发中...</p>
+            </div>
+          </template>
+          <script setup lang="ts"></script>
+          EOF
+          
+          cat > src/views/Settings.vue << 'EOF'
+          <template>
+            <div class="settings">
+              <h1>设置</h1>
+              <p>设置功能开发中...</p>
+            </div>
+          </template>
+          <script setup lang="ts"></script>
+          EOF
+          
+          cat > src/views/StationDetail.vue << 'EOF'
+          <template>
+            <div class="station-detail">
+              <h1>电台详情</h1>
+              <p>电台详情功能开发中...</p>
+            </div>
+          </template>
+          <script setup lang="ts"></script>
+          EOF
+          
+          # 创建样式文件
+          cat > src/style.css << 'EOF'
+          * { margin: 0; padding: 0; box-sizing: border-box; }
+          body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background-color: #f2f2f7; color: #1c1c1e; }
+          #app { min-height: 100vh; }
+          .home, .search, .history, .favorites, .settings, .station-detail { padding: 20px; text-align: center; }
+          h1 { font-size: 24px; margin-bottom: 10px; }
+          EOF
           
           # 创建 vite.config.ts
           cat > vite.config.ts << 'EOF'
@@ -185,9 +189,8 @@ jobs:
             },
           })
           EOF
-          echo '✅ 已创建 vite.config.ts'
           
-          # 创建 tsconfig.json
+          # 创建 TypeScript 配置
           cat > tsconfig.json << 'EOF'
           {
             "compilerOptions": {
@@ -207,17 +210,13 @@ jobs:
               "noUnusedParameters": true,
               "noFallthroughCasesInSwitch": true,
               "baseUrl": ".",
-              "paths": {
-                "@/*": ["src/*"]
-              }
+              "paths": { "@/*": ["src/*"] }
             },
             "include": ["src/**/*.ts", "src/**/*.d.ts", "src/**/*.tsx", "src/**/*.vue"],
             "references": [{ "path": "./tsconfig.node.json" }]
           }
           EOF
-          echo '✅ 已创建 tsconfig.json'
           
-          # 创建 tsconfig.node.json
           cat > tsconfig.node.json << 'EOF'
           {
             "compilerOptions": {
@@ -230,16 +229,14 @@ jobs:
             "include": ["vite.config.ts"]
           }
           EOF
-          echo '✅ 已创建 tsconfig.node.json'
           
-          # 创建类型声明文件
           cat > src/vite-env.d.ts << 'EOF'
           /// <reference types="vite/client" />
           EOF
-          echo '✅ 已创建 src/vite-env.d.ts'
           
-          echo '📁 完整目录结构:'
-          find . -type f -name "*.ts" -o -name "*.vue" -o -name "*.json" -o -name "*.html" -o -name "*.css" | grep -v node_modules | sort
+          echo '✅ 所有Vue项目文件创建完成'
+          echo '📁 目录结构:'
+          find src -type f -name "*.vue" -o -name "*.ts" -o -name "*.css" | sort
       
       - name: 构建Web
         run: npm run build
@@ -282,7 +279,7 @@ jobs:
           echo '🔍 验证工具:'
           npx vite --version 2>/dev/null || echo '❌ Vite 不可用'
       
-      - name: 创建完整的Vue项目文件和Electron文件
+      - name: 创建完整的Vue项目和Electron文件
         shell: bash
         run: |
           # 创建 index.html
@@ -310,7 +307,6 @@ jobs:
           import App from './App.vue'
           import router from './router'
           import './style.css'
-          
           const app = createApp(App)
           app.use(createPinia())
           app.use(router)
@@ -318,11 +314,7 @@ jobs:
           EOF
           
           cat > src/App.vue << 'EOF'
-          <template>
-            <div id="app">
-              <router-view />
-            </div>
-          </template>
+          <template><div id="app"><router-view /></div></template>
           <script setup lang="ts"></script>
           EOF
           
@@ -340,15 +332,43 @@ jobs:
           export default router
           EOF
           
+          # 创建所有视图组件
+          cat > src/views/Home.vue << 'EOF'
+          <template><div class="home"><h1>全球电台</h1><p>欢迎使用全球电台</p></div></template>
+          <script setup lang="ts"></script>
+          EOF
+          
+          cat > src/views/Search.vue << 'EOF'
+          <template><div class="search"><h1>搜索电台</h1><p>搜索功能开发中...</p></div></template>
+          <script setup lang="ts"></script>
+          EOF
+          
+          cat > src/views/History.vue << 'EOF'
+          <template><div class="history"><h1>播放历史</h1><p>历史记录功能开发中...</p></div></template>
+          <script setup lang="ts"></script>
+          EOF
+          
+          cat > src/views/Favorites.vue << 'EOF'
+          <template><div class="favorites"><h1>我的收藏</h1><p>收藏功能开发中...</p></div></template>
+          <script setup lang="ts"></script>
+          EOF
+          
+          cat > src/views/Settings.vue << 'EOF'
+          <template><div class="settings"><h1>设置</h1><p>设置功能开发中...</p></div></template>
+          <script setup lang="ts"></script>
+          EOF
+          
+          cat > src/views/StationDetail.vue << 'EOF'
+          <template><div class="station-detail"><h1>电台详情</h1><p>电台详情功能开发中...</p></div></template>
+          <script setup lang="ts"></script>
+          EOF
+          
           cat > src/style.css << 'EOF'
           * { margin: 0; padding: 0; box-sizing: border-box; }
           body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background-color: #f2f2f7; color: #1c1c1e; }
           #app { min-height: 100vh; }
-          EOF
-          
-          cat > src/views/Home.vue << 'EOF'
-          <template><div class="home"><h1>全球电台</h1><p>欢迎使用全球电台</p></div></template>
-          <script setup lang="ts"></script>
+          .home, .search, .history, .favorites, .settings, .station-detail { padding: 20px; text-align: center; }
+          h1 { font-size: 24px; margin-bottom: 10px; }
           EOF
           
           cat > vite.config.ts << 'EOF'
@@ -519,6 +539,7 @@ jobs:
           EOF
           
           mkdir -p src/router src/views
+          
           cat > src/main.ts << 'EOF'
           import { createApp } from 'vue'
           import { createPinia } from 'pinia'
@@ -550,15 +571,40 @@ jobs:
           export default router
           EOF
           
+          cat > src/views/Home.vue << 'EOF'
+          <template><div><h1>全球电台</h1><p>欢迎使用全球电台</p></div></template>
+          <script setup lang="ts"></script>
+          EOF
+          
+          cat > src/views/Search.vue << 'EOF'
+          <template><div><h1>搜索电台</h1><p>搜索功能开发中...</p></div></template>
+          <script setup lang="ts"></script>
+          EOF
+          
+          cat > src/views/History.vue << 'EOF'
+          <template><div><h1>播放历史</h1><p>历史记录功能开发中...</p></div></template>
+          <script setup lang="ts"></script>
+          EOF
+          
+          cat > src/views/Favorites.vue << 'EOF'
+          <template><div><h1>我的收藏</h1><p>收藏功能开发中...</p></div></template>
+          <script setup lang="ts"></script>
+          EOF
+          
+          cat > src/views/Settings.vue << 'EOF'
+          <template><div><h1>设置</h1><p>设置功能开发中...</p></div></template>
+          <script setup lang="ts"></script>
+          EOF
+          
+          cat > src/views/StationDetail.vue << 'EOF'
+          <template><div><h1>电台详情</h1><p>电台详情功能开发中...</p></div></template>
+          <script setup lang="ts"></script>
+          EOF
+          
           cat > src/style.css << 'EOF'
           * { margin: 0; padding: 0; box-sizing: border-box; }
           body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background-color: #f2f2f7; color: #1c1c1e; }
           #app { min-height: 100vh; }
-          EOF
-          
-          cat > src/views/Home.vue << 'EOF'
-          <template><div><h1>全球电台</h1><p>欢迎使用全球电台</p></div></template>
-          <script setup lang="ts"></script>
           EOF
           
           cat > vite.config.ts << 'EOF'
