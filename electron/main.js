@@ -1,30 +1,5 @@
 const { app, BrowserWindow, Menu, shell } = require('electron');
 const path = require('path');
-const fs = require('fs');
-
-// 确保在打包后也能正确找到入口
-function getPreloadPath() {
-  const possiblePaths = [
-    path.join(__dirname, 'preload.js'),
-    path.join(process.resourcesPath, 'app.asar', 'electron', 'preload.js'),
-    path.join(process.cwd(), 'electron', 'preload.js')
-  ];
-  for (const p of possiblePaths) {
-    if (fs.existsSync(p)) {
-      console.log(`✅ 找到 preload 文件: ${p}`);
-      return p;
-    }
-  }
-  console.warn('⚠️ 未找到 preload 文件，使用默认路径');
-  return path.join(__dirname, 'preload.js');
-}
-
-function getIndexPath() {
-  if (app.isPackaged) {
-    return `file://${path.join(__dirname, '../dist/index.html')}`;
-  }
-  return 'http://localhost:4173';
-}
 
 let mainWindow;
 
@@ -35,7 +10,7 @@ function createWindow() {
     minWidth: 800,
     minHeight: 600,
     webPreferences: {
-      preload: getPreloadPath(),
+      preload: path.join(__dirname, 'preload.js'),
       nodeIntegration: false,
       contextIsolation: true,
     },
@@ -46,13 +21,17 @@ function createWindow() {
     backgroundColor: '#1a365d',
   });
 
-  const startUrl = getIndexPath();
-  console.log(`📂 加载 URL: ${startUrl}`);
+  // 加载页面
+  const isDev = !app.isPackaged;
+  const startUrl = isDev
+    ? 'http://localhost:4173'
+    : `file://${path.join(__dirname, '../dist/index.html')}`;
+
   mainWindow.loadURL(startUrl);
 
   mainWindow.once('ready-to-show', () => {
     mainWindow.show();
-    if (!app.isPackaged) {
+    if (isDev) {
       mainWindow.webContents.openDevTools();
     }
   });
@@ -64,9 +43,6 @@ function createWindow() {
 
   Menu.setApplicationMenu(null);
 }
-
-// 导出用于 electron-builder 的入口
-module.exports = { app, createWindow };
 
 app.whenReady().then(createWindow);
 
