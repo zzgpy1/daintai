@@ -12,176 +12,22 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
+      - uses: actions/setup-node@v4
         with:
-          node-version: '22'
-      
-      - name: 安装依赖
-        shell: bash
+          node-version: 18
+          cache: 'npm'
+      - run: npm ci
+      - run: npm run build
+      - name: 验证构建产物
         run: |
-          npm install || npm install --legacy-peer-deps
-          if ! command -v vite &> /dev/null && ! [ -f node_modules/.bin/vite ]; then
-            npm install -D vite @vitejs/plugin-vue
-          fi
-      
-      - name: 创建完整的Vue项目文件
-        shell: bash
-        run: |
-          cat > index.html << 'EOF'
-          <!DOCTYPE html>
-          <html lang="zh-CN">
-            <head>
-              <meta charset="UTF-8" />
-              <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-              <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-              <title>全球电台 - GlobalRadio</title>
-            </head>
-            <body>
-              <div id="app"></div>
-              <script type="module" src="/src/main.ts"></script>
-            </body>
-          </html>
-          EOF
-          
-          mkdir -p src/router src/stores src/views src/components src/utils src/types
-          
-          cat > src/main.ts << 'EOF'
-          import { createApp } from 'vue'
-          import { createPinia } from 'pinia'
-          import App from './App.vue'
-          import router from './router'
-          import './style.css'
-          const app = createApp(App)
-          app.use(createPinia())
-          app.use(router)
-          app.mount('#app')
-          EOF
-          
-          cat > src/App.vue << 'EOF'
-          <template><div id="app"><router-view /></div></template>
-          <script setup lang="ts"></script>
-          EOF
-          
-          cat > src/router/index.ts << 'EOF'
-          import { createRouter, createWebHistory } from 'vue-router'
-          const routes = [
-            { path: '/', name: 'Home', component: () => import('@/views/Home.vue') },
-            { path: '/search', name: 'Search', component: () => import('@/views/Search.vue') },
-            { path: '/history', name: 'History', component: () => import('@/views/History.vue') },
-            { path: '/favorites', name: 'Favorites', component: () => import('@/views/Favorites.vue') },
-            { path: '/settings', name: 'Settings', component: () => import('@/views/Settings.vue') },
-            { path: '/station/:uuid', name: 'StationDetail', component: () => import('@/views/StationDetail.vue') },
-          ]
-          const router = createRouter({ history: createWebHistory(), routes, scrollBehavior() { return { top: 0 } } })
-          export default router
-          EOF
-          
-          cat > src/views/Home.vue << 'EOF'
-          <template><div class="home"><h1>全球电台</h1><p>欢迎使用全球电台</p></div></template>
-          <script setup lang="ts"></script>
-          EOF
-          
-          cat > src/views/Search.vue << 'EOF'
-          <template><div class="search"><h1>搜索电台</h1><p>搜索功能开发中...</p></div></template>
-          <script setup lang="ts"></script>
-          EOF
-          
-          cat > src/views/History.vue << 'EOF'
-          <template><div class="history"><h1>播放历史</h1><p>历史记录功能开发中...</p></div></template>
-          <script setup lang="ts"></script>
-          EOF
-          
-          cat > src/views/Favorites.vue << 'EOF'
-          <template><div class="favorites"><h1>我的收藏</h1><p>收藏功能开发中...</p></div></template>
-          <script setup lang="ts"></script>
-          EOF
-          
-          cat > src/views/Settings.vue << 'EOF'
-          <template><div class="settings"><h1>设置</h1><p>设置功能开发中...</p></div></template>
-          <script setup lang="ts"></script>
-          EOF
-          
-          cat > src/views/StationDetail.vue << 'EOF'
-          <template><div class="station-detail"><h1>电台详情</h1><p>电台详情功能开发中...</p></div></template>
-          <script setup lang="ts"></script>
-          EOF
-          
-          cat > src/style.css << 'EOF'
-          * { margin: 0; padding: 0; box-sizing: border-box; }
-          body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background-color: #f2f2f7; color: #1c1c1e; }
-          #app { min-height: 100vh; }
-          .home, .search, .history, .favorites, .settings, .station-detail { padding: 20px; text-align: center; }
-          h1 { font-size: 24px; margin-bottom: 10px; }
-          EOF
-          
-          cat > vite.config.ts << 'EOF'
-          import { defineConfig } from 'vite'
-          import vue from '@vitejs/plugin-vue'
-          import { resolve } from 'path'
-          export default defineConfig({
-            plugins: [vue()],
-            resolve: { alias: { '@': resolve(__dirname, 'src') } },
-            server: { host: '0.0.0.0', port: 4173 },
-            build: { outDir: 'dist', assetsDir: 'assets', sourcemap: false },
-          })
-          EOF
-          
-          cat > tsconfig.json << 'EOF'
-          {
-            "compilerOptions": {
-              "target": "ES2020",
-              "useDefineForClassFields": true,
-              "module": "ESNext",
-              "lib": ["ES2020", "DOM", "DOM.Iterable"],
-              "skipLibCheck": true,
-              "moduleResolution": "bundler",
-              "allowImportingTsExtensions": true,
-              "resolveJsonModule": true,
-              "isolatedModules": true,
-              "noEmit": true,
-              "jsx": "preserve",
-              "strict": true,
-              "noUnusedLocals": true,
-              "noUnusedParameters": true,
-              "noFallthroughCasesInSwitch": true,
-              "baseUrl": ".",
-              "paths": { "@/*": ["src/*"] }
-            },
-            "include": ["src/**/*.ts", "src/**/*.d.ts", "src/**/*.tsx", "src/**/*.vue"],
-            "references": [{ "path": "./tsconfig.node.json" }]
-          }
-          EOF
-          
-          cat > tsconfig.node.json << 'EOF'
-          {
-            "compilerOptions": {
-              "composite": true,
-              "skipLibCheck": true,
-              "module": "ESNext",
-              "moduleResolution": "bundler",
-              "allowSyntheticDefaultImports": true
-            },
-            "include": ["vite.config.ts"]
-          }
-          EOF
-          
-          cat > src/vite-env.d.ts << 'EOF'
-          /// <reference types="vite/client" />
-          EOF
-          
-          echo '✅ 所有Vue项目文件创建完成'
-      
-      - name: 构建Web
-        run: npm run build
-      
+          ls -la dist/
+          test -f dist/index.html || (echo "index.html不存在" && exit 1)
       - uses: actions/upload-artifact@v4
         with:
           name: web-dist
           path: dist/
 
-  # 2. 构建Electron桌面端
+  # 2. 构建Electron桌面端 (修正)
   build-electron:
     strategy:
       matrix:
@@ -189,515 +35,65 @@ jobs:
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
-      
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
+      - uses: actions/setup-node@v4
         with:
-          node-version: '22'
-      
-      - name: 安装依赖并确保工具链完整
-        shell: bash
+          node-version: 18
+          cache: 'npm'
+      - run: npm ci
+      - name: 验证Electron入口文件
         run: |
-          set +e
-          npm install || npm install --legacy-peer-deps
-          
-          if ! command -v vite &> /dev/null && ! [ -f node_modules/.bin/vite ]; then
-            echo '⚠️  Vite 未找到，正在安装...'
-            npm install -D vite @vitejs/plugin-vue
-          fi
-          
-          if ! [ -f node_modules/.bin/electron-builder ]; then
-            echo '⚠️  Electron 未找到，正在安装...'
-            npm install -D electron electron-builder
-          fi
-          
-          echo '🔍 验证工具:'
-          npx vite --version 2>/dev/null || echo '❌ Vite 不可用'
-      
-      - name: 创建完整的Vue项目和Electron文件
-        shell: bash
+          test -f electron/main.js || (echo "electron/main.js不存在" && exit 1)
+          test -f electron/preload.js || (echo "electron/preload.js不存在" && exit 1)
+      - run: npm run build
+      - name: 验证构建产物
         run: |
-          cat > index.html << 'EOF'
-          <!DOCTYPE html>
-          <html lang="zh-CN">
-            <head>
-              <meta charset="UTF-8" />
-              <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-              <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-              <title>全球电台 - GlobalRadio</title>
-            </head>
-            <body>
-              <div id="app"></div>
-              <script type="module" src="/src/main.ts"></script>
-            </body>
-          </html>
-          EOF
-          
-          mkdir -p src/router src/stores src/views src/components src/utils src/types
-          
-          cat > src/main.ts << 'EOF'
-          import { createApp } from 'vue'
-          import { createPinia } from 'pinia'
-          import App from './App.vue'
-          import router from './router'
-          import './style.css'
-          const app = createApp(App)
-          app.use(createPinia())
-          app.use(router)
-          app.mount('#app')
-          EOF
-          
-          cat > src/App.vue << 'EOF'
-          <template><div id="app"><router-view /></div></template>
-          <script setup lang="ts"></script>
-          EOF
-          
-          cat > src/router/index.ts << 'EOF'
-          import { createRouter, createWebHistory } from 'vue-router'
-          const routes = [
-            { path: '/', name: 'Home', component: () => import('@/views/Home.vue') },
-            { path: '/search', name: 'Search', component: () => import('@/views/Search.vue') },
-            { path: '/history', name: 'History', component: () => import('@/views/History.vue') },
-            { path: '/favorites', name: 'Favorites', component: () => import('@/views/Favorites.vue') },
-            { path: '/settings', name: 'Settings', component: () => import('@/views/Settings.vue') },
-            { path: '/station/:uuid', name: 'StationDetail', component: () => import('@/views/StationDetail.vue') },
-          ]
-          const router = createRouter({ history: createWebHistory(), routes, scrollBehavior() { return { top: 0 } } })
-          export default router
-          EOF
-          
-          cat > src/views/Home.vue << 'EOF'
-          <template><div><h1>全球电台</h1><p>欢迎使用全球电台</p></div></template>
-          <script setup lang="ts"></script>
-          EOF
-          
-          cat > src/views/Search.vue << 'EOF'
-          <template><div><h1>搜索电台</h1><p>搜索功能开发中...</p></div></template>
-          <script setup lang="ts"></script>
-          EOF
-          
-          cat > src/views/History.vue << 'EOF'
-          <template><div><h1>播放历史</h1><p>历史记录功能开发中...</p></div></template>
-          <script setup lang="ts"></script>
-          EOF
-          
-          cat > src/views/Favorites.vue << 'EOF'
-          <template><div><h1>我的收藏</h1><p>收藏功能开发中...</p></div></template>
-          <script setup lang="ts"></script>
-          EOF
-          
-          cat > src/views/Settings.vue << 'EOF'
-          <template><div><h1>设置</h1><p>设置功能开发中...</p></div></template>
-          <script setup lang="ts"></script>
-          EOF
-          
-          cat > src/views/StationDetail.vue << 'EOF'
-          <template><div><h1>电台详情</h1><p>电台详情功能开发中...</p></div></template>
-          <script setup lang="ts"></script>
-          EOF
-          
-          cat > src/style.css << 'EOF'
-          * { margin: 0; padding: 0; box-sizing: border-box; }
-          body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background-color: #f2f2f7; color: #1c1c1e; }
-          #app { min-height: 100vh; }
-          EOF
-          
-          cat > vite.config.ts << 'EOF'
-          import { defineConfig } from 'vite'
-          import vue from '@vitejs/plugin-vue'
-          import { resolve } from 'path'
-          export default defineConfig({
-            plugins: [vue()],
-            resolve: { alias: { '@': resolve(__dirname, 'src') } },
-            server: { host: '0.0.0.0', port: 4173 },
-            build: { outDir: 'dist', assetsDir: 'assets', sourcemap: false },
-          })
-          EOF
-          
-          cat > tsconfig.json << 'EOF'
-          {
-            "compilerOptions": {
-              "target": "ES2020",
-              "useDefineForClassFields": true,
-              "module": "ESNext",
-              "lib": ["ES2020", "DOM", "DOM.Iterable"],
-              "skipLibCheck": true,
-              "moduleResolution": "bundler",
-              "allowImportingTsExtensions": true,
-              "resolveJsonModule": true,
-              "isolatedModules": true,
-              "noEmit": true,
-              "jsx": "preserve",
-              "strict": true,
-              "noUnusedLocals": true,
-              "noUnusedParameters": true,
-              "noFallthroughCasesInSwitch": true,
-              "baseUrl": ".",
-              "paths": { "@/*": ["src/*"] }
-            },
-            "include": ["src/**/*.ts", "src/**/*.d.ts", "src/**/*.tsx", "src/**/*.vue"],
-            "references": [{ "path": "./tsconfig.node.json" }]
-          }
-          EOF
-          
-          cat > tsconfig.node.json << 'EOF'
-          {
-            "compilerOptions": {
-              "composite": true,
-              "skipLibCheck": true,
-              "module": "ESNext",
-              "moduleResolution": "bundler",
-              "allowSyntheticDefaultImports": true
-            },
-            "include": ["vite.config.ts"]
-          }
-          EOF
-          
-          cat > src/vite-env.d.ts << 'EOF'
-          /// <reference types="vite/client" />
-          EOF
-          
-          mkdir -p electron
-          cat > electron/main.js << 'EOF'
-          const { app, BrowserWindow, Menu, shell } = require('electron');
-          const path = require('path');
-          let mainWindow;
-          function createWindow() {
-            mainWindow = new BrowserWindow({
-              width: 1200,
-              height: 800,
-              webPreferences: {
-                preload: path.join(__dirname, 'preload.js'),
-                nodeIntegration: false,
-                contextIsolation: true,
-              },
-              icon: path.join(__dirname, '../public/favicon.ico'),
-              show: false,
-            });
-            const isDev = !app.isPackaged;
-            const startUrl = isDev
-              ? 'http://localhost:4173'
-              : `file://${path.join(__dirname, '../dist/index.html')}`;
-            mainWindow.loadURL(startUrl);
-            mainWindow.once('ready-to-show', () => mainWindow.show());
-            mainWindow.webContents.setWindowOpenHandler(({ url }) => {
-              shell.openExternal(url);
-              return { action: 'deny' };
-            });
-            Menu.setApplicationMenu(null);
-          }
-          app.whenReady().then(createWindow);
-          app.on('window-all-closed', () => { if (process.platform !== 'darwin') app.quit(); });
-          app.on('activate', () => { if (BrowserWindow.getAllWindows().length === 0) createWindow(); });
-          EOF
-          
-          cat > electron/preload.js << 'EOF'
-          const { contextBridge } = require('electron');
-          contextBridge.exposeInMainWorld('electronAPI', {
-            platform: process.platform,
-          });
-          EOF
-          
-          echo '✅ 所有文件创建完成'
-      
-      # 修正 package.json（使用 node 替代 sed，避免跨平台兼容性问题）
-      - name: 强制修正 package.json 的 Electron 配置
-        shell: bash
-        run: |
-          node -e "
-            const fs = require('fs');
-            const pkg = JSON.parse(fs.readFileSync('package.json', 'utf8'));
-            
-            pkg.main = 'electron/main.js';
-            
-            if (!pkg.scripts) pkg.scripts = {};
-            pkg.scripts.build = 'npx vite build';
-            pkg.scripts['electron:build'] = 'npm run build && npx electron-builder';
-            pkg.scripts['electron:dev'] = 'npm run build && npx electron .';
-            
-            pkg.build = {
-              appId: 'com.globalradio.app',
-              productName: '全球电台',
-              directories: { output: 'release' },
-              files: ['dist/**/*', 'electron/**/*'],
-              extraResources: [{ from: 'electron', to: 'electron', filter: ['**/*'] }],
-              linux: { target: ['AppImage', 'deb'], icon: 'public/icon.png', category: 'Audio' },
-              mac: { target: ['dmg', 'zip'], icon: 'public/icon.icns', category: 'public.app-category.music' },
-              win: { target: ['nsis', 'portable'], icon: 'public/favicon.ico' },
-              nsis: { oneClick: false, allowToChangeInstallationDirectory: true, createDesktopShortcut: true, createStartMenuShortcut: true }
-            };
-            
-            fs.writeFileSync('package.json', JSON.stringify(pkg, null, 2));
-            console.log('✅ 已修正 package.json');
-            console.log('📋 main:', pkg.main);
-          "
-      
-      # 修正 capacitor.config.ts（使用 node 替代 sed）
-      - name: 强制修正 capacitor.config.ts
-        shell: bash
-        run: |
-          if [ -f "capacitor.config.ts" ]; then
-            node -e "
-              const fs = require('fs');
-              let content = fs.readFileSync('capacitor.config.ts', 'utf8');
-              content = content.replace(/webDir:\s*['\"]www['\"]/g, 'webDir: \"dist\"');
-              content = content.replace(/\"webDir\"\s*:\s*['\"]www['\"]/g, '\"webDir\": \"dist\"');
-              fs.writeFileSync('capacitor.config.ts', content);
-              console.log('✅ 已修正 capacitor.config.ts');
-            "
-          else
-            echo '⚠️ capacitor.config.ts 不存在，正在创建...'
-            cat > capacitor.config.ts << 'EOF'
-          import { CapacitorConfig } from '@capacitor/cli';
-          const config: CapacitorConfig = {
-            appId: 'com.globalradio.app',
-            appName: '全球电台',
-            webDir: 'dist',
-            server: { androidScheme: 'https' },
-            plugins: {
-              SplashScreen: { launchShowDuration: 800, backgroundColor: "#1a365d" },
-              StatusBar: { style: "dark", backgroundColor: "#1a365d" }
-            },
-            android: { allowMixedContent: true, captureInput: true }
-          };
-          export default config;
-          EOF
-            echo '✅ 已创建 capacitor.config.ts'
-          fi
-      
+          ls -la dist/
+          test -f dist/index.html || (echo "dist/index.html不存在" && exit 1)
       - name: 构建Electron应用
         run: npm run electron:build
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      
       - uses: actions/upload-artifact@v4
         with:
           name: electron-${{ matrix.os }}
           path: release/
 
-  # 3. 构建Android APK（仅在 ubuntu 运行，且需要先初始化 Android 项目）
+  # 3. 构建Android APK (修正)
   build-android:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
+      - uses: actions/setup-node@v4
         with:
-          node-version: '22'
-      
+          node-version: 18
+          cache: 'npm'
       - name: Setup Java
         uses: actions/setup-java@v4
         with:
           distribution: 'temurin'
           java-version: '17'
-      
-      - name: 安装依赖
-        shell: bash
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+      - run: npm ci
+      - run: npm run build
+      - name: 验证Capacitor配置
         run: |
-          npm install || npm install --legacy-peer-deps
-          if ! command -v vite &> /dev/null && ! [ -f node_modules/.bin/vite ]; then
-            npm install -D vite @vitejs/plugin-vue
-          fi
-      
-      - name: 创建Vue项目文件
-        shell: bash
-        run: |
-          cat > index.html << 'EOF'
-          <!DOCTYPE html>
-          <html lang="zh-CN">
-            <head>
-              <meta charset="UTF-8" />
-              <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-              <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-              <title>全球电台 - GlobalRadio</title>
-            </head>
-            <body>
-              <div id="app"></div>
-              <script type="module" src="/src/main.ts"></script>
-            </body>
-          </html>
-          EOF
-          
-          mkdir -p src/router src/views
-          
-          cat > src/main.ts << 'EOF'
-          import { createApp } from 'vue'
-          import { createPinia } from 'pinia'
-          import App from './App.vue'
-          import router from './router'
-          import './style.css'
-          const app = createApp(App)
-          app.use(createPinia())
-          app.use(router)
-          app.mount('#app')
-          EOF
-          
-          cat > src/App.vue << 'EOF'
-          <template><div id="app"><router-view /></div></template>
-          <script setup lang="ts"></script>
-          EOF
-          
-          cat > src/router/index.ts << 'EOF'
-          import { createRouter, createWebHistory } from 'vue-router'
-          const routes = [
-            { path: '/', name: 'Home', component: () => import('@/views/Home.vue') },
-            { path: '/search', name: 'Search', component: () => import('@/views/Search.vue') },
-            { path: '/history', name: 'History', component: () => import('@/views/History.vue') },
-            { path: '/favorites', name: 'Favorites', component: () => import('@/views/Favorites.vue') },
-            { path: '/settings', name: 'Settings', component: () => import('@/views/Settings.vue') },
-            { path: '/station/:uuid', name: 'StationDetail', component: () => import('@/views/StationDetail.vue') },
-          ]
-          const router = createRouter({ history: createWebHistory(), routes, scrollBehavior() { return { top: 0 } } })
-          export default router
-          EOF
-          
-          cat > src/views/Home.vue << 'EOF'
-          <template><div><h1>全球电台</h1><p>欢迎使用全球电台</p></div></template>
-          <script setup lang="ts"></script>
-          EOF
-          
-          cat > src/views/Search.vue << 'EOF'
-          <template><div><h1>搜索电台</h1><p>搜索功能开发中...</p></div></template>
-          <script setup lang="ts"></script>
-          EOF
-          
-          cat > src/views/History.vue << 'EOF'
-          <template><div><h1>播放历史</h1><p>历史记录功能开发中...</p></div></template>
-          <script setup lang="ts"></script>
-          EOF
-          
-          cat > src/views/Favorites.vue << 'EOF'
-          <template><div><h1>我的收藏</h1><p>收藏功能开发中...</p></div></template>
-          <script setup lang="ts"></script>
-          EOF
-          
-          cat > src/views/Settings.vue << 'EOF'
-          <template><div><h1>设置</h1><p>设置功能开发中...</p></div></template>
-          <script setup lang="ts"></script>
-          EOF
-          
-          cat > src/views/StationDetail.vue << 'EOF'
-          <template><div><h1>电台详情</h1><p>电台详情功能开发中...</p></div></template>
-          <script setup lang="ts"></script>
-          EOF
-          
-          cat > src/style.css << 'EOF'
-          * { margin: 0; padding: 0; box-sizing: border-box; }
-          body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background-color: #f2f2f7; color: #1c1c1e; }
-          #app { min-height: 100vh; }
-          EOF
-          
-          cat > vite.config.ts << 'EOF'
-          import { defineConfig } from 'vite'
-          import vue from '@vitejs/plugin-vue'
-          import { resolve } from 'path'
-          export default defineConfig({
-            plugins: [vue()],
-            resolve: { alias: { '@': resolve(__dirname, 'src') } },
-            build: { outDir: 'dist' },
-          })
-          EOF
-          
-          cat > tsconfig.json << 'EOF'
-          {
-            "compilerOptions": {
-              "target": "ES2020",
-              "module": "ESNext",
-              "lib": ["ES2020", "DOM", "DOM.Iterable"],
-              "skipLibCheck": true,
-              "moduleResolution": "bundler",
-              "allowImportingTsExtensions": true,
-              "resolveJsonModule": true,
-              "isolatedModules": true,
-              "noEmit": true,
-              "jsx": "preserve",
-              "strict": true,
-              "baseUrl": ".",
-              "paths": { "@/*": ["src/*"] }
-            },
-            "include": ["src/**/*.ts", "src/**/*.d.ts", "src/**/*.tsx", "src/**/*.vue"],
-            "references": [{ "path": "./tsconfig.node.json" }]
-          }
-          EOF
-          
-          cat > tsconfig.node.json << 'EOF'
-          {
-            "compilerOptions": {
-              "composite": true,
-              "skipLibCheck": true,
-              "module": "ESNext",
-              "moduleResolution": "bundler",
-              "allowSyntheticDefaultImports": true
-            },
-            "include": ["vite.config.ts"]
-          }
-          EOF
-          
-          cat > src/vite-env.d.ts << 'EOF'
-          /// <reference types="vite/client" />
-          EOF
-          
-          echo '✅ 所有Vue项目文件创建完成'
-      
-      # 修正 capacitor.config.ts
-      - name: 强制修正 capacitor.config.ts
-        shell: bash
-        run: |
-          if [ -f "capacitor.config.ts" ]; then
-            node -e "
-              const fs = require('fs');
-              let content = fs.readFileSync('capacitor.config.ts', 'utf8');
-              content = content.replace(/webDir:\s*['\"]www['\"]/g, 'webDir: \"dist\"');
-              content = content.replace(/\"webDir\"\s*:\s*['\"]www['\"]/g, '\"webDir\": \"dist\"');
-              fs.writeFileSync('capacitor.config.ts', content);
-              console.log('✅ 已修正 capacitor.config.ts');
-            "
-          else
-            echo '⚠️ capacitor.config.ts 不存在，正在创建...'
-            cat > capacitor.config.ts << 'EOF'
-          import { CapacitorConfig } from '@capacitor/cli';
-          const config: CapacitorConfig = {
-            appId: 'com.globalradio.app',
-            appName: '全球电台',
-            webDir: 'dist',
-            server: { androidScheme: 'https' },
-            plugins: {
-              SplashScreen: { launchShowDuration: 800, backgroundColor: "#1a365d" },
-              StatusBar: { style: "dark", backgroundColor: "#1a365d" }
-            },
-            android: { allowMixedContent: true, captureInput: true }
-          };
-          export default config;
-          EOF
-            echo '✅ 已创建 capacitor.config.ts'
-          fi
-      
-      - name: 构建Vue
-        run: npm run build
-      
-      # 初始化 Android 项目（如果不存在）
-      - name: 初始化 Android 项目
-        shell: bash
-        run: |
-          if [ ! -d "android" ]; then
-            echo '⚠️ Android 目录不存在，正在初始化...'
-            npx cap init "全球电台" "com.globalradio.app" --web-dir=dist
-            npx cap add android
-            echo '✅ Android 项目已初始化'
-          else
-            echo '✅ Android 目录已存在'
-          fi
-      
+          test -f capacitor.config.ts || (echo "capacitor.config.ts不存在" && exit 1)
       - name: 同步Capacitor
         run: npx cap sync android
-      
+      - name: 验证Android项目
+        run: |
+          cd android
+          test -f gradlew || (echo "gradlew不存在，尝试重新添加Android平台" && cd .. && npx cap add android)
       - name: 构建APK
         run: |
           cd android
           chmod +x gradlew
           ./gradlew assembleRelease
-      
+      - name: 验证APK
+        run: |
+          ls -la android/app/build/outputs/apk/release/
+          test -f android/app/build/outputs/apk/release/*.apk || (echo "APK构建失败" && exit 1)
       - uses: actions/upload-artifact@v4
         with:
           name: android-apk
@@ -709,14 +105,47 @@ jobs:
     runs-on: ubuntu-latest
     if: startsWith(github.ref, 'refs/tags/')
     steps:
+      - uses: actions/checkout@v4
       - uses: actions/download-artifact@v4
         with:
           path: artifacts
-      
+      - name: 生成Release Notes
+        run: |
+          VERSION=${GITHUB_REF#refs/tags/v}
+          cat > RELEASE_NOTES.md << EOF
+          # 全球电台 v${VERSION}
+
+          ## 📦 下载说明
+          请根据您的操作系统选择对应的安装包：
+
+          ### 🖥️ Windows
+          - \`global-radio-${VERSION}-win-setup.exe\` - 安装版
+          - \`global-radio-${VERSION}-win-portable.exe\` - 便携版
+
+          ### 🍎 macOS
+          - \`global-radio-${VERSION}-mac.dmg\` - DMG安装包
+          - \`global-radio-${VERSION}-mac.zip\` - ZIP压缩包
+
+          ### 🐧 Linux
+          - \`global-radio-${VERSION}-linux.AppImage\` - AppImage
+          - \`global-radio-${VERSION}-linux.deb\` - DEB安装包
+
+          ### 📱 Android
+          - \`app-release-${VERSION}.apk\` - APK安装包
+
+          ### 🌐 Web
+          - Web版本已部署到演示站点
+
+          ---
+          感谢使用全球电台！如有问题请反馈至 [Issues](https://github.com/moli-xia/global-radio/issues)
+          EOF
+          cat RELEASE_NOTES.md
       - name: 创建Release
         uses: softprops/action-gh-release@v1
         with:
           body_path: RELEASE_NOTES.md
+          draft: false
+          prerelease: false
           files: |
             artifacts/**/*.zip
             artifacts/**/*.exe
