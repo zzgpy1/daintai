@@ -56,6 +56,9 @@
     },
     "files": [
       "dist/**/*",
+      "!dist/registerSW.js",
+      "!dist/workbox-*.js",
+      "!dist/manifest.webmanifest",
       "electron/**/*"
     ],
     "extraResources": [
