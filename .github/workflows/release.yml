@@ -7,15 +7,43 @@ on:
   workflow_dispatch:
 
 jobs:
-  # 1. 构建Web产物
-  build-web:
+  # 1. 检查并生成锁文件
+  prepare-lock:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: 18
+          node-version: 22
           cache: 'npm'
+      - name: 生成 package-lock.json（如果缺失）
+        run: |
+          if [ ! -f package-lock.json ]; then
+            echo "⚠️ package-lock.json 不存在，正在生成..."
+            npm install --package-lock-only
+          else
+            echo "✅ package-lock.json 已存在"
+          fi
+      - name: 上传锁文件作为制品
+        uses: actions/upload-artifact@v4
+        with:
+          name: lockfile
+          path: package-lock.json
+
+  # 2. 构建 Web 产物
+  build-web:
+    needs: prepare-lock
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: 'npm'
+      - name: 下载锁文件
+        uses: actions/download-artifact@v4
+        with:
+          name: lockfile
       - run: npm ci
       - run: npm run build
       - uses: actions/upload-artifact@v4
@@ -23,8 +51,9 @@ jobs:
           name: web-dist
           path: dist/
 
-  # 2. 构建Electron桌面端
+  # 3. 构建 Electron 桌面端
   build-electron:
+    needs: prepare-lock
     strategy:
       matrix:
         os: [ubuntu-latest, windows-latest, macos-latest]
@@ -33,13 +62,15 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: 22   # 或 'lts/*' 以始终使用最新 LTS
-          cache: 'npm'       # 添加此参数可启用依赖缓存，加速构建
+          node-version: 22
+          cache: 'npm'
+      - name: 下载锁文件
+        uses: actions/download-artifact@v4
+        with:
+          name: lockfile
       - run: npm ci
       - run: npm run build
-      - name: Prepare release
-        run: node scripts/release-prepare.js
-      - name: Build Electron App
+      - name: 构建 Electron 应用
         run: npm run electron:build
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -48,25 +79,30 @@ jobs:
           name: electron-${{ matrix.os }}
           path: release/
 
-  # 3. 构建Android APK
+  # 4. 构建 Android APK
   build-android:
+    needs: prepare-lock
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: 18
+          node-version: 22
           cache: 'npm'
-      - name: Setup Java
+      - name: 设置 Java 环境
         uses: actions/setup-java@v4
         with:
           distribution: 'temurin'
           java-version: '17'
+      - name: 下载锁文件
+        uses: actions/download-artifact@v4
+        with:
+          name: lockfile
       - run: npm ci
       - run: npm run build
-      - name: Sync Capacitor
+      - name: 同步 Capacitor
         run: npx cap sync android
-      - name: Build APK
+      - name: 构建 APK
         run: |
           cd android
           chmod +x gradlew
@@ -76,18 +112,50 @@ jobs:
           name: android-apk
           path: android/app/build/outputs/apk/release/*.apk
 
-  # 4. 创建GitHub Release
+  # 5. 创建 GitHub Release
   create-release:
     needs: [build-web, build-electron, build-android]
     runs-on: ubuntu-latest
     if: startsWith(github.ref, 'refs/tags/')
     steps:
+      - uses: actions/checkout@v4
       - uses: actions/download-artifact@v4
         with:
           path: artifacts
-      - name: List artifacts
-        run: ls -la artifacts/
-      - name: Create Release
+      - name: 生成 Release 说明
+        run: |
+          VERSION=${GITHUB_REF#refs/tags/}
+          cat > RELEASE_NOTES.md << EOF
+          # 全球电台 $VERSION
+
+          ## 📦 下载说明
+          请根据您的操作系统选择对应的安装包：
+
+          ### 🖥️ Windows
+          - \`global-radio-${VERSION}-win-setup.exe\` - 安装版
+          - \`global-radio-${VERSION}-win-portable.exe\` - 便携版
+
+          ### 🍎 macOS
+          - \`global-radio-${VERSION}-mac.dmg\` - DMG 安装包
+          - \`global-radio-${VERSION}-mac.zip\` - ZIP 压缩包
+
+          ### 🐧 Linux
+          - \`global-radio-${VERSION}-linux.AppImage\` - AppImage
+          - \`global-radio-${VERSION}-linux.deb\` - DEB 安装包
+
+          ### 📱 Android
+          - \`app-release-${VERSION}.apk\` - APK 安装包
+
+          ### 🌐 Web
+          - Web 版本已部署到演示站点
+
+          ## 📝 更新内容
+          - 修复已知问题
+          - 提升应用稳定性
+
+          感谢使用全球电台！如有问题请反馈至 [Issues](https://github.com/moli-xia/global-radio/issues)
+          EOF
+      - name: 创建 GitHub Release
         uses: softprops/action-gh-release@v1
         with:
           body_path: RELEASE_NOTES.md
