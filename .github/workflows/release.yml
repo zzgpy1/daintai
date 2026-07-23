@@ -217,7 +217,6 @@ jobs:
       - name: 创建完整的Vue项目和Electron文件
         shell: bash
         run: |
-          # 创建 index.html
           cat > index.html << 'EOF'
           <!DOCTYPE html>
           <html lang="zh-CN">
@@ -358,7 +357,6 @@ jobs:
           /// <reference types="vite/client" />
           EOF
           
-          # 创建 Electron 源文件
           mkdir -p electron
           cat > electron/main.js << 'EOF'
           const { app, BrowserWindow, Menu, shell } = require('electron');
@@ -402,79 +400,51 @@ jobs:
           
           echo '✅ 所有文件创建完成'
       
-      # 🔧 关键修复：强制修正 package.json 的 Electron 配置
-      - name: 强制修正 package.json 的 Electron 打包配置
+      # 修正 package.json（使用 node 替代 sed，避免跨平台兼容性问题）
+      - name: 强制修正 package.json 的 Electron 配置
         shell: bash
         run: |
           node -e "
             const fs = require('fs');
             const pkg = JSON.parse(fs.readFileSync('package.json', 'utf8'));
             
-            // 确保主入口指向 electron/main.js
             pkg.main = 'electron/main.js';
             
-            // 确保 scripts 正确
             if (!pkg.scripts) pkg.scripts = {};
             pkg.scripts.build = 'npx vite build';
             pkg.scripts['electron:build'] = 'npm run build && npx electron-builder';
             pkg.scripts['electron:dev'] = 'npm run build && npx electron .';
             
-            // 完整的 build 配置
             pkg.build = {
               appId: 'com.globalradio.app',
               productName: '全球电台',
-              directories: {
-                output: 'release'
-              },
-              files: [
-                'dist/**/*',
-                'electron/**/*'
-              ],
-              extraResources: [
-                {
-                  from: 'electron',
-                  to: 'electron',
-                  filter: ['**/*']
-                }
-              ],
-              linux: {
-                target: ['AppImage', 'deb'],
-                icon: 'public/icon.png',
-                category: 'Audio'
-              },
-              mac: {
-                target: ['dmg', 'zip'],
-                icon: 'public/icon.icns',
-                category: 'public.app-category.music'
-              },
-              win: {
-                target: ['nsis', 'portable'],
-                icon: 'public/favicon.ico'
-              },
-              nsis: {
-                oneClick: false,
-                allowToChangeInstallationDirectory: true,
-                createDesktopShortcut: true,
-                createStartMenuShortcut: true
-              }
+              directories: { output: 'release' },
+              files: ['dist/**/*', 'electron/**/*'],
+              extraResources: [{ from: 'electron', to: 'electron', filter: ['**/*'] }],
+              linux: { target: ['AppImage', 'deb'], icon: 'public/icon.png', category: 'Audio' },
+              mac: { target: ['dmg', 'zip'], icon: 'public/icon.icns', category: 'public.app-category.music' },
+              win: { target: ['nsis', 'portable'], icon: 'public/favicon.ico' },
+              nsis: { oneClick: false, allowToChangeInstallationDirectory: true, createDesktopShortcut: true, createStartMenuShortcut: true }
             };
             
             fs.writeFileSync('package.json', JSON.stringify(pkg, null, 2));
-            console.log('✅ 已强制修正 package.json 的 Electron 配置');
-            console.log('📋 关键配置:');
-            console.log('  - main:', pkg.main);
-            console.log('  - build.files:', pkg.build.files);
+            console.log('✅ 已修正 package.json');
+            console.log('📋 main:', pkg.main);
           "
       
-      # 🔧 关键修复：强制修正 capacitor.config.ts
+      # 修正 capacitor.config.ts（使用 node 替代 sed）
       - name: 强制修正 capacitor.config.ts
         shell: bash
         run: |
           if [ -f "capacitor.config.ts" ]; then
-            sed -i "s/webDir: 'www'/webDir: 'dist'/g" capacitor.config.ts
-            sed -i 's/"webDir": "www"/"webDir": "dist"/g' capacitor.config.ts
-            echo '✅ 已修正 capacitor.config.ts 中的 webDir'
-            cat capacitor.config.ts | grep -i webdir || echo '⚠️ 未找到 webDir 配置'
+            node -e "
+              const fs = require('fs');
+              let content = fs.readFileSync('capacitor.config.ts', 'utf8');
+              content = content.replace(/webDir:\s*['\"]www['\"]/g, 'webDir: \"dist\"');
+              content = content.replace(/\"webDir\"\s*:\s*['\"]www['\"]/g, '\"webDir\": \"dist\"');
+              fs.writeFileSync('capacitor.config.ts', content);
+              console.log('✅ 已修正 capacitor.config.ts');
+            "
           else
             echo '⚠️ capacitor.config.ts 不存在，正在创建...'
             cat > capacitor.config.ts << 'EOF'
@@ -495,20 +465,6 @@ jobs:
             echo '✅ 已创建 capacitor.config.ts'
           fi
       
-      - name: 确保所有必要脚本存在
-        shell: bash
-        run: |
-          node -e "
-            const fs = require('fs');
-            const pkg = JSON.parse(fs.readFileSync('package.json', 'utf8'));
-            if (!pkg.scripts) pkg.scripts = {};
-            if (!pkg.scripts.build) pkg.scripts.build = 'npx vite build';
-            if (!pkg.scripts['electron:build']) pkg.scripts['electron:build'] = 'npm run build && npx electron-builder';
-            if (!pkg.scripts['electron:dev']) pkg.scripts['electron:dev'] = 'npm run build && npx electron .';
-            fs.writeFileSync('package.json', JSON.stringify(pkg, null, 2));
-            console.log('✅ 已确保所有必要脚本存在');
-          "
-      
       - name: 构建Electron应用
         run: npm run electron:build
         env:
@@ -519,7 +475,7 @@ jobs:
           name: electron-${{ matrix.os }}
           path: release/
 
-  # 3. 构建Android APK
+  # 3. 构建Android APK（仅在 ubuntu 运行，且需要先初始化 Android 项目）
   build-android:
     runs-on: ubuntu-latest
     steps:
@@ -684,14 +640,19 @@ jobs:
           
           echo '✅ 所有Vue项目文件创建完成'
       
-      # 🔧 关键修复：强制修正 capacitor.config.ts
+      # 修正 capacitor.config.ts
       - name: 强制修正 capacitor.config.ts
         shell: bash
         run: |
           if [ -f "capacitor.config.ts" ]; then
-            sed -i "s/webDir: 'www'/webDir: 'dist'/g" capacitor.config.ts
-            sed -i 's/"webDir": "www"/"webDir": "dist"/g' capacitor.config.ts
-            echo '✅ 已修正 capacitor.config.ts 中的 webDir'
+            node -e "
+              const fs = require('fs');
+              let content = fs.readFileSync('capacitor.config.ts', 'utf8');
+              content = content.replace(/webDir:\s*['\"]www['\"]/g, 'webDir: \"dist\"');
+              content = content.replace(/\"webDir\"\s*:\s*['\"]www['\"]/g, '\"webDir\": \"dist\"');
+              fs.writeFileSync('capacitor.config.ts', content);
+              console.log('✅ 已修正 capacitor.config.ts');
+            "
           else
             echo '⚠️ capacitor.config.ts 不存在，正在创建...'
             cat > capacitor.config.ts << 'EOF'
@@ -715,19 +676,27 @@ jobs:
       - name: 构建Vue
         run: npm run build
       
+      # 初始化 Android 项目（如果不存在）
+      - name: 初始化 Android 项目
+        shell: bash
+        run: |
+          if [ ! -d "android" ]; then
+            echo '⚠️ Android 目录不存在，正在初始化...'
+            npx cap init "全球电台" "com.globalradio.app" --web-dir=dist
+            npx cap add android
+            echo '✅ Android 项目已初始化'
+          else
+            echo '✅ Android 目录已存在'
+          fi
+      
       - name: 同步Capacitor
         run: npx cap sync android
       
       - name: 构建APK
         run: |
-          if [ -d "android" ] && [ -f "android/gradlew" ]; then
-            cd android
-            chmod +x gradlew
-            ./gradlew assembleRelease
-          else
-            echo '⚠️ Android 目录或 gradlew 文件不存在，跳过构建'
-            exit 1
-          fi
+          cd android
+          chmod +x gradlew
+          ./gradlew assembleRelease
       
       - uses: actions/upload-artifact@v4
         with:
