@@ -28,8 +28,6 @@ jobs:
           echo "📂 检查关键文件..."
           test -f src/main.ts || (echo "❌ src/main.ts 不存在" && exit 1)
           test -f index.html || (echo "❌ index.html 不存在" && exit 1)
-          test -f electron/main.js || (echo "⚠️ electron/main.js 不存在")
-          test -f electron/preload.js || (echo "⚠️ electron/preload.js 不存在")
           echo "✅ 验证通过"
 
   # 2. 构建 Web 产物
@@ -52,37 +50,7 @@ jobs:
           name: web-dist
           path: dist/
 
-  # 3. 构建 Electron 桌面端 (Linux)
-  build-electron:
-    runs-on: ubuntu-latest
-    needs: validate
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: ${{ env.NODE_VERSION }}
-      - name: 安装依赖
-        run: npm install --no-audit --no-fund
-      - name: 显示 Electron 文件
-        run: |
-          echo "📂 electron 目录内容："
-          ls -la electron/ || echo "⚠️ electron 目录不存在"
-      - name: 构建 Web
-        run: npm run build
-      - name: 构建 Electron (Linux)
-        run: |
-          # 确保 dist 目录存在
-          test -d dist || (echo "❌ dist 目录不存在" && exit 1)
-          # 运行 electron-builder
-          npx electron-builder --linux --dir
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      - uses: actions/upload-artifact@v4
-        with:
-          name: electron-linux
-          path: release/
-
-  # 4. 构建 Android APK
+  # 3. 构建 Android APK
   build-android:
     runs-on: ubuntu-latest
     needs: validate
@@ -108,7 +76,7 @@ jobs:
             echo "⚠️ Capacitor 未配置，创建默认配置"
             echo '{"appId":"com.globalradio.app","appName":"全球电台","webDir":"dist"}' > capacitor.config.json
           fi
-      - name: 初始化 Capacitor
+      - name: 添加 Android 平台
         run: |
           if [ ! -d "android" ]; then
             npx cap add android
@@ -125,7 +93,7 @@ jobs:
           name: android-apk
           path: android/app/build/outputs/apk/release/*.apk
 
-  # 5. 构建 Docker 镜像
+  # 4. 构建 Docker 镜像
   build-docker:
     runs-on: ubuntu-latest
     needs: build-web
@@ -175,9 +143,9 @@ jobs:
             ${{ env.DOCKER_IMAGE_ARM64 }}:latest
             ${{ env.DOCKER_IMAGE_ARM64 }}:${{ github.ref_name }}
 
-  # 6. 创建 GitHub Release
+  # 5. 创建 GitHub Release
   create-release:
-    needs: [build-web, build-electron, build-android]
+    needs: [build-web, build-android, build-docker]
     runs-on: ubuntu-latest
     if: startsWith(github.ref, 'refs/tags/')
     steps:
@@ -198,10 +166,6 @@ jobs:
           # 全球电台 v${VERSION}
 
           ## 📦 下载说明
-
-          ### 🐧 Linux
-          - `global-radio-${VERSION}-linux.AppImage` - AppImage
-          - `global-radio-${VERSION}-linux.deb` - DEB 安装包
 
           ### 📱 Android
           - `app-release-${VERSION}.apk` - APK 安装包
@@ -225,9 +189,6 @@ jobs:
           draft: false
           prerelease: false
           files: |
-            release-assets/*.zip
-            release-assets/*.AppImage
-            release-assets/*.deb
             release-assets/*.apk
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
