@@ -7,7 +7,6 @@ on:
   workflow_dispatch:
 
 jobs:
-  # 1. 构建Web产物
   build-web:
     runs-on: ubuntu-latest
     steps:
@@ -17,20 +16,18 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '22'
-          # 注意：这里不启用 cache: 'npm'，因为还没有锁文件
       
-      - name: 安装依赖（自动生成 package-lock.json）
-        run: npm install  # 这个命令会在没有锁文件时生成一个
+      - name: 安装依赖
+        run: npm install
       
       - name: 构建Web
-        run: npm run build
+        run: npm run build  # 确保 package.json 中有 "build": "vite build"
       
       - uses: actions/upload-artifact@v4
         with:
           name: web-dist
           path: dist/
 
-  # 2. 构建Electron桌面端
   build-electron:
     strategy:
       matrix:
@@ -44,14 +41,8 @@ jobs:
         with:
           node-version: '22'
       
-      - name: 安装依赖（自动生成 package-lock.json）
+      - name: 安装依赖
         run: npm install
-      
-      - name: 构建Vue
-        run: npm run build
-      
-      - name: 准备发布说明
-        run: node scripts/release-prepare.js
       
       - name: 构建Electron应用
         run: npm run electron:build
@@ -63,7 +54,6 @@ jobs:
           name: electron-${{ matrix.os }}
           path: release/
 
-  # 3. 构建Android APK
   build-android:
     runs-on: ubuntu-latest
     steps:
@@ -80,17 +70,12 @@ jobs:
           distribution: 'temurin'
           java-version: '17'
       
-      - name: 安装依赖（自动生成 package-lock.json）
+      - name: 安装依赖
         run: npm install
       
-      - name: 构建Vue
-        run: npm run build
-      
-      - name: 同步Capacitor
-        run: npx cap sync android
-      
-      - name: 构建APK
+      - name: 构建Android APK
         run: |
+          npx cap sync android
           cd android
           chmod +x gradlew
           ./gradlew assembleRelease
@@ -100,7 +85,6 @@ jobs:
           name: android-apk
           path: android/app/build/outputs/apk/release/*.apk
 
-  # 4. 创建GitHub Release
   create-release:
     needs: [build-web, build-electron, build-android]
     runs-on: ubuntu-latest
@@ -113,7 +97,6 @@ jobs:
       - name: 创建Release
         uses: softprops/action-gh-release@v1
         with:
-          body_path: RELEASE_NOTES.md
           files: |
             artifacts/**/*.zip
             artifacts/**/*.exe
