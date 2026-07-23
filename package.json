@@ -72,11 +72,6 @@
       "target": ["AppImage", "deb"],
       "icon": "public/icon.png",
       "category": "AudioVideo"
-    },
-    "nsis": {
-      "oneClick": false,
-      "perMachine": true,
-      "allowToChangeInstallationDirectory": true
     }
   }
 }
