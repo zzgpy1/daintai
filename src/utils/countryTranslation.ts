@@ -8,4 +8,12 @@ const countryNamesCN: Record<string, string> = {
 const countryNamesEN: Record<string, string> = {
   'CN': 'China', 'US': 'United States', 'GB': 'United Kingdom', 'DE': 'Germany',
   'FR': 'France', 'JP': 'Japan', 'KR': 'South Korea', 'RU': 'Russia',
-  'CA': 'Canada', 'AU': 'Australia', 'IT':
+  'CA': 'Canada', 'AU': 'Australia', 'IT': 'Italy', 'ES': 'Spain',
+  'BR': 'Brazil', 'IN': 'India', 'MX': 'Mexico', 'NL': 'Netherlands',
+  'SE': 'Sweden', 'NO': 'Norway', 'DK': 'Denmark', 'FI': 'Finland'
+}
+
+export function getLocalizedCountryName(code: string): string {
+  if (!code) return ''
+  return countryNamesCN[code.toUpperCase()] || countryNamesEN[code.toUpperCase()] || code
+}
