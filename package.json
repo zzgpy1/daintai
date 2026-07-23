@@ -13,7 +13,36 @@
     "android:build": "npm run build && npx cap sync android && cd android && chmod +x gradlew && ./gradlew assembleRelease",
     "release": "node scripts/build-all.js"
   },
-  "main": "electron/main.js",
+  "dependencies": {
+    "@capacitor/device": "^5.0.8",
+    "@capacitor/haptics": "^5.0.8",
+    "@capacitor/keyboard": "^5.0.9",
+    "@capacitor/status-bar": "^5.0.8",
+    "@headlessui/vue": "^1.7.16",
+    "@heroicons/vue": "^2.0.18",
+    "@jofr/capacitor-media-session": "^3.0.3",
+    "axios": "^1.6.2",
+    "pinia": "^2.1.7",
+    "vue": "^3.3.11",
+    "vue-audio-visual": "^3.0.11",
+    "vue-router": "^4.2.5"
+  },
+  "devDependencies": {
+    "@capacitor/android": "^5.7.8",
+    "@capacitor/cli": "^5.7.8",
+    "@capacitor/core": "^5.7.8",
+    "@vitejs/plugin-vue": "^4.5.2",
+    "autoprefixer": "^10.4.16",
+    "electron": "^28.2.0",
+    "electron-builder": "^24.9.1",
+    "postcss": "^8.4.32",
+    "tailwindcss": "^3.3.6",
+    "terser": "^5.43.1",
+    "typescript": "^5.2.2",
+    "vite": "^5.0.8",
+    "vite-plugin-pwa": "^1.0.0",
+    "vue-tsc": "^3.2.1"
+  },
   "build": {
     "appId": "com.globalradio.app",
     "productName": "全球电台",
@@ -43,11 +72,6 @@
       "target": ["AppImage", "deb"],
       "icon": "public/icon.png",
       "category": "AudioVideo"
-    },
-    "nsis": {
-      "oneClick": false,
-      "perMachine": true,
-      "allowToChangeInstallationDirectory": true
     }
   }
 }
