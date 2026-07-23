@@ -1,11 +1,23 @@
 const { app, BrowserWindow, Menu, shell } = require('electron');
 const path = require('path');
+const fs = require('fs');
 
-// 确保在打包后也能正确找到入口
+let mainWindow;
+
 function getPreloadPath() {
   // 在开发环境和生产环境中使用不同的路径
   if (app.isPackaged) {
-    return path.join(process.resourcesPath, 'app.asar', 'electron', 'preload.js');
+    const possiblePaths = [
+      path.join(process.resourcesPath, 'app.asar', 'electron', 'preload.js'),
+      path.join(__dirname, 'preload.js'),
+      path.join(process.cwd(), 'electron', 'preload.js')
+    ];
+    for (const p of possiblePaths) {
+      if (fs.existsSync(p)) {
+        return p;
+      }
+    }
+    return path.join(__dirname, 'preload.js');
   }
   return path.join(__dirname, 'preload.js');
 }
@@ -16,8 +28,6 @@ function getIndexPath() {
   }
   return 'http://localhost:4173';
 }
-
-let mainWindow;
 
 function createWindow() {
   mainWindow = new BrowserWindow({
@@ -47,13 +57,11 @@ function createWindow() {
     }
   });
 
-  // 外部链接用默认浏览器打开
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {
     shell.openExternal(url);
     return { action: 'deny' };
   });
 
-  // 隐藏默认菜单栏
   Menu.setApplicationMenu(null);
 }
 
