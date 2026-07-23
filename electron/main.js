@@ -1,4 +1,3 @@
-// electron/main.js
 const { app, BrowserWindow, Menu, shell } = require('electron');
 const path = require('path');
 const fs = require('fs');
