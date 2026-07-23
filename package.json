@@ -3,6 +3,8 @@
   "private": true,
   "version": "1.0.0",
   "type": "module",
+  "description": "全球电台 - 基于 Vue 3 的在线电台应用",
+  "author": "moli-xia",
   "scripts": {
     "dev": "vite",
     "build": "vite build",
@@ -52,17 +54,47 @@
       "dist/**/*",
       "electron/**/*"
     ],
-    "win": {
-      "target": ["nsis", "portable"],
-      "icon": "public/favicon.ico"
+    "extraResources": [
+      {
+        "from": "electron",
+        "to": "electron",
+        "filter": ["**/*"]
+      }
+    ],
+    "linux": {
+      "target": ["AppImage", "deb"],
+      "icon": "public/icon.png",
+      "category": "Audio",
+      "synopsis": "全球电台 - 在线电台收听工具",
+      "description": "基于 Vue 3 的在线电台应用，支持播放、搜索、收藏、历史记录等功能。",
+      "maintainer": "moli-xia"
     },
     "mac": {
       "target": ["dmg", "zip"],
-      "icon": "public/icon.icns"
+      "icon": "public/icon.icns",
+      "category": "public.app-category.music",
+      "hardenedRuntime": true,
+      "gatekeeperAssess": false
     },
-    "linux": {
-      "target": ["AppImage", "deb"],
-      "icon": "public/icon.png"
+    "win": {
+      "target": ["nsis", "portable"],
+      "icon": "public/favicon.ico",
+      "publisherName": "moli-xia",
+      "certificateFile": "",
+      "certificatePassword": "",
+      "publish": [
+        "github"
+      ]
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true
+    },
+    "publish": {
+      "provider": "github",
+      "releaseType": "release"
     }
   }
 }
