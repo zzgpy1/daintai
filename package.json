@@ -1,7 +1,10 @@
 {
   "name": "global-radio",
-  "private": true,
   "version": "1.0.1",
+  "description": "全球电台 - 聆听全球高品质电台",
+  "main": "electron/main.js",
+  "author": "GlobalRadio Team",
+  "private": true,
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -72,6 +75,11 @@
       "target": ["AppImage", "deb"],
       "icon": "public/icon.png",
       "category": "AudioVideo"
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": true,
+      "allowToChangeInstallationDirectory": true
     }
   }
 }
