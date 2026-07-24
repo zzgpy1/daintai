@@ -72,7 +72,7 @@ jobs:
           path: web-dist.zip
 
   # ============================================
-  # 构建 Android APK（完整初始化 + 自动签名）
+  # 构建 Android APK（自动签名）
   # ============================================
   build-android:
     runs-on: ubuntu-latest
@@ -103,12 +103,8 @@ jobs:
           ls -la dist/
           test -f dist/index.html || (echo "dist/index.html 不存在" && exit 1)
 
-      # ============================================
-      # 初始化 Capacitor Android 平台
-      # ============================================
       - name: 初始化 Capacitor Android 平台
         run: |
-          # 检查 capacitor.config 是否存在
           if [ ! -f "capacitor.config.ts" ] && [ ! -f "capacitor.config.js" ]; then
             echo "⚠️ capacitor.config 不存在，创建默认配置"
             cat > capacitor.config.json << 'EOF'
@@ -120,7 +116,6 @@ jobs:
           EOF
           fi
           
-          # 如果 android 目录不存在，添加平台
           if [ ! -d "android" ]; then
             echo "📱 添加 Android 平台..."
             npx cap add android
@@ -128,16 +123,11 @@ jobs:
             echo "✅ Android 平台已存在"
           fi
           
-          # 同步 Capacitor
           echo "🔄 同步 Capacitor..."
           npx cap sync android
           
-          # 验证目录结构
           echo "📂 android 目录内容："
           ls -la android/
-          echo ""
-          echo "📂 android/app 目录内容："
-          ls -la android/app/ || echo "app 目录不存在"
 
       - name: 检查 gradlew
         run: |
@@ -164,9 +154,6 @@ jobs:
           fi
           ls -la gradlew
 
-      # ============================================
-      # 自动生成密钥库
-      # ============================================
       - name: 生成密钥库
         id: generate_keystore
         run: |
@@ -191,15 +178,12 @@ jobs:
           
           ls -la keystore.jks
 
-      # ============================================
-      # 构建 APK
-      # ============================================
       - name: 构建 Debug APK
         run: |
           cd android
           ./gradlew assembleDebug
 
-      - name: 构建 Release APK（已签名）
+      - name: 构建 Release APK
         run: |
           cd android
           if [ -f "keystore.jks" ]; then
@@ -366,13 +350,6 @@ jobs:
           ls -la dist/
       - name: 检查 Dockerfile
         run: test -f Dockerfile || (echo "Dockerfile 不存在" && exit 1)
-      - name: 验证 Docker 用户名
-        run: |
-          if [ -z "${{ secrets.DOCKER_USERNAME }}" ]; then
-            echo "错误: DOCKER_USERNAME 未设置"
-            exit 1
-          fi
-          echo "Docker 用户名: ${{ secrets.DOCKER_USERNAME }}"
       - name: 设置 Docker Buildx
         uses: docker/setup-buildx-action@v3
       - name: 登录 Docker Hub
@@ -467,6 +444,7 @@ jobs:
           echo "📂 查找所有产物..."
           find artifacts/ -type f -print
           
+          # 复制 APK（优先使用已签名的非 Debug 版本）
           APK_FILE=$(find artifacts/ -type f -name "*.apk" ! -name "*-debug.apk" ! -name "*-unsigned.apk" | head -1)
           if [ -z "$APK_FILE" ]; then
             APK_FILE=$(find artifacts/ -type f -name "*.apk" | head -1)
@@ -479,12 +457,7 @@ jobs:
             exit 1
           fi
           
-          DEBUG_APK=$(find artifacts/ -type f -name "*-debug.apk" | head -1)
-          if [ -n "$DEBUG_APK" ]; then
-            cp "$DEBUG_APK" "release-assets/global-radio-${VERSION}-debug.apk"
-            echo "✅ Debug APK: $DEBUG_APK -> global-radio-${VERSION}-debug.apk"
-          fi
-          
+          # 复制 EXE
           EXE_FILE=$(find artifacts/ -type f -name "*.exe" | head -1)
           if [ -n "$EXE_FILE" ]; then
             cp "$EXE_FILE" "release-assets/global-radio-${VERSION}.exe"
@@ -493,6 +466,7 @@ jobs:
             echo "⚠️ 未找到 EXE 文件"
           fi
           
+          # 复制 ZIP
           ZIP_FILE=$(find artifacts/ -type f -name "*.zip" | head -1)
           if [ -n "$ZIP_FILE" ]; then
             cp "$ZIP_FILE" "release-assets/web-dist-${VERSION}.zip"
@@ -517,7 +491,7 @@ jobs:
           ## 📦 下载说明
 
           ### 📱 Android
-          - 下载 APK 文件安装到手机（已签名，可正常安装）
+          - 下载 APK 文件安装到手机
 
           ### 💻 Windows
           - 下载 EXE 文件安装到电脑
@@ -550,17 +524,6 @@ jobs:
           upload_url: ${{ steps.create_release.outputs.upload_url }}
           asset_path: release-assets/global-radio-${{ steps.get_version.outputs.VERSION }}.apk
           asset_name: global-radio-${{ steps.get_version.outputs.VERSION }}.apk
-          asset_content_type: application/vnd.android.package-archive
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: 上传 Debug APK
-        if: hashFiles('release-assets/global-radio-${{ steps.get_version.outputs.VERSION }}-debug.apk') != ''
-        uses: actions/upload-release-asset@v1
-        with:
-          upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: release-assets/global-radio-${{ steps.get_version.outputs.VERSION }}-debug.apk
-          asset_name: global-radio-${{ steps.get_version.outputs.VERSION }}-debug.apk
           asset_content_type: application/vnd.android.package-archive
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
