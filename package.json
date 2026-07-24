@@ -6,9 +6,11 @@
   "private": true,
   "type": "module",
   "main": "electron/main.js",
+  {
   "scripts": {
-    "dev": "vite",
-    "build": "vite build",
+    "version:bump": "node scripts/bump-version.js",
+    "prebuild": "npm run version:bump",
+    "build": "vite build"
     "preview": "vite preview",
     "electron:dev": "npm run build && electron .",
     "electron:build": "npm run build && npx electron-builder",
