@@ -1,0 +1,22 @@
+version: '3.8'
+
+services:
+  global-radio-web:
+    image: global-radio:latest
+    container_name: global-radio-web
+    restart: unless-stopped
+    ports:
+      - "80:80"
+    environment:
+      - TZ=Asia/Shanghai
+    networks:
+      - global-radio-network
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost/"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+
+networks:
+  global-radio-network:
+    driver: bridge
