@@ -1,0 +1,9 @@
+{
+  "name": "global-radio-electron",
+  "version": "1.0.0",
+  "description": "全球电台 Electron 桌面应用",
+  "main": "main.js",
+  "dependencies": {
+    "electron-updater": "^6.1.7"
+  }
+}
