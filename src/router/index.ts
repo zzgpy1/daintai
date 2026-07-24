@@ -7,12 +7,42 @@ import History from '@/views/History.vue'
 const router = createRouter({
   history: createWebHistory(),
   routes: [
-    { path: '/', name: 'Home', component: Home, meta: { title: '首页' } },
-    { path: '/search', name: 'Search', component: Search, meta: { title: '搜索' } },
-    { path: '/history', name: 'History', component: History, meta: { title: '足迹' } },
-    { path: '/favorites', name: 'Favorites', component: Favorites, meta: { title: '收藏' } },
-    { path: '/settings', name: 'Settings', component: () => import('@/views/Settings.vue'), meta: { title: '设置' } },
-    { path: '/station/:uuid', name: 'StationDetail', component: () => import('@/views/StationDetail.vue'), meta: { title: '电台详情' } }
+    {
+      path: '/',
+      name: 'Home',
+      component: Home,
+      meta: { title: '首页' }
+    },
+    {
+      path: '/search',
+      name: 'Search',
+      component: Search,
+      meta: { title: '搜索' }
+    },
+    {
+      path: '/history',
+      name: 'History',
+      component: History,
+      meta: { title: '足迹' }
+    },
+    {
+      path: '/favorites',
+      name: 'Favorites',
+      component: Favorites,
+      meta: { title: '收藏' }
+    },
+    {
+      path: '/settings',
+      name: 'Settings',
+      component: () => import('@/views/Settings.vue'),
+      meta: { title: '设置' }
+    },
+    {
+      path: '/station/:uuid',
+      name: 'StationDetail',
+      component: () => import('@/views/StationDetail.vue'),
+      meta: { title: '电台详情' }
+    }
   ],
   scrollBehavior(_to, _from, savedPosition) {
     return savedPosition || { top: 0 }
