@@ -7,7 +7,7 @@
   "type": "module",
   "main": "electron/main.js",
   "scripts": {
-    "version:bump": "node scripts/version-bump.js",
+    "version:bump": "node scripts/version-bump.cjs",
     "prebuild": "npm run version:bump",
     "dev": "vite",
     "build": "vite build",
