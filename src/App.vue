@@ -1,9 +1,6 @@
 <template>
   <div id="app" class="min-h-screen bg-ios-light-gray dark:bg-dark-bg">
-    <!-- 顶部导航（桌面端） -->
     <TopNavigation />
-    
-    <!-- 主内容区域 -->
     <main class="pt-0 desktop:pt-16 pb-24 md:pb-0">
       <router-view v-slot="{ Component }">
         <transition
@@ -18,31 +15,17 @@
         </transition>
       </router-view>
     </main>
-
-    <!-- 底部播放栏 -->
     <PlayerBar />
-    
-    <!-- 底部导航（移动端） -->
     <BottomNavigation />
-    
-    <!-- 回到顶部按钮 -->
     <BackToTopButton />
-    
-    <!-- Toast 通知容器 -->
     <ToastContainer />
-    
-    <!-- 顶部装饰层 -->
     <TopLayerEffects />
-
-    <!-- ============================================ -->
-    <!-- 更新弹窗 -->
-    <!-- ============================================ -->
     <UpdateDialog
       v-if="showUpdateDialog"
       :update-info="updateInfo"
       @close="showUpdateDialog = false"
-      @download="handleDownload"
-      @skip="handleSkip"
+      @download="handleDialogDownload"
+      @skip="handleDialogSkip"
     />
   </div>
 </template>
@@ -63,7 +46,6 @@ import UpdateDialog from '@/components/UpdateDialog.vue'
 const themeStore = useThemeStore()
 const toastStore = useToastStore()
 
-// 更新相关状态
 const showUpdateDialog = ref(false)
 const updateInfo = ref<UpdateInfo>({
   hasUpdate: false,
@@ -73,10 +55,8 @@ const updateInfo = ref<UpdateInfo>({
   body: ''
 })
 
-// 检查更新
 const checkUpdate = async () => {
   try {
-    // 检查是否跳过了此版本
     const skippedVersion = localStorage.getItem('skipped_version')
     const checker = UpdateChecker.getInstance()
     const result = await checker.checkForUpdate()
@@ -90,26 +70,19 @@ const checkUpdate = async () => {
   }
 }
 
-const handleDownload = () => {
+const handleDialogDownload = () => {
   showUpdateDialog.value = false
-  toastStore.showSuccess('正在下载更新，请稍候...')
+  toastStore.showSuccess('正在下载更新...')
 }
 
-const handleSkip = () => {
+const handleDialogSkip = () => {
   showUpdateDialog.value = false
 }
 
 onMounted(() => {
-  // 初始化主题
   themeStore.initTheme()
-
-  // APP 启动后延迟 2 秒检查更新
   setTimeout(() => {
     checkUpdate()
-  }, 2000)
+  }, 3000)
 })
 </script>
-
-<style>
-/* 全局样式在 style.css 中定义 */
-</style>
