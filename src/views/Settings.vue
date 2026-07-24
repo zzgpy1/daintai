@@ -1,7 +1,7 @@
 <template>
   <div class="settings-page min-h-screen bg-ios-light-gray dark:bg-dark-bg pb-20">
     <div class="container-responsive py-4 space-y-6">
-      <h1 class="text-2xl font-bold text-ios-dark-gray dark:text-dark-text">{{ t('settings.title') }}</h1>
+      <h1 class="text-2xl font-bold text-ios-dark-gray dark:text-dark-text">⚙️ 设置</h1>
 
       <!-- ============================================ -->
       <!-- 1. 主题设置 -->
@@ -9,37 +9,15 @@
       <section class="ios-card p-4">
         <div class="flex items-center justify-between">
           <div>
-            <h2 class="text-lg font-semibold text-ios-dark-gray dark:text-dark-text">{{ t('settings.themeMode') }}</h2>
-            <p class="text-sm text-ios-gray dark:text-dark-secondary mt-1">{{ t('settings.switchTheme') }}</p>
+            <h2 class="text-lg font-semibold text-ios-dark-gray dark:text-dark-text">🌓 主题模式</h2>
+            <p class="text-sm text-ios-gray dark:text-dark-secondary mt-1">切换应用的外观主题</p>
           </div>
           <ThemeToggle />
         </div>
       </section>
 
       <!-- ============================================ -->
-      <!-- 2. 语言设置 -->
-      <!-- ============================================ -->
-      <section class="ios-card p-4">
-        <h2 class="text-lg font-semibold text-ios-dark-gray dark:text-dark-text mb-3">{{ t('nav.language') }}</h2>
-        <div class="flex flex-wrap gap-2">
-          <button
-            v-for="lang in languages"
-            :key="lang.code"
-            @click="setLanguage(lang.code)"
-            class="px-3 py-2 rounded-ios text-sm transition-all"
-            :class="[
-              currentLanguage === lang.code
-                ? 'bg-ios-blue text-white'
-                : 'bg-gray-100 dark:bg-dark-gray text-ios-dark-gray dark:text-dark-text hover:bg-gray-200 dark:hover:bg-dark-light-gray'
-            ]"
-          >
-            {{ lang.nativeName }}
-          </button>
-        </div>
-      </section>
-
-      <!-- ============================================ -->
-      <!-- 3. 睡眠定时器 -->
+      <!-- 2. 睡眠定时器 -->
       <!-- ============================================ -->
       <section class="ios-card p-4">
         <h2 class="text-lg font-semibold text-ios-dark-gray dark:text-dark-text mb-4">⏱️ 睡眠定时器</h2>
@@ -93,7 +71,7 @@
       </section>
 
       <!-- ============================================ -->
-      <!-- 4. 关于应用 + 更新检测 -->
+      <!-- 3. 关于应用 + 更新检测 -->
       <!-- ============================================ -->
       <section class="ios-card p-4">
         <h2 class="text-lg font-semibold text-ios-dark-gray dark:text-dark-text mb-4">📱 关于应用</h2>
@@ -113,11 +91,11 @@
 
           <!-- 平台信息 -->
           <div class="flex justify-between">
-            <span class="text-ios-gray dark:text-dark-secondary">{{ t('settings.deviceType') }}</span>
+            <span class="text-ios-gray dark:text-dark-secondary">设备类型</span>
             <span class="text-ios-dark-gray dark:text-dark-text">{{ deviceType }}</span>
           </div>
 
-          <!-- 最新版本状态 -->
+          <!-- 最新版本 -->
           <div class="flex justify-between">
             <span class="text-ios-gray dark:text-dark-secondary">最新版本</span>
             <span 
@@ -130,7 +108,7 @@
             </span>
           </div>
 
-          <!-- 更新操作按钮 -->
+          <!-- 更新按钮 -->
           <div class="flex flex-col gap-2 mt-3">
             <button
               @click="manualCheckUpdate"
@@ -149,9 +127,16 @@
             >
               ⬇️ 下载最新版本
             </button>
+
+            <button
+              v-if="hasNewVersion"
+              @click="skipVersion"
+              class="w-full p-2 text-xs text-ios-gray dark:text-dark-secondary hover:text-ios-blue transition-colors"
+            >
+              忽略此版本
+            </button>
           </div>
 
-          <!-- 分隔线 -->
           <div class="border-t border-gray-100 dark:border-dark-gray pt-3 mt-2">
             <div class="flex justify-between">
               <span class="text-ios-gray dark:text-dark-secondary">GitHub</span>
@@ -169,9 +154,7 @@
       </section>
     </div>
 
-    <!-- ============================================ -->
     <!-- 更新弹窗 -->
-    <!-- ============================================ -->
     <UpdateDialog
       v-if="showUpdateDialog"
       :update-info="updateInfo"
@@ -183,10 +166,9 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { usePlayerStore } from '@/stores/player'
 import { useLanguageStore } from '@/stores/language'
-import { useThemeStore } from '@/stores/theme'
 import { useToastStore } from '@/stores/toast'
 import { UpdateChecker, type UpdateInfo } from '@/services/updateChecker'
 import ThemeToggle from '@/components/ThemeToggle.vue'
@@ -194,21 +176,16 @@ import UpdateDialog from '@/components/UpdateDialog.vue'
 
 const playerStore = usePlayerStore()
 const languageStore = useLanguageStore()
-const themeStore = useThemeStore()
 const toastStore = useToastStore()
 const { t, languages, currentLanguage, setLanguage } = languageStore
 
-// 版本信息 - 从环境变量或硬编码
-const currentVersion = ref('v2026.07.24-102147')
+const currentVersion = ref('v2026.07.24-105948')
 const latestVersion = ref('')
 const downloadUrl = ref('')
 const hasNewVersion = ref(false)
 const isChecking = ref(false)
-
-// 睡眠定时器
 const customMinutes = ref<number>(30)
 
-// 更新弹窗
 const showUpdateDialog = ref(false)
 const updateInfo = ref<UpdateInfo>({
   hasUpdate: false,
@@ -218,17 +195,12 @@ const updateInfo = ref<UpdateInfo>({
   body: ''
 })
 
-// 设备类型
 const deviceType = computed(() => {
   const width = window.innerWidth
   if (width >= 1024) return '💻 桌面端'
   if (width >= 768) return '📱 平板端'
   return '📱 手机端'
 })
-
-// ============================================
-// 更新相关方法
-// ============================================
 
 const manualCheckUpdate = async () => {
   isChecking.value = true
@@ -261,6 +233,14 @@ const downloadUpdate = () => {
   }
 }
 
+const skipVersion = () => {
+  if (latestVersion.value) {
+    localStorage.setItem('skipped_version', latestVersion.value)
+    hasNewVersion.value = false
+    toastStore.showInfo(`已忽略版本 ${latestVersion.value}`)
+  }
+}
+
 const handleDialogDownload = () => {
   showUpdateDialog.value = false
   toastStore.showSuccess('正在下载更新...')
@@ -269,10 +249,6 @@ const handleDialogDownload = () => {
 const handleDialogSkip = () => {
   showUpdateDialog.value = false
 }
-
-// ============================================
-// 睡眠定时器方法
-// ============================================
 
 const setSleepTimer = (minutes: number) => {
   if (minutes > 0) {
@@ -287,22 +263,9 @@ const clearSleepTimer = () => {
   toastStore.showInfo('⏱️ 定时器已取消')
 }
 
-// ============================================
-// 生命周期
-// ============================================
-
-let autoCheckTimer: NodeJS.Timeout
-
 onMounted(() => {
-  // 自动检查更新（延迟 3 秒）
   setTimeout(() => {
     manualCheckUpdate()
-  }, 3000)
-})
-
-onUnmounted(() => {
-  if (autoCheckTimer) {
-    clearTimeout(autoCheckTimer)
-  }
+  }, 2000)
 })
 </script>
