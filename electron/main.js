@@ -2,6 +2,9 @@ const { app, BrowserWindow, Menu, shell } = require('electron');
 const path = require('path');
 const fs = require('fs');
 
+// 禁用 GPU 加速，解决 Windows 兼容性问题
+app.disableHardwareAcceleration();
+
 let mainWindow;
 
 function createWindow() {
@@ -13,7 +16,7 @@ function createWindow() {
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true,
-      sandbox: false,  // 解决 av_strdup 问题
+      sandbox: false,
     },
     icon: path.join(__dirname, '../public/favicon.ico'),
     show: false,
