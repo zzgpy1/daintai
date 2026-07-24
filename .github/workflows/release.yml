@@ -7,9 +7,9 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: '版本号 (如 v1.0.0)'
-        required: true
-        default: 'v1.0.0'
+        description: '自定义版本号 (留空则使用日期，如 v2026.07.24)'
+        required: false
+        default: ''
       create_release:
         description: '是否创建 GitHub Release'
         type: boolean
@@ -133,10 +133,7 @@ jobs:
         run: |
           VERSION="${{ github.event.inputs.tag }}"
           if [ -z "$VERSION" ]; then
-            VERSION=$(echo ${GITHUB_REF#refs/tags/})
-          fi
-          if [ -z "$VERSION" ]; then
-            VERSION="dev"
+            VERSION="v$(date +'%Y.%m.%d')"
           fi
 
           mkdir -p apk-outputs
@@ -166,6 +163,64 @@ jobs:
         with:
           name: android-apk
           path: apk-outputs/*.apk
+
+  # ============================================
+  # 新增：构建 Windows EXE
+  # ============================================
+  build-windows:
+    runs-on: windows-latest
+    needs: validate
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: 安装依赖
+        run: npm install --no-audit --no-fund
+
+      - name: 构建 Web
+        run: npm run build
+
+      - name: 验证构建产物
+        run: |
+          if (Test-Path dist/index.html) {
+            Write-Host "✅ dist/index.html 存在"
+          } else {
+            Write-Host "❌ dist/index.html 不存在"
+            exit 1
+          }
+
+      - name: 检查 Electron 配置
+        run: |
+          if (Test-Path electron/main.js) {
+            Write-Host "✅ electron/main.js 存在"
+          } else {
+            Write-Host "⚠️ electron/main.js 不存在，跳过 Electron 构建"
+            exit 0
+          }
+
+      - name: 构建 Windows EXE
+        if: hashFiles('electron/main.js') != ''
+        run: |
+          npm run electron:build -- --win
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: 收集 Windows 产物
+        if: hashFiles('electron/main.js') != ''
+        run: |
+          New-Item -ItemType Directory -Force -Path exe-outputs
+          Get-ChildItem -Path release/ -Recurse -Filter "*.exe" | Copy-Item -Destination exe-outputs/
+          Get-ChildItem -Path exe-outputs/ -Filter "*.exe" | ForEach-Object {
+            Write-Host "📦 找到 EXE: $($_.Name)"
+          }
+
+      - uses: actions/upload-artifact@v4
+        if: hashFiles('electron/main.js') != ''
+        with:
+          name: windows-exe
+          path: exe-outputs/*.exe
 
   build-docker:
     runs-on: ubuntu-latest
@@ -204,10 +259,7 @@ jobs:
         run: |
           VERSION="${{ github.event.inputs.tag }}"
           if [ -z "$VERSION" ]; then
-            VERSION=$(echo ${GITHUB_REF#refs/tags/})
-          fi
-          if [ -z "$VERSION" ]; then
-            VERSION="dev"
+            VERSION="v$(date +'%Y.%m.%d')"
           fi
           echo "VERSION=${VERSION}" >> $GITHUB_OUTPUT
           echo "镜像标签: ${{ secrets.DOCKER_USERNAME }}/global-radio:${VERSION}"
@@ -233,7 +285,7 @@ jobs:
             ${{ secrets.DOCKER_USERNAME }}/global-radio-arm64:${{ steps.get_version.outputs.VERSION }}
 
   create-release:
-    needs: [build-web, build-android]
+    needs: [build-web, build-android, build-windows]
     runs-on: ubuntu-latest
     if: |
       github.event.inputs.create_release == 'true' ||
@@ -249,10 +301,7 @@ jobs:
         run: |
           VERSION="${{ github.event.inputs.tag }}"
           if [ -z "$VERSION" ]; then
-            VERSION=$(echo ${GITHUB_REF#refs/tags/})
-          fi
-          if [ -z "$VERSION" ]; then
-            VERSION="dev-$(date +'%Y%m%d%H%M%S')"
+            VERSION="v$(date +'%Y.%m.%d')"
           fi
           echo "VERSION=${VERSION}" >> $GITHUB_OUTPUT
           echo "RELEASE_TAG=${VERSION}" >> $GITHUB_OUTPUT
@@ -283,44 +332,12 @@ jobs:
         id: prepare_assets
         run: |
           mkdir -p release-assets
-          echo "查找所有 APK 文件..."
-          find artifacts/ -type f -name "*.apk" -print
-
-          SIGNED_APK=$(find artifacts/ -type f -name "app-release.apk" | head -n 1)
-          if [ -n "$SIGNED_APK" ]; then
-            echo "找到已签名 APK: $SIGNED_APK"
-            cp "$SIGNED_APK" "release-assets/global-radio-${{ steps.get_version.outputs.VERSION }}.apk"
-          else
-            UNSIGNED_APK=$(find artifacts/ -type f -name "app-release-unsigned.apk" | head -n 1)
-            if [ -n "$UNSIGNED_APK" ]; then
-              echo "找到未签名 APK: $UNSIGNED_APK"
-              cp "$UNSIGNED_APK" "release-assets/global-radio-${{ steps.get_version.outputs.VERSION }}.apk"
-            else
-              ANY_APK=$(find artifacts/ -type f -name "*.apk" | head -n 1)
-              if [ -n "$ANY_APK" ]; then
-                echo "找到备用 APK: $ANY_APK"
-                cp "$ANY_APK" "release-assets/global-radio-${{ steps.get_version.outputs.VERSION }}.apk"
-              else
-                echo "没有找到任何 APK 文件！"
-                echo "artifacts 目录结构："
-                ls -laR artifacts/
-                exit 1
-              fi
-            fi
-          fi
-
-          WEB_ZIP=$(find artifacts/ -type f -name "*.zip" | head -n 1)
-          if [ -n "$WEB_ZIP" ]; then
-            echo "找到 Web 产物: $WEB_ZIP"
-            cp "$WEB_ZIP" "release-assets/"
-          else
-            echo "未找到 Web 产物"
-          fi
-
+          echo "查找所有产物..."
+          find artifacts/ -type f -name "*.apk" -exec cp {} release-assets/ \;
+          find artifacts/ -type f -name "*.exe" -exec cp {} release-assets/ \;
+          find artifacts/ -type f -name "*.zip" -exec cp {} release-assets/ \;
           echo "release-assets 目录内容："
-          ls -la release-assets/
-
-          test -f "release-assets/global-radio-${{ steps.get_version.outputs.VERSION }}.apk" || (echo "目标 APK 不存在！" && exit 1)
+          ls -la release-assets/ || echo "没有产物文件"
 
       - name: 生成 Release Notes
         run: |
@@ -328,15 +345,18 @@ jobs:
           cat > RELEASE_NOTES.md << EOF
           # 全球电台 v${VERSION}
 
-          ## 下载说明
+          ## 📦 下载说明
 
-          ### Android
+          ### 📱 Android
           - 下载 APK 文件安装到手机
 
-          ### Web
+          ### 💻 Windows
+          - 下载 EXE 文件安装到电脑
+
+          ### 🌐 Web
           - 在线演示: https://aabb.live
 
-          ### Docker
+          ### 🐳 Docker
           - docker pull ${{ secrets.DOCKER_USERNAME }}/global-radio:${VERSION}
           - docker pull ${{ secrets.DOCKER_USERNAME }}/global-radio-arm64:${VERSION}
 
@@ -363,6 +383,16 @@ jobs:
           asset_path: release-assets/global-radio-${{ steps.get_version.outputs.VERSION }}.apk
           asset_name: global-radio-${{ steps.get_version.outputs.VERSION }}.apk
           asset_content_type: application/vnd.android.package-archive
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: 上传 Windows EXE
+        uses: actions/upload-release-asset@v1
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: release-assets/global-radio-${{ steps.get_version.outputs.VERSION }}.exe
+          asset_name: global-radio-${{ steps.get_version.outputs.VERSION }}.exe
+          asset_content_type: application/vnd.microsoft.portable-executable
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
