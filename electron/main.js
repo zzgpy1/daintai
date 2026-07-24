@@ -2,7 +2,8 @@ const { app, BrowserWindow, Menu, shell } = require('electron');
 const path = require('path');
 const fs = require('fs');
 
-// 禁用 GPU 加速，解决 Windows 兼容性问题
+// 禁用 FFmpeg 内置，避免 av_strdup 错误
+app.commandLine.appendSwitch('disable-ffmpeg');
 app.disableHardwareAcceleration();
 
 let mainWindow;
