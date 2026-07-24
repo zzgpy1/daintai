@@ -7,8 +7,6 @@
   "type": "module",
   "main": "electron/main.js",
   "scripts": {
-    "version:bump": "node scripts/bump-version.js",
-    "prebuild": "npm run version:bump",
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
@@ -16,9 +14,7 @@
     "electron:build": "npm run build && npx electron-builder",
     "android:sync": "npx cap sync android",
     "android:build": "npm run build && npx cap sync android && cd android && chmod +x gradlew && ./gradlew assembleRelease",
-    "release": "node scripts/build-all.js",
-    "test": "echo \"No tests specified\" && exit 0",
-    "lint": "echo \"No linter configured\" && exit 0"
+    "test": "echo \"No tests specified\" && exit 0"
   },
   "dependencies": {
     "@capacitor/device": "^5.0.8",
@@ -42,7 +38,6 @@
     "autoprefixer": "^10.4.16",
     "electron": "^28.2.0",
     "electron-builder": "^24.9.1",
-    "electron-updater": "^6.1.7",
     "postcss": "^8.4.32",
     "tailwindcss": "^3.3.6",
     "terser": "^5.43.1",
@@ -59,17 +54,7 @@
     },
     "files": [
       "dist/**/*",
-      "!dist/registerSW.js",
-      "!dist/workbox-*.js",
-      "!dist/manifest.webmanifest",
       "electron/**/*"
-    ],
-    "extraResources": [
-      {
-        "from": "electron/",
-        "to": "electron/",
-        "filter": ["**/*"]
-      }
     ],
     "win": {
       "target": ["nsis", "portable"],
