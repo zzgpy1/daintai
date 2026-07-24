@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: '自定义版本号 (留空则自动生成: v2026.07.24-143052)'
+        description: '自定义版本号 (留空则自动生成)'
         required: false
         default: ''
       create_release:
@@ -72,7 +72,7 @@ jobs:
           path: web-dist.zip
 
   # ============================================
-  # 构建 Android APK（自动生成密钥并签名）
+  # 构建 Android APK（完整初始化 + 自动签名）
   # ============================================
   build-android:
     runs-on: ubuntu-latest
@@ -103,45 +103,80 @@ jobs:
           ls -la dist/
           test -f dist/index.html || (echo "dist/index.html 不存在" && exit 1)
 
-      - name: 添加 Android 平台
+      # ============================================
+      # 初始化 Capacitor Android 平台
+      # ============================================
+      - name: 初始化 Capacitor Android 平台
         run: |
-          if [ ! -d "android" ]; then
-            npx cap add android
+          # 检查 capacitor.config 是否存在
+          if [ ! -f "capacitor.config.ts" ] && [ ! -f "capacitor.config.js" ]; then
+            echo "⚠️ capacitor.config 不存在，创建默认配置"
+            cat > capacitor.config.json << 'EOF'
+          {
+            "appId": "com.globalradio.app",
+            "appName": "全球电台",
+            "webDir": "dist"
+          }
+          EOF
           fi
+          
+          # 如果 android 目录不存在，添加平台
+          if [ ! -d "android" ]; then
+            echo "📱 添加 Android 平台..."
+            npx cap add android
+          else
+            echo "✅ Android 平台已存在"
+          fi
+          
+          # 同步 Capacitor
+          echo "🔄 同步 Capacitor..."
+          npx cap sync android
+          
+          # 验证目录结构
+          echo "📂 android 目录内容："
           ls -la android/
-
-      - name: 同步 Capacitor
-        run: npx cap sync android
-
-      - name: 验证 Capacitor 同步结果
-        run: |
-          echo "android/app/src/main/assets/ 目录内容："
-          ls -la android/app/src/main/assets/ || echo "assets 目录不存在"
-          test -f android/app/src/main/assets/index.html && echo "index.html 已复制" || echo "index.html 未复制"
+          echo ""
+          echo "📂 android/app 目录内容："
+          ls -la android/app/ || echo "app 目录不存在"
 
       - name: 检查 gradlew
         run: |
           cd android
-          chmod +x gradlew
+          if [ -f "gradlew" ]; then
+            chmod +x gradlew
+            echo "✅ gradlew 存在且可执行"
+          else
+            echo "❌ gradlew 不存在，重新同步..."
+            cd ..
+            npx cap sync android
+            cd android
+            if [ -f "gradlew" ]; then
+              chmod +x gradlew
+              echo "✅ gradlew 已恢复"
+            else
+              echo "❌ gradlew 仍然不存在，强制添加平台..."
+              cd ..
+              rm -rf android
+              npx cap add android
+              cd android
+              chmod +x gradlew
+            fi
+          fi
           ls -la gradlew
 
       # ============================================
-      # 自动生成密钥库（如果未在 Secrets 中配置）
+      # 自动生成密钥库
       # ============================================
       - name: 生成密钥库
         id: generate_keystore
         run: |
           cd android
           
-          # 检查是否有 Secrets 中的密钥库
           if [ -n "${{ secrets.KEYSTORE_BASE64 }}" ]; then
             echo "✅ 使用 Secrets 中的密钥库"
             echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 -d > keystore.jks
-            echo "KEYSTORE_EXISTS=true" >> $GITHUB_OUTPUT
           else
             echo "⚠️ 未找到密钥库 Secrets，自动生成临时密钥..."
-            
-            # 生成密钥库
             keytool -genkey -v \
               -keystore keystore.jks \
               -alias globalradio \
@@ -150,26 +185,21 @@ jobs:
               -validity 10000 \
               -storepass 123456 \
               -keypass 123456 \
-              -dname "CN=GlobalRadio, OU=GlobalRadio Team, O=GlobalRadio, L=Beijing, ST=Beijing, C=CN"
-            
+              -dname "CN=GlobalRadio, OU=GlobalRadio, O=GlobalRadio, L=Beijing, ST=Beijing, C=CN"
             echo "✅ 临时密钥库已生成"
-            echo "KEYSTORE_EXISTS=true" >> $GITHUB_OUTPUT
           fi
           
           ls -la keystore.jks
 
       # ============================================
-      # 构建 Debug APK
+      # 构建 APK
       # ============================================
       - name: 构建 Debug APK
         run: |
           cd android
           ./gradlew assembleDebug
 
-      # ============================================
-      # 构建 Release APK（使用生成的密钥签名）
-      # ============================================
-      - name: 构建 Release APK
+      - name: 构建 Release APK（已签名）
         run: |
           cd android
           if [ -f "keystore.jks" ]; then
@@ -204,33 +234,29 @@ jobs:
 
           mkdir -p apk-outputs
 
-          # 收集 Debug APK
           DEBUG_APK="android/app/build/outputs/apk/debug/app-debug.apk"
           if [ -f "$DEBUG_APK" ]; then
             cp "$DEBUG_APK" "apk-outputs/global-radio-${VERSION}-debug.apk"
-            echo "Debug APK: global-radio-${VERSION}-debug.apk"
+            echo "✅ Debug APK: global-radio-${VERSION}-debug.apk"
           fi
 
-          # 收集 Release APK
           RELEASE_APK="android/app/build/outputs/apk/release/app-release.apk"
           if [ -f "$RELEASE_APK" ]; then
-            # 验证是否已签名
             if unzip -l "$RELEASE_APK" | grep -q "META-INF"; then
               echo "✅ Release APK 已签名"
               cp "$RELEASE_APK" "apk-outputs/global-radio-${VERSION}.apk"
-              echo "Release APK: global-radio-${VERSION}.apk"
+              echo "✅ Release APK: global-radio-${VERSION}.apk"
             else
-              echo "⚠️ Release APK 未签名，使用 Debug APK"
+              echo "⚠️ Release APK 未签名"
               if [ -f "$DEBUG_APK" ]; then
                 cp "$DEBUG_APK" "apk-outputs/global-radio-${VERSION}.apk"
-                echo "使用 Debug APK 替代: global-radio-${VERSION}.apk"
+                echo "✅ 使用 Debug APK 替代: global-radio-${VERSION}.apk"
               fi
             fi
           else
-            # 如果没有 Release APK，使用 Debug APK
             if [ -f "$DEBUG_APK" ]; then
               cp "$DEBUG_APK" "apk-outputs/global-radio-${VERSION}.apk"
-              echo "使用 Debug APK: global-radio-${VERSION}.apk"
+              echo "✅ 使用 Debug APK: global-radio-${VERSION}.apk"
             else
               echo "❌ 没有找到任何 APK 文件"
               exit 1
@@ -441,7 +467,6 @@ jobs:
           echo "📂 查找所有产物..."
           find artifacts/ -type f -print
           
-          # 复制 APK（优先使用已签名的）
           APK_FILE=$(find artifacts/ -type f -name "*.apk" ! -name "*-debug.apk" ! -name "*-unsigned.apk" | head -1)
           if [ -z "$APK_FILE" ]; then
             APK_FILE=$(find artifacts/ -type f -name "*.apk" | head -1)
@@ -454,14 +479,12 @@ jobs:
             exit 1
           fi
           
-          # 复制 Debug APK
           DEBUG_APK=$(find artifacts/ -type f -name "*-debug.apk" | head -1)
           if [ -n "$DEBUG_APK" ]; then
             cp "$DEBUG_APK" "release-assets/global-radio-${VERSION}-debug.apk"
             echo "✅ Debug APK: $DEBUG_APK -> global-radio-${VERSION}-debug.apk"
           fi
           
-          # 复制 EXE
           EXE_FILE=$(find artifacts/ -type f -name "*.exe" | head -1)
           if [ -n "$EXE_FILE" ]; then
             cp "$EXE_FILE" "release-assets/global-radio-${VERSION}.exe"
@@ -470,7 +493,6 @@ jobs:
             echo "⚠️ 未找到 EXE 文件"
           fi
           
-          # 复制 ZIP
           ZIP_FILE=$(find artifacts/ -type f -name "*.zip" | head -1)
           if [ -n "$ZIP_FILE" ]; then
             cp "$ZIP_FILE" "release-assets/web-dist-${VERSION}.zip"
