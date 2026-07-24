@@ -1,3 +1,4 @@
+// src/stores/radio.ts
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import type { RadioStation, Country, Language } from '@/types/radio'
@@ -30,8 +31,8 @@ export const useRadioStore = defineStore('radio', () => {
     isLoading.value = true
     try {
       const result = await radioAPI.getTopStations(limit)
-      topStations.value = result.data
-      return result.data
+      topStations.value = result.data || []
+      return topStations.value
     } catch (err) {
       error.value = err instanceof Error ? err.message : '加载热门电台失败'
       throw err
@@ -44,8 +45,8 @@ export const useRadioStore = defineStore('radio', () => {
     isLoading.value = true
     try {
       const result = await radioAPI.getRandomStations(limit)
-      stations.value = result.data
-      return result.data
+      stations.value = result.data || []
+      return stations.value
     } catch (err) {
       error.value = err instanceof Error ? err.message : '加载随机电台失败'
       throw err
@@ -57,8 +58,8 @@ export const useRadioStore = defineStore('radio', () => {
   const loadCountries = async () => {
     try {
       const result = await radioAPI.getCountries()
-      countries.value = result.data
-      return result.data
+      countries.value = result.data || []
+      return countries.value
     } catch (err) {
       console.error('加载国家列表失败:', err)
       throw err
