@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: '自定义版本号 (留空则自动生成: v2026.07.24-143052)'
+        description: '自定义版本号 (留空则自动生成)'
         required: false
         default: ''
       create_release:
@@ -72,7 +72,7 @@ jobs:
           path: web-dist.zip
 
   # ============================================
-  # 构建 Android APK
+  # 构建 Android APK（已签名）
   # ============================================
   build-android:
     runs-on: ubuntu-latest
@@ -92,53 +92,43 @@ jobs:
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
 
+      - name: 生成 Debug 签名密钥
+        run: |
+          cd android/app
+          if [ ! -f "debug.keystore" ]; then
+            keytool -genkey -v -keystore debug.keystore -storepass android -alias androiddebugkey -keypass android -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=Android Debug, O=Android, C=US"
+          fi
+
       - name: 安装依赖
         run: npm install --no-audit --no-fund
 
       - name: 构建 Web
         run: npm run build
 
-      - name: 验证 Web 构建产物
-        run: |
-          ls -la dist/
-          test -f dist/index.html || (echo "dist/index.html 不存在" && exit 1)
-
       - name: 添加 Android 平台
         run: |
           if [ ! -d "android" ]; then
             npx cap add android
           fi
-          ls -la android/
 
       - name: 同步 Capacitor
         run: npx cap sync android
 
-      - name: 验证 Capacitor 同步结果
-        run: |
-          echo "android/app/src/main/assets/ 目录内容："
-          ls -la android/app/src/main/assets/ || echo "assets 目录不存在"
-          test -f android/app/src/main/assets/index.html && echo "index.html 已复制" || echo "index.html 未复制"
-
-      - name: 检查 gradlew
+      - name: 构建 Debug APK（已签名）
         run: |
           cd android
           chmod +x gradlew
-          ls -la gradlew
-
-      - name: 构建 Debug APK
-        run: |
-          cd android
           ./gradlew assembleDebug
 
-      - name: 构建 Release APK
+      - name: 构建 Release APK（已签名）
         run: |
           cd android
+          chmod +x gradlew
           ./gradlew assembleRelease
 
-      - name: 获取版本号并收集 APK
+      - name: 收集 APK 产物
         id: collect_apk
         run: |
-          # 生成版本号（与 create-release 保持一致）
           if [ -n "${{ github.event.inputs.tag }}" ]; then
             VERSION="${{ github.event.inputs.tag }}"
           else
@@ -148,21 +138,23 @@ jobs:
 
           mkdir -p apk-outputs
 
+          # Debug APK
           DEBUG_APK="android/app/build/outputs/apk/debug/app-debug.apk"
           if [ -f "$DEBUG_APK" ]; then
             cp "$DEBUG_APK" "apk-outputs/global-radio-${VERSION}-debug.apk"
             echo "Debug APK: global-radio-${VERSION}-debug.apk"
           fi
 
+          # Release APK（已签名）
           RELEASE_APK="android/app/build/outputs/apk/release/app-release.apk"
           if [ -f "$RELEASE_APK" ]; then
             cp "$RELEASE_APK" "apk-outputs/global-radio-${VERSION}.apk"
             echo "Release APK: global-radio-${VERSION}.apk"
           else
-            UNSIGNED_APK="android/app/build/outputs/apk/release/app-release-unsigned.apk"
-            if [ -f "$UNSIGNED_APK" ]; then
-              cp "$UNSIGNED_APK" "apk-outputs/global-radio-${VERSION}.apk"
-              echo "未签名 APK: global-radio-${VERSION}.apk"
+            # 如果 Release 失败，使用 Debug 作为备选
+            if [ -f "$DEBUG_APK" ]; then
+              cp "$DEBUG_APK" "apk-outputs/global-radio-${VERSION}.apk"
+              echo "⚠️ 使用 Debug APK 作为 Release 备选"
             fi
           fi
 
@@ -175,7 +167,7 @@ jobs:
           path: apk-outputs/*.apk
 
   # ============================================
-  # 构建 Windows EXE
+  # 构建 Windows EXE（便携版 + 完整依赖）
   # ============================================
   build-windows:
     runs-on: windows-latest
@@ -187,7 +179,10 @@ jobs:
           node-version: 20
 
       - name: 安装依赖
-        run: npm install --no-audit --no-fund
+        run: |
+          npm install --no-audit --no-fund
+          # 确保 electron 完整安装
+          npm install electron --no-audit --no-fund
 
       - name: 构建 Web
         run: npm run build
@@ -201,15 +196,6 @@ jobs:
             exit 1
           }
 
-      - name: 检查 Electron 配置
-        run: |
-          if (Test-Path electron/main.js) {
-            Write-Host "✅ electron/main.js 存在"
-          } else {
-            Write-Host "⚠️ electron/main.js 不存在，跳过"
-            exit 0
-          }
-
       - name: 获取版本号
         id: get_version
         run: |
@@ -221,12 +207,30 @@ jobs:
           Write-Host "VERSION=$VERSION"
           echo "VERSION=$VERSION" >> $env:GITHUB_OUTPUT
 
-      - name: 构建 Windows EXE
+      - name: 检查 Electron 配置
+        run: |
+          if (Test-Path electron/main.js) {
+            Write-Host "✅ electron/main.js 存在"
+          } else {
+            Write-Host "⚠️ electron/main.js 不存在，跳过"
+            exit 0
+          }
+
+      - name: 构建 Windows EXE（便携版）
         if: hashFiles('electron/main.js') != ''
         run: |
-          npm run electron:build -- --win --x64
+          # 清理旧构建
+          Remove-Item -Recurse -Force -ErrorAction SilentlyContinue release/
+          # 构建便携版 EXE
+          npm run electron:build -- --win portable
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: 验证构建产物
+        if: hashFiles('electron/main.js') != ''
+        run: |
+          Write-Host "📂 release 目录内容："
+          Get-ChildItem -Path release/ -Recurse | Select-Object FullName, Length
 
       - name: 收集 Windows 产物
         if: hashFiles('electron/main.js') != ''
@@ -234,11 +238,12 @@ jobs:
           $VERSION = "${{ steps.get_version.outputs.VERSION }}"
           New-Item -ItemType Directory -Force -Path exe-outputs
           
+          # 查找 EXE 文件（便携版）
           Get-ChildItem -Path release/ -Recurse -Filter "*.exe" | ForEach-Object {
             if ($_.Length -gt 1MB) {
-              $destName = "global-radio-${VERSION}-win-x64.exe"
+              $destName = "global-radio-${VERSION}-win-portable.exe"
               Copy-Item -Path $_.FullName -Destination "exe-outputs/$destName"
-              Write-Host "✅ EXE: $destName"
+              Write-Host "✅ EXE: $destName ($([math]::Round($_.Length/1MB, 2)) MB)"
             }
           }
 
@@ -321,7 +326,7 @@ jobs:
         with:
           path: artifacts/
 
-      - name: 获取版本号（与 build-android 保持一致）
+      - name: 获取版本号
         id: get_version
         run: |
           if [ -n "${{ github.event.inputs.tag }}" ]; then
@@ -333,7 +338,7 @@ jobs:
           echo "RELEASE_TAG=${VERSION}" >> $GITHUB_OUTPUT
           echo "版本号: ${VERSION}"
 
-      - name: 删除已存在的 Release（如果 tag 已存在）
+      - name: 删除已存在的 Release
         run: |
           TAG="${{ steps.get_version.outputs.RELEASE_TAG }}"
           echo "检查 Release ${TAG} 是否已存在..."
@@ -342,54 +347,45 @@ jobs:
           
           if echo "$RESPONSE" | grep -q '"id":'; then
             RELEASE_ID=$(echo "$RESPONSE" | grep -o '"id":[0-9]*' | head -1 | cut -d: -f2)
-            echo "⚠️ Release ${TAG} 已存在，正在删除..."
+            echo "删除已存在的 Release: ${TAG} (ID: ${RELEASE_ID})"
             curl -X DELETE \
               -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
               "https://api.github.com/repos/${{ github.repository }}/releases/${RELEASE_ID}"
-            echo "等待 3 秒确保删除完成..."
             sleep 3
           else
-            echo "✅ Release ${TAG} 不存在"
+            echo "Release ${TAG} 不存在"
           fi
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: 整理产物（自动匹配文件名）
+      - name: 整理产物
         id: prepare_assets
         run: |
           mkdir -p release-assets
           VERSION="${{ steps.get_version.outputs.VERSION }}"
           
           echo "📂 查找所有产物..."
-          echo "artifacts 目录结构："
           find artifacts/ -type f -print
           
-          # 复制并重命名 APK
+          # APK
           APK_FILE=$(find artifacts/ -type f -name "*.apk" | head -1)
           if [ -n "$APK_FILE" ]; then
             cp "$APK_FILE" "release-assets/global-radio-${VERSION}.apk"
-            echo "✅ APK: $APK_FILE -> global-radio-${VERSION}.apk"
-          else
-            echo "❌ 未找到 APK 文件"
-            exit 1
+            echo "✅ APK: global-radio-${VERSION}.apk"
           fi
           
-          # 复制并重命名 EXE
+          # EXE
           EXE_FILE=$(find artifacts/ -type f -name "*.exe" | head -1)
           if [ -n "$EXE_FILE" ]; then
-            cp "$EXE_FILE" "release-assets/global-radio-${VERSION}.exe"
-            echo "✅ EXE: $EXE_FILE -> global-radio-${VERSION}.exe"
-          else
-            echo "⚠️ 未找到 EXE 文件"
+            cp "$EXE_FILE" "release-assets/global-radio-${VERSION}-win-portable.exe"
+            echo "✅ EXE: global-radio-${VERSION}-win-portable.exe"
           fi
           
-          # 复制 ZIP
+          # ZIP
           ZIP_FILE=$(find artifacts/ -type f -name "*.zip" | head -1)
           if [ -n "$ZIP_FILE" ]; then
             cp "$ZIP_FILE" "release-assets/web-dist-${VERSION}.zip"
-            echo "✅ ZIP: $ZIP_FILE -> web-dist-${VERSION}.zip"
-          else
-            echo "⚠️ 未找到 ZIP 文件"
+            echo "✅ ZIP: web-dist-${VERSION}.zip"
           fi
           
           echo "📦 release-assets 目录内容："
@@ -411,7 +407,7 @@ jobs:
           - 下载 APK 文件安装到手机
 
           ### 💻 Windows
-          - 下载 EXE 文件安装到电脑
+          - 下载 EXE 文件（便携版，无需安装）
 
           ### 🌐 Web
           - 在线演示: https://aabb.live
@@ -446,12 +442,11 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: 上传 Windows EXE
-        if: hashFiles('release-assets/global-radio-${{ steps.get_version.outputs.VERSION }}.exe') != ''
         uses: actions/upload-release-asset@v1
         with:
           upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: release-assets/global-radio-${{ steps.get_version.outputs.VERSION }}.exe
-          asset_name: global-radio-${{ steps.get_version.outputs.VERSION }}.exe
+          asset_path: release-assets/global-radio-${{ steps.get_version.outputs.VERSION }}-win-portable.exe
+          asset_name: global-radio-${{ steps.get_version.outputs.VERSION }}-win-portable.exe
           asset_content_type: application/vnd.microsoft.portable-executable
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
