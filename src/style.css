@@ -1,0 +1,87 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  * {
+    -webkit-tap-highlight-color: transparent;
+  }
+  
+  body, #app {
+    font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', Roboto, sans-serif;
+    background-color: #F2F2F7;
+    color: #1C1C1E;
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    transition: background-color 0.3s ease, color 0.3s ease;
+  }
+  
+  .dark body, .dark #app {
+    background-color: #000000;
+    color: #FFFFFF;
+  }
+  
+  html {
+    scroll-behavior: smooth;
+  }
+}
+
+@layer components {
+  .ios-card {
+    @apply bg-white rounded-ios shadow-ios border border-gray-100 transition-all duration-300;
+  }
+  
+  .dark .ios-card {
+    @apply bg-dark-card border-dark-gray shadow-dark-ios;
+  }
+  
+  .ios-button {
+    @apply px-4 py-2 rounded-ios font-medium transition-all duration-200 active:scale-95;
+  }
+  
+  .ios-button-primary {
+    @apply ios-button bg-ios-blue text-white hover:bg-blue-600;
+  }
+  
+  .ios-button-secondary {
+    @apply ios-button bg-ios-light-gray text-ios-dark-gray hover:bg-gray-200;
+  }
+  
+  .dark .ios-button-secondary {
+    @apply bg-dark-gray text-dark-text hover:bg-dark-light-gray;
+  }
+  
+  .glass-effect {
+    backdrop-filter: blur(20px);
+    background: rgba(255, 255, 255, 0.8);
+  }
+  
+  .dark .glass-effect {
+    background: rgba(28, 28, 30, 0.8);
+  }
+  
+  .container-responsive {
+    @apply w-full mx-auto px-4;
+    @apply mobile:px-4;
+    @apply tablet:px-6 tablet:max-w-4xl;
+    @apply desktop:px-8 desktop:max-w-6xl;
+  }
+  
+  ::-webkit-scrollbar {
+    width: 6px;
+  }
+  
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  
+  ::-webkit-scrollbar-thumb {
+    background: rgba(0, 0, 0, 0.2);
+    border-radius: 3px;
+  }
+  
+  .dark ::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.2);
+  }
+}
