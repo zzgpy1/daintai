@@ -10,10 +10,8 @@ export interface UpdateInfo {
 
 export class UpdateChecker {
   private static instance: UpdateChecker
-  // 固定当前版本，避免频繁检查
-  private currentVersion: string = 'v2026.07.24-114207'
+  private currentVersion: string = 'v2026.07.24-124559'
   private lastCheckTime: number = 0
-  private checkInterval: number = 3600000 // 1小时检查一次
 
   static getInstance(): UpdateChecker {
     if (!UpdateChecker.instance) {
@@ -22,21 +20,16 @@ export class UpdateChecker {
     return UpdateChecker.instance
   }
 
-  async checkForUpdate(force: boolean = false): Promise<UpdateInfo> {
+  async checkForUpdate(): Promise<UpdateInfo> {
     try {
-      // 防止频繁检查
+      // 1小时内不重复检查
       const now = Date.now()
-      if (!force && (now - this.lastCheckTime) < this.checkInterval) {
-        return {
-          hasUpdate: false,
-          version: '',
-          downloadUrl: '',
-          releaseDate: ''
-        }
+      if (now - this.lastCheckTime < 3600000) {
+        return { hasUpdate: false, version: '', downloadUrl: '', releaseDate: '' }
       }
       this.lastCheckTime = now
 
-      // 检查是否用户跳过了此版本
+      // 检查用户是否跳过了此版本
       const skippedVersion = localStorage.getItem('skipped_version')
       
       const response = await fetch(
@@ -50,9 +43,15 @@ export class UpdateChecker {
       const data = await response.json()
       const latestVersion = data.tag_name || ''
 
-      // 如果当前版本已经是最新，或者用户跳过了此版本
-      const isSameVersion = this.compareVersions(latestVersion, this.currentVersion) <= 0
-      const isSkipped = latestVersion === skippedVersion
+      // 如果当前版本已经是最新，不提示
+      if (this.compareVersions(latestVersion, this.currentVersion) <= 0) {
+        return { hasUpdate: false, version: '', downloadUrl: '', releaseDate: '' }
+      }
+
+      // 如果用户跳过了此版本，不提示
+      if (latestVersion === skippedVersion) {
+        return { hasUpdate: false, version: '', downloadUrl: '', releaseDate: '' }
+      }
 
       const apkAsset = data.assets?.find(
         (asset: any) => 
@@ -62,7 +61,7 @@ export class UpdateChecker {
       )
 
       return {
-        hasUpdate: !isSameVersion && !isSkipped,
+        hasUpdate: true,
         version: latestVersion,
         downloadUrl: apkAsset?.browser_download_url || '',
         releaseDate: data.published_at || '',
@@ -70,25 +69,17 @@ export class UpdateChecker {
       }
     } catch (error) {
       console.error('检查更新失败:', error)
-      return {
-        hasUpdate: false,
-        version: '',
-        downloadUrl: '',
-        releaseDate: ''
-      }
+      return { hasUpdate: false, version: '', downloadUrl: '', releaseDate: '' }
     }
   }
 
   private compareVersions(v1: string, v2: string): number {
-    const clean1 = v1.replace(/^v/, '')
-    const clean2 = v2.replace(/^v/, '')
-    
-    const parts1 = clean1.split(/[.-]/).map(Number)
-    const parts2 = clean2.split(/[.-]/).map(Number)
+    const clean1 = v1.replace(/^v/, '').split(/[.-]/).map(Number)
+    const clean2 = v2.replace(/^v/, '').split(/[.-]/).map(Number)
 
-    for (let i = 0; i < Math.max(parts1.length, parts2.length); i++) {
-      const n1 = parts1[i] || 0
-      const n2 = parts2[i] || 0
+    for (let i = 0; i < Math.max(clean1.length, clean2.length); i++) {
+      const n1 = clean1[i] || 0
+      const n2 = clean2[i] || 0
       if (n1 !== n2) return n1 - n2
     }
     return 0
