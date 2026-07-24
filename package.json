@@ -68,11 +68,14 @@
     "win": {
       "target": [
         {
-          "target": "nsis",
+          "target": "portable",
           "arch": ["x64"]
         }
       ],
       "icon": "public/favicon.ico"
+    },
+    "portable": {
+      "artifactName": "global-radio-${version}-win-portable.exe"
     },
     "mac": {
       "target": ["dmg", "zip"],
@@ -82,13 +85,6 @@
       "target": ["AppImage", "deb"],
       "icon": "public/icon.png",
       "category": "AudioVideo"
-    },
-    "nsis": {
-      "oneClick": false,
-      "perMachine": true,
-      "allowToChangeInstallationDirectory": true,
-      "createDesktopShortcut": true,
-      "createStartMenuShortcut": true
     }
   }
 }
