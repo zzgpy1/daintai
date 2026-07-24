@@ -13,9 +13,10 @@
     "electron:dev": "npm run build && electron .",
     "electron:build": "npm run build && npx electron-builder",
     "android:sync": "npx cap sync android",
-    "android:build": "npm run build && npx cap sync android && cd android && chmod +x gradlew && ./gradlew assembleDebug",
-    "android:release": "npm run build && npx cap sync android && cd android && chmod +x gradlew && ./gradlew assembleRelease",
-    "release": "node scripts/build-all.js"
+    "android:build": "npm run build && npx cap sync android && cd android && chmod +x gradlew && ./gradlew assembleRelease",
+    "release": "node scripts/build-all.js",
+    "test": "echo \"No tests specified\" && exit 0",
+    "lint": "echo \"No linter configured\" && exit 0"
   },
   "dependencies": {
     "@capacitor/device": "^5.0.8",
@@ -66,16 +67,12 @@
     ],
     "win": {
       "target": [
-        "portable"
-      ],
-      "icon": "public/favicon.ico",
-      "extraResources": [
         {
-          "from": "node_modules/electron/dist/",
-          "to": ".",
-          "filter": ["**/*.dll"]
+          "target": "nsis",
+          "arch": ["x64"]
         }
-      ]
+      ],
+      "icon": "public/favicon.ico"
     },
     "mac": {
       "target": ["dmg", "zip"],
@@ -89,10 +86,9 @@
     "nsis": {
       "oneClick": false,
       "perMachine": true,
-      "allowToChangeInstallationDirectory": true
-    },
-    "portable": {
-      "artifactName": "global-radio-${version}-win-portable.exe"
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true
     }
   }
 }
