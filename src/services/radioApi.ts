@@ -1,37 +1,22 @@
-// 在 searchStations 方法中增加中文搜索优化
+// 在 searchStations 方法中，增加中文搜索优化
 async searchStations(params: RadioSearchParams = {}): Promise<RadioStation[]> {
   return this.retryWithFallback(async () => {
     const searchParams: any = {}
     
     Object.entries(params).forEach(([key, value]) => {
       if (value !== undefined && value !== null && value !== '') {
-        let processedValue = value.toString().trim()
-        
-        // 检测是否为中文字符
-        const hasChinese = /[\u4e00-\u9fff]/.test(processedValue)
-        if (hasChinese) {
-          processedValue = processedValue.normalize('NFC')
-        }
-        searchParams[key] = processedValue
+        searchParams[key] = value.toString().trim()
       }
     })
 
-    // 如果搜索中文，增加模糊匹配参数
+    // 如果搜索中文，增加 tag 联合搜索
     if (searchParams.name && /[\u4e00-\u9fff]/.test(searchParams.name)) {
-      // 使用 tag 和 name 联合搜索
       const [nameResults, tagResults] = await Promise.all([
         this.currentAPI.get('/json/stations/search', { 
-          params: { ...searchParams, limit: searchParams.limit || 50, hidebroken: true },
-          headers: { 'User-Agent': this.userAgent }
+          params: { ...searchParams, limit: searchParams.limit || 50, hidebroken: true }
         }),
         this.currentAPI.get('/json/stations/search', {
-          params: { 
-            tag: searchParams.name, 
-            order: 'random', 
-            limit: Math.ceil((searchParams.limit || 50) / 2),
-            hidebroken: true 
-          },
-          headers: { 'User-Agent': this.userAgent }
+          params: { tag: searchParams.name, order: 'random', limit: Math.ceil((searchParams.limit || 50) / 2), hidebroken: true }
         })
       ])
 
@@ -42,17 +27,12 @@ async searchStations(params: RadioSearchParams = {}): Promise<RadioStation[]> {
         }
       })
       
-      const result = Array.from(merged.values()).slice(0, searchParams.limit || 50)
-      return result
+      return Array.from(merged.values()).slice(0, searchParams.limit || 50)
     }
 
     const response = await this.currentAPI.get('/json/stations/search', {
       params: searchParams,
-      headers: {
-        'Accept-Charset': 'UTF-8',
-        'Content-Type': 'application/json; charset=UTF-8',
-        'User-Agent': this.userAgent
-      }
+      headers: { 'User-Agent': this.userAgent }
     })
     
     return response.data || []
