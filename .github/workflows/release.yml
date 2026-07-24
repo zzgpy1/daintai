@@ -29,6 +29,9 @@ env:
   NODE_VERSION: 20
 
 jobs:
+  # ============================================
+  # Job 1: 验证项目结构
+  # ============================================
   validate:
     runs-on: ubuntu-latest
     steps:
@@ -40,6 +43,9 @@ jobs:
           test -f index.html || (echo "index.html 不存在" && exit 1)
           echo "验证通过"
 
+  # ============================================
+  # Job 2: 构建 Web 产物
+  # ============================================
   build-web:
     runs-on: ubuntu-latest
     needs: validate
@@ -67,6 +73,9 @@ jobs:
           name: web-dist
           path: web-dist.zip
 
+  # ============================================
+  # Job 3: 构建 Android APK
+  # ============================================
   build-android:
     runs-on: ubuntu-latest
     needs: validate
@@ -118,20 +127,17 @@ jobs:
           chmod +x gradlew
           ls -la gradlew
 
-      # 构建 Debug APK（用于调试）
       - name: 构建 Debug APK
         run: |
           cd android
           ./gradlew assembleDebug
 
-      # 构建 Release APK
       - name: 构建 Release APK
         run: |
           cd android
           ./gradlew assembleRelease
 
-      # 验证并收集 APK
-      - name: 验证并收集 APK
+      - name: 收集 APK 产物
         run: |
           VERSION="${{ github.event.inputs.tag }}"
           if [ -z "$VERSION" ]; then
@@ -141,37 +147,30 @@ jobs:
             VERSION="dev"
           fi
 
-          # 创建输出目录
           mkdir -p apk-outputs
 
-          # 检查 Debug APK
+          # 收集 Debug APK
           DEBUG_APK="android/app/build/outputs/apk/debug/app-debug.apk"
           if [ -f "$DEBUG_APK" ]; then
             cp "$DEBUG_APK" "apk-outputs/global-radio-${VERSION}-debug.apk"
-            echo "✅ Debug APK: global-radio-${VERSION}-debug.apk"
-          else
-            echo "⚠️ Debug APK 不存在"
+            echo "Debug APK: global-radio-${VERSION}-debug.apk"
           fi
 
-          # 检查 Release APK（已签名）
+          # 收集 Release APK（已签名）
           RELEASE_APK="android/app/build/outputs/apk/release/app-release.apk"
           if [ -f "$RELEASE_APK" ]; then
             cp "$RELEASE_APK" "apk-outputs/global-radio-${VERSION}.apk"
-            echo "✅ Release APK: global-radio-${VERSION}.apk"
+            echo "Release APK: global-radio-${VERSION}.apk"
           else
-            echo "⚠️ 已签名 Release APK 不存在，尝试使用未签名版本..."
+            # 如果没有已签名的，使用未签名的
             UNSIGNED_APK="android/app/build/outputs/apk/release/app-release-unsigned.apk"
             if [ -f "$UNSIGNED_APK" ]; then
-              cp "$UNSIGNED_APK" "apk-outputs/global-radio-${VERSION}-unsigned.apk"
-              echo "✅ 未签名 APK: global-radio-${VERSION}-unsigned.apk"
-              echo "⚠️ 注意：这是未签名版本，安装时可能需要开启未知来源"
-            else
-              echo "❌ 没有找到任何 Release APK"
-              exit 1
+              cp "$UNSIGNED_APK" "apk-outputs/global-radio-${VERSION}.apk"
+              echo "未签名 APK: global-radio-${VERSION}.apk"
             fi
           fi
 
-          echo "📦 所有 APK："
+          echo "APK 产物列表："
           ls -la apk-outputs/
 
       - uses: actions/upload-artifact@v4
@@ -179,6 +178,72 @@ jobs:
           name: android-apk
           path: apk-outputs/*.apk
 
+  # ============================================
+  # Job 4: 构建 Docker 镜像（可选）
+  # ============================================
+  build-docker:
+    runs-on: ubuntu-latest
+    needs: build-web
+    if: |
+      github.event.inputs.build_docker == 'true' &&
+      secrets.DOCKER_USERNAME != '' &&
+      secrets.DOCKER_PASSWORD != ''
+    steps:
+      - uses: actions/checkout@v4
+      - name: 下载 Web 产物
+        uses: actions/download-artifact@v4
+        with:
+          name: web-dist
+          path: .
+      - name: 解压 Web 产物
+        run: |
+          unzip web-dist.zip -d dist
+          rm web-dist.zip
+          ls -la dist/
+      - name: 检查 Dockerfile
+        run: test -f Dockerfile || (echo "Dockerfile 不存在" && exit 1)
+      - name: 设置 Docker Buildx
+        uses: docker/setup-buildx-action@v3
+      - name: 登录 Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+      - name: 获取版本号
+        id: get_version
+        run: |
+          VERSION="${{ github.event.inputs.tag }}"
+          if [ -z "$VERSION" ]; then
+            VERSION=$(echo ${GITHUB_REF#refs/tags/})
+          fi
+          if [ -z "$VERSION" ]; then
+            VERSION="dev"
+          fi
+          echo "VERSION=${VERSION}" >> $GITHUB_OUTPUT
+      - name: 构建并推送 AMD64 镜像
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: Dockerfile
+          platforms: linux/amd64
+          push: true
+          tags: |
+            superneed/global-radio:latest
+            superneed/global-radio:${{ steps.get_version.outputs.VERSION }}
+      - name: 构建并推送 ARM64 镜像
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: Dockerfile
+          platforms: linux/arm64
+          push: true
+          tags: |
+            superneed/global-radio-arm64:latest
+            superneed/global-radio-arm64:${{ steps.get_version.outputs.VERSION }}
+
+  # ============================================
+  # Job 5: 创建 GitHub Release
+  # ============================================
   create-release:
     needs: [build-web, build-android]
     runs-on: ubuntu-latest
@@ -190,15 +255,6 @@ jobs:
       - uses: actions/download-artifact@v4
         with:
           path: artifacts/
-
-      - name: 整理产物
-        run: |
-          mkdir -p release-assets
-          echo "查找所有产物..."
-          find artifacts/ -type f -name "*.apk" -exec cp {} release-assets/ \;
-          find artifacts/ -type f -name "*.zip" -exec cp {} release-assets/ \;
-          echo "整理后的产物列表："
-          ls -la release-assets/ || echo "没有产物文件"
 
       - name: 获取版本号
         id: get_version
@@ -213,6 +269,54 @@ jobs:
           echo "VERSION=${VERSION}" >> $GITHUB_OUTPUT
           echo "RELEASE_TAG=${VERSION}" >> $GITHUB_OUTPUT
           echo "版本号: ${VERSION}"
+
+      - name: 整理产物
+        id: prepare_assets
+        run: |
+          mkdir -p release-assets
+          echo "查找所有 APK 文件..."
+          find artifacts/ -type f -name "*.apk" -print
+
+          # 优先查找已签名的 Release APK
+          SIGNED_APK=$(find artifacts/ -type f -name "app-release.apk" | head -n 1)
+          if [ -n "$SIGNED_APK" ]; then
+            echo "找到已签名 APK: $SIGNED_APK"
+            cp "$SIGNED_APK" "release-assets/global-radio-${{ steps.get_version.outputs.VERSION }}.apk"
+          else
+            # 如果没有已签名的，查找未签名的
+            UNSIGNED_APK=$(find artifacts/ -type f -name "app-release-unsigned.apk" | head -n 1)
+            if [ -n "$UNSIGNED_APK" ]; then
+              echo "找到未签名 APK: $UNSIGNED_APK"
+              cp "$UNSIGNED_APK" "release-assets/global-radio-${{ steps.get_version.outputs.VERSION }}.apk"
+            else
+              # 最后尝试任何 APK 文件
+              ANY_APK=$(find artifacts/ -type f -name "*.apk" | head -n 1)
+              if [ -n "$ANY_APK" ]; then
+                echo "找到备用 APK: $ANY_APK"
+                cp "$ANY_APK" "release-assets/global-radio-${{ steps.get_version.outputs.VERSION }}.apk"
+              else
+                echo "没有找到任何 APK 文件！"
+                echo "artifacts 目录结构："
+                ls -laR artifacts/
+                exit 1
+              fi
+            fi
+          fi
+
+          # 复制 Web 产物
+          WEB_ZIP=$(find artifacts/ -type f -name "*.zip" | head -n 1)
+          if [ -n "$WEB_ZIP" ]; then
+            echo "找到 Web 产物: $WEB_ZIP"
+            cp "$WEB_ZIP" "release-assets/"
+          else
+            echo "未找到 Web 产物"
+          fi
+
+          echo "release-assets 目录内容："
+          ls -la release-assets/
+
+          # 验证目标 APK 是否存在
+          test -f "release-assets/global-radio-${{ steps.get_version.outputs.VERSION }}.apk" || (echo "目标 APK 不存在！" && exit 1)
 
       - name: 生成 Release Notes
         run: |
@@ -251,5 +355,16 @@ jobs:
           asset_path: release-assets/global-radio-${{ steps.get_version.outputs.VERSION }}.apk
           asset_name: global-radio-${{ steps.get_version.outputs.VERSION }}.apk
           asset_content_type: application/vnd.android.package-archive
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: 上传 Web 产物（如果有）
+        if: hashFiles('release-assets/web-dist.zip') != ''
+        uses: actions/upload-release-asset@v1
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: release-assets/web-dist.zip
+          asset_name: web-dist-${{ steps.get_version.outputs.VERSION }}.zip
+          asset_content_type: application/zip
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
