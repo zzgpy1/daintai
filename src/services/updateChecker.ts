@@ -10,7 +10,8 @@ export interface UpdateInfo {
 
 export class UpdateChecker {
   private static instance: UpdateChecker
-  private currentVersion: string = 'v2026.07.24-060846' // 从 package.json 读取
+  // 从 package.json 读取版本号，保持与构建一致
+  private currentVersion: string = 'v2026.07.24-102147'
 
   static getInstance(): UpdateChecker {
     if (!UpdateChecker.instance) {
@@ -21,56 +22,57 @@ export class UpdateChecker {
 
   async checkForUpdate(): Promise<UpdateInfo> {
     try {
-      // 从 GitHub API 获取最新 Release
       const response = await fetch(
         'https://api.github.com/repos/zzgpy1/daintai/releases/latest'
       )
       
       if (!response.ok) {
-        throw new Error('Failed to fetch latest release')
+        throw new Error(`HTTP ${response.status}`)
       }
 
       const data = await response.json()
-      const latestVersion = data.tag_name
+      const latestVersion = data.tag_name || ''
 
-      // 比较版本号
+      // 比较版本号（移除 v 前缀）
       const hasUpdate = this.compareVersions(latestVersion, this.currentVersion) > 0
 
-      // 查找 APK 下载链接
-      const apkAsset = data.assets.find(
-        (asset: any) => asset.name.endsWith('.apk') && !asset.name.includes('debug')
+      // 查找非 Debug 的 APK
+      const apkAsset = data.assets?.find(
+        (asset: any) => 
+          asset.name.endsWith('.apk') && 
+          !asset.name.includes('debug') &&
+          !asset.name.includes('unsigned')
       )
 
       return {
         hasUpdate,
         version: latestVersion,
         downloadUrl: apkAsset?.browser_download_url || '',
-        releaseDate: data.published_at,
-        body: data.body
+        releaseDate: data.published_at || '',
+        body: data.body || ''
       }
     } catch (error) {
       console.error('检查更新失败:', error)
       return {
         hasUpdate: false,
         version: '',
-        downloadUrl: ''
+        downloadUrl: '',
+        releaseDate: ''
       }
     }
   }
 
   private compareVersions(v1: string, v2: string): number {
-    // 提取版本号中的数字部分进行比较
-    const extractNumbers = (v: string) => {
-      const match = v.match(/(\d+)/g)
-      return match ? match.map(Number) : []
-    }
+    // 移除 v 前缀，按点或连字符分割
+    const clean1 = v1.replace(/^v/, '')
+    const clean2 = v2.replace(/^v/, '')
+    
+    const parts1 = clean1.split(/[.-]/).map(Number)
+    const parts2 = clean2.split(/[.-]/).map(Number)
 
-    const nums1 = extractNumbers(v1)
-    const nums2 = extractNumbers(v2)
-
-    for (let i = 0; i < Math.max(nums1.length, nums2.length); i++) {
-      const n1 = nums1[i] || 0
-      const n2 = nums2[i] || 0
+    for (let i = 0; i < Math.max(parts1.length, parts2.length); i++) {
+      const n1 = parts1[i] || 0
+      const n2 = parts2[i] || 0
       if (n1 !== n2) return n1 - n2
     }
     return 0
