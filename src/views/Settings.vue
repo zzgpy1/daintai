@@ -1,7 +1,6 @@
 <template>
   <div class="settings-page min-h-screen bg-ios-light-gray dark:bg-dark-bg pb-20">
     <div class="container-responsive py-4 space-y-6">
-      <!-- 移动端标题 -->
       <h1 class="text-2xl font-bold text-ios-dark-gray dark:text-dark-text">{{ t('settings.title') }}</h1>
 
       <!-- ============================================ -->
@@ -43,25 +42,23 @@
       <!-- 3. 睡眠定时器 -->
       <!-- ============================================ -->
       <section class="ios-card p-4">
-        <h2 class="text-lg font-semibold text-ios-dark-gray dark:text-dark-text mb-4">睡眠定时器</h2>
+        <h2 class="text-lg font-semibold text-ios-dark-gray dark:text-dark-text mb-4">⏱️ 睡眠定时器</h2>
         
-        <!-- 定时器状态 -->
         <div v-if="playerStore.hasSleepTimer" class="p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg mb-4">
           <div class="flex items-center justify-between">
             <div>
-              <p class="text-sm font-medium text-blue-700 dark:text-blue-300">⏱️ 定时器已启动</p>
-              <p class="text-xs text-blue-600 dark:text-blue-400">{{ playerStore.sleepTimerRemaining }} 分钟后自动停止</p>
+              <p class="text-sm font-medium text-blue-700 dark:text-blue-300">定时器已启动</p>
+              <p class="text-xs text-blue-600 dark:text-blue-400">剩余 {{ playerStore.sleepTimerRemaining }} 分钟后停止</p>
             </div>
             <button
               @click="clearSleepTimer"
-              class="px-3 py-1 bg-blue-100 dark:bg-blue-800 text-blue-700 dark:text-blue-300 rounded-lg text-sm hover:bg-blue-200 dark:hover:bg-blue-700 transition-colors"
+              class="px-3 py-1 bg-blue-100 dark:bg-blue-800 text-blue-700 dark:text-blue-300 rounded-lg text-sm hover:bg-blue-200 transition-colors"
             >
-              {{ t('settings.cancel') }}
+              取消
             </button>
           </div>
         </div>
 
-        <!-- 定时器选项 -->
         <div v-else class="grid grid-cols-4 gap-3">
           <button
             v-for="time in [15, 30, 45, 60]"
@@ -70,20 +67,18 @@
             class="p-3 rounded-lg border border-gray-200 dark:border-dark-gray text-center hover:bg-gray-50 dark:hover:bg-dark-gray transition-all"
           >
             <div class="text-lg font-semibold text-ios-dark-gray dark:text-dark-text">{{ time }}</div>
-            <div class="text-xs text-ios-gray dark:text-dark-secondary">{{ t('settings.minutes') }}</div>
+            <div class="text-xs text-ios-gray dark:text-dark-secondary">分钟</div>
           </button>
         </div>
 
-        <!-- 自定义时间 -->
         <div v-if="!playerStore.hasSleepTimer" class="mt-4">
-          <label class="block text-sm font-medium text-ios-gray dark:text-dark-secondary mb-2">{{ t('settings.customTime') }}</label>
           <div class="flex gap-2">
             <input
               v-model.number="customMinutes"
               type="number"
               min="1"
               max="480"
-              :placeholder="t('settings.enterMinutes')"
+              placeholder="自定义分钟"
               class="flex-1 px-3 py-2 border border-gray-200 dark:border-dark-gray rounded-lg bg-white dark:bg-dark-card text-ios-dark-gray dark:text-dark-text"
             />
             <button
@@ -91,7 +86,7 @@
               :disabled="!customMinutes || customMinutes < 1"
               class="px-4 py-2 bg-ios-blue text-white rounded-lg hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             >
-              {{ t('settings.setTimer') }}
+              设置
             </button>
           </div>
         </div>
@@ -101,13 +96,19 @@
       <!-- 4. 关于应用 + 更新检测 -->
       <!-- ============================================ -->
       <section class="ios-card p-4">
-        <h2 class="text-lg font-semibold text-ios-dark-gray dark:text-dark-text mb-4">{{ t('settings.aboutApp') }}</h2>
+        <h2 class="text-lg font-semibold text-ios-dark-gray dark:text-dark-text mb-4">📱 关于应用</h2>
         
         <div class="space-y-3">
+          <!-- 应用名称 -->
+          <div class="flex justify-between">
+            <span class="text-ios-gray dark:text-dark-secondary">应用名称</span>
+            <span class="text-ios-dark-gray dark:text-dark-text font-medium">全球电台</span>
+          </div>
+
           <!-- 当前版本 -->
           <div class="flex justify-between">
             <span class="text-ios-gray dark:text-dark-secondary">当前版本</span>
-            <span class="text-ios-dark-gray dark:text-dark-text font-medium">{{ currentVersion }}</span>
+            <span class="text-ios-dark-gray dark:text-dark-text font-medium text-ios-blue">{{ currentVersion }}</span>
           </div>
 
           <!-- 平台信息 -->
@@ -116,7 +117,7 @@
             <span class="text-ios-dark-gray dark:text-dark-text">{{ deviceType }}</span>
           </div>
 
-          <!-- 最新版本 -->
+          <!-- 最新版本状态 -->
           <div class="flex justify-between">
             <span class="text-ios-gray dark:text-dark-secondary">最新版本</span>
             <span 
@@ -125,12 +126,12 @@
                 hasNewVersion ? 'text-ios-green' : 'text-ios-gray dark:text-dark-secondary'
               ]"
             >
-              {{ latestVersion || (isChecking ? '检查中...' : '检查更新') }}
+              {{ latestVersion || (isChecking ? '检查中...' : '已是最新') }}
             </span>
           </div>
 
           <!-- 更新操作按钮 -->
-          <div class="flex flex-col gap-2 mt-2">
+          <div class="flex flex-col gap-2 mt-3">
             <button
               @click="manualCheckUpdate"
               :disabled="isChecking"
@@ -148,34 +149,28 @@
             >
               ⬇️ 下载最新版本
             </button>
-
-            <button
-              v-if="hasNewVersion"
-              @click="skipVersion"
-              class="w-full p-2 text-xs text-ios-gray dark:text-dark-secondary hover:text-ios-blue transition-colors"
-            >
-              忽略此版本
-            </button>
           </div>
 
-          <!-- GitHub 链接 -->
-          <div class="flex justify-between items-center gap-3 pt-3 border-t border-gray-100 dark:border-dark-gray">
-            <span class="text-ios-gray dark:text-dark-secondary">GitHub</span>
-            <a
-              href="https://github.com/zzgpy1/daintai"
-              target="_blank"
-              rel="noopener noreferrer"
-              class="text-ios-blue hover:underline truncate"
-            >
-              zzgpy1/daintai
-            </a>
+          <!-- 分隔线 -->
+          <div class="border-t border-gray-100 dark:border-dark-gray pt-3 mt-2">
+            <div class="flex justify-between">
+              <span class="text-ios-gray dark:text-dark-secondary">GitHub</span>
+              <a
+                href="https://github.com/zzgpy1/daintai"
+                target="_blank"
+                rel="noopener noreferrer"
+                class="text-ios-blue hover:underline truncate"
+              >
+                zzgpy1/daintai
+              </a>
+            </div>
           </div>
         </div>
       </section>
     </div>
 
     <!-- ============================================ -->
-    <!-- 更新弹窗（防止在 Settings 中重复） -->
+    <!-- 更新弹窗 -->
     <!-- ============================================ -->
     <UpdateDialog
       v-if="showUpdateDialog"
@@ -188,7 +183,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { usePlayerStore } from '@/stores/player'
 import { useLanguageStore } from '@/stores/language'
 import { useThemeStore } from '@/stores/theme'
@@ -203,8 +198,8 @@ const themeStore = useThemeStore()
 const toastStore = useToastStore()
 const { t, languages, currentLanguage, setLanguage } = languageStore
 
-// 版本信息
-const currentVersion = ref('v2026.07.24-060846')
+// 版本信息 - 从环境变量或硬编码
+const currentVersion = ref('v2026.07.24-102147')
 const latestVersion = ref('')
 const downloadUrl = ref('')
 const hasNewVersion = ref(false)
@@ -226,9 +221,9 @@ const updateInfo = ref<UpdateInfo>({
 // 设备类型
 const deviceType = computed(() => {
   const width = window.innerWidth
-  if (width >= 1024) return t('settings.desktop')
-  if (width >= 768) return t('settings.tablet')
-  return t('settings.mobile')
+  if (width >= 1024) return '💻 桌面端'
+  if (width >= 768) return '📱 平板端'
+  return '📱 手机端'
 })
 
 // ============================================
@@ -266,15 +261,6 @@ const downloadUpdate = () => {
   }
 }
 
-const skipVersion = () => {
-  if (latestVersion.value) {
-    localStorage.setItem('skipped_version', latestVersion.value)
-    hasNewVersion.value = false
-    toastStore.showInfo(`已忽略版本 ${latestVersion.value}`)
-  }
-}
-
-// 弹窗事件处理
 const handleDialogDownload = () => {
   showUpdateDialog.value = false
   toastStore.showSuccess('正在下载更新...')
@@ -305,14 +291,18 @@ const clearSleepTimer = () => {
 // 生命周期
 // ============================================
 
+let autoCheckTimer: NodeJS.Timeout
+
 onMounted(() => {
-  // 自动检查更新
+  // 自动检查更新（延迟 3 秒）
   setTimeout(() => {
     manualCheckUpdate()
-  }, 1000)
+  }, 3000)
+})
+
+onUnmounted(() => {
+  if (autoCheckTimer) {
+    clearTimeout(autoCheckTimer)
+  }
 })
 </script>
-
-<style scoped>
-/* 设置页面样式 */
-</style>
