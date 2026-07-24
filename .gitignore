@@ -41,6 +41,10 @@ out/
 android/.gradle
 android/local.properties
 
+# 确保 gradlew 被提交
+!android/gradlew
+!android/gradlew.bat
+
 # Testing
 coverage
 
