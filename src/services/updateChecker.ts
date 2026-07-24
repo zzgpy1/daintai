@@ -10,8 +10,8 @@ export interface UpdateInfo {
 
 export class UpdateChecker {
   private static instance: UpdateChecker
-  // 从 package.json 读取版本号，保持与构建一致
-  private currentVersion: string = 'v2026.07.24-102147'
+  private currentVersion: string = 'v2026.07.24-105948'
+  private checkedVersion: string = ''
 
   static getInstance(): UpdateChecker {
     if (!UpdateChecker.instance) {
@@ -22,6 +22,9 @@ export class UpdateChecker {
 
   async checkForUpdate(): Promise<UpdateInfo> {
     try {
+      // 防止重复检查同一版本
+      const skippedVersion = localStorage.getItem('skipped_version')
+      
       const response = await fetch(
         'https://api.github.com/repos/zzgpy1/daintai/releases/latest'
       )
@@ -33,10 +36,23 @@ export class UpdateChecker {
       const data = await response.json()
       const latestVersion = data.tag_name || ''
 
-      // 比较版本号（移除 v 前缀）
-      const hasUpdate = this.compareVersions(latestVersion, this.currentVersion) > 0
+      // 如果已经检查过这个版本，不再提示
+      if (this.checkedVersion === latestVersion) {
+        return {
+          hasUpdate: false,
+          version: latestVersion,
+          downloadUrl: '',
+          releaseDate: ''
+        }
+      }
+      this.checkedVersion = latestVersion
 
-      // 查找非 Debug 的 APK
+      // 比较版本号
+      const hasUpdate = this.compareVersions(latestVersion, this.currentVersion) > 0
+      
+      // 如果用户跳过了这个版本，不再提示
+      const finalHasUpdate = hasUpdate && latestVersion !== skippedVersion
+
       const apkAsset = data.assets?.find(
         (asset: any) => 
           asset.name.endsWith('.apk') && 
@@ -45,7 +61,7 @@ export class UpdateChecker {
       )
 
       return {
-        hasUpdate,
+        hasUpdate: finalHasUpdate,
         version: latestVersion,
         downloadUrl: apkAsset?.browser_download_url || '',
         releaseDate: data.published_at || '',
@@ -63,7 +79,6 @@ export class UpdateChecker {
   }
 
   private compareVersions(v1: string, v2: string): number {
-    // 移除 v 前缀，按点或连字符分割
     const clean1 = v1.replace(/^v/, '')
     const clean2 = v2.replace(/^v/, '')
     
