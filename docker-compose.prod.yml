@@ -1,0 +1,37 @@
+version: '3.8'
+
+services:
+  nginx:
+    image: nginx:alpine
+    container_name: global-radio-nginx
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./dist:/usr/share/nginx/html:ro
+      - ./nginx.prod.conf:/etc/nginx/conf.d/default.conf:ro
+      - ./ssl:/etc/nginx/ssl:ro
+    networks:
+      - global-radio-network
+    depends_on:
+      - app
+
+  app:
+    image: $DOCKER_USERNAME/global-radio:latest
+    container_name: global-radio-app
+    restart: unless-stopped
+    environment:
+      - NODE_ENV=production
+      - VITE_RADIO_API_URL=${VITE_RADIO_API_URL}
+    networks:
+      - global-radio-network
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:4173', (r) => {process.exit(r.statusCode === 200 ? 0 : 1)})"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+networks:
+  global-radio-network:
+    driver: bridge
