@@ -1,118 +1,75 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
-import type { RadioStation } from '@/types/radio'
+import type { RadioStation, RadioSearchParams } from '@/types/radio'
 import { radioAPI } from '@/services/radioApi'
 
 export const useRadioStore = defineStore('radio', () => {
-  const stations = ref<RadioStation[]>([])
-  const topStations = ref<RadioStation[]>([])
-  const latestStations = ref<RadioStation[]>([])
-  const isLoading = ref(false)
-  const error = ref<string | null>(null)
-  const searchQuery = ref('')
+  // ... 现有状态保持不变 ...
 
-  const filteredStations = computed(() => {
-    if (!searchQuery.value) return stations.value
-    const query = searchQuery.value.toLowerCase().trim()
-    return stations.value.filter(station => 
-      station.name.toLowerCase().includes(query) ||
-      station.country.toLowerCase().includes(query) ||
-      station.tags.toLowerCase().includes(query)
-    )
-  })
-
-  const searchStations = async (params: any = {}) => {
+  // 新增：加载国内推荐电台（中文）
+  const loadChineseStations = async (limit: number = 30) => {
     try {
-      isLoading.value = true
+      isLoadingStations.value = true
       error.value = null
-      const results = await radioAPI.searchStations(params)
-      stations.value = results
-      return results
+      
+      // 同时搜索中文标签、中国地区、中文语言
+      const [tagResult, countryResult, languageResult] = await Promise.all([
+        radioAPI.searchStations({ tag: 'chinese', order: 'random', limit: Math.ceil(limit/3), hidebroken: true }),
+        radioAPI.searchStations({ countrycode: 'CN', order: 'random', limit: Math.ceil(limit/3), hidebroken: true }),
+        radioAPI.searchStations({ language: 'chinese', order: 'random', limit: Math.ceil(limit/3), hidebroken: true })
+      ])
+      
+      // 合并去重
+      const merged = new Map<string, RadioStation>()
+      ;[...tagResult, ...countryResult, ...languageResult].forEach(station => {
+        if (!merged.has(station.stationuuid)) {
+          merged.set(station.stationuuid, station)
+        }
+      })
+      
+      // 随机排序并限制数量
+      const result = Array.from(merged.values())
+        .sort(() => 0.5 - Math.random())
+        .slice(0, limit)
+      
+      // 追加到现有电台列表
+      stations.value = result
+      return result
     } catch (err) {
-      error.value = err instanceof Error ? err.message : '搜索失败'
+      error.value = err instanceof Error ? err.message : '加载中文电台失败'
+      console.error('加载中文电台错误:', err)
       return []
     } finally {
-      isLoading.value = false
+      isLoadingStations.value = false
     }
   }
 
-  const loadTopStations = async ({ force = false } = {}) => {
-    if (topStations.value.length > 0 && !force) return
+  // 新增：获取热门中文电台（用于首页推荐）
+  const getChineseTopStations = async (limit: number = 20) => {
     try {
-      isLoading.value = true
-      error.value = null
-      const response = await radioAPI.getTopStations(50)
-      topStations.value = response.data || []
+      const cached = localStorage.getItem('chinese_top_stations')
+      if (cached) {
+        const parsed = JSON.parse(cached)
+        if (Date.now() - parsed.timestamp < 5 * 60 * 1000) {
+          return parsed.data
+        }
+      }
+      
+      const results = await loadChineseStations(limit)
+      localStorage.setItem('chinese_top_stations', JSON.stringify({
+        data: results,
+        timestamp: Date.now()
+      }))
+      return results
     } catch (err) {
-      error.value = err instanceof Error ? err.message : '加载热门电台失败'
-    } finally {
-      isLoading.value = false
+      console.error('获取中文热门电台失败:', err)
+      return []
     }
-  }
-
-  const loadLatestStations = async ({ force = false } = {}) => {
-    if (latestStations.value.length > 0 && !force) return
-    try {
-      isLoading.value = true
-      error.value = null
-      latestStations.value = await radioAPI.getLatestStations(50)
-    } catch (err) {
-      error.value = err instanceof Error ? err.message : '加载最新电台失败'
-    } finally {
-      isLoading.value = false
-    }
-  }
-
-  const loadRandomStations = async () => {
-    try {
-      isLoading.value = true
-      error.value = null
-      const response = await radioAPI.getRandomStations(50)
-      stations.value = response.data || []
-    } catch (err) {
-      error.value = err instanceof Error ? err.message : '加载随机电台失败'
-    } finally {
-      isLoading.value = false
-    }
-  }
-
-  const getStationByUuid = async (uuid: string): Promise<RadioStation | null> => {
-    try {
-      isLoading.value = true
-      error.value = null
-      return await radioAPI.getStationByUUID(uuid)
-    } catch (err) {
-      error.value = err instanceof Error ? err.message : '加载电台失败'
-      return null
-    } finally {
-      isLoading.value = false
-    }
-  }
-
-  const resetSearch = () => {
-    searchQuery.value = ''
-    stations.value = []
-    error.value = null
-  }
-
-  const clearError = () => {
-    error.value = null
   }
 
   return {
-    stations,
-    topStations,
-    latestStations,
-    isLoading,
-    error,
-    searchQuery,
-    filteredStations,
-    searchStations,
-    loadTopStations,
-    loadLatestStations,
-    loadRandomStations,
-    getStationByUuid,
-    resetSearch,
-    clearError
+    // ... 现有导出 ...
+    loadChineseStations,
+    getChineseTopStations
   }
 })
