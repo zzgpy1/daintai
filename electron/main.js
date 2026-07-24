@@ -13,6 +13,7 @@ function createWindow() {
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true,
+      sandbox: false,  // 解决 av_strdup 问题
     },
     icon: path.join(__dirname, '../public/favicon.ico'),
     show: false,
@@ -20,7 +21,6 @@ function createWindow() {
     backgroundColor: '#1a365d',
   });
 
-  // 加载 index.html
   const indexPath = path.join(__dirname, '../dist/index.html');
   if (fs.existsSync(indexPath)) {
     mainWindow.loadFile(indexPath);
