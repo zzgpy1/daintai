@@ -1,7 +1,11 @@
 <template>
   <div class="settings-page min-h-screen bg-ios-light-gray dark:bg-dark-bg pb-20">
     <div class="container-responsive py-4 space-y-6">
-      <h1 class="text-2xl font-bold text-ios-dark-gray dark:text-dark-text">⚙️ 设置</h1>
+      <!-- 标题 -->
+      <div class="flex items-center justify-between">
+        <h1 class="text-2xl font-bold text-ios-dark-gray dark:text-dark-text">⚙️ 设置</h1>
+        <button @click="$router.push('/')" class="text-ios-blue text-sm">返回首页</button>
+      </div>
 
       <!-- ============================================ -->
       <!-- 1. 主题设置 -->
@@ -71,31 +75,27 @@
       </section>
 
       <!-- ============================================ -->
-      <!-- 3. 关于应用 + 更新检测 -->
+      <!-- 3. 关于应用 -->
       <!-- ============================================ -->
       <section class="ios-card p-4">
         <h2 class="text-lg font-semibold text-ios-dark-gray dark:text-dark-text mb-4">📱 关于应用</h2>
         
         <div class="space-y-3">
-          <!-- 应用名称 -->
           <div class="flex justify-between">
             <span class="text-ios-gray dark:text-dark-secondary">应用名称</span>
             <span class="text-ios-dark-gray dark:text-dark-text font-medium">全球电台</span>
           </div>
 
-          <!-- 当前版本 -->
           <div class="flex justify-between">
             <span class="text-ios-gray dark:text-dark-secondary">当前版本</span>
             <span class="text-ios-dark-gray dark:text-dark-text font-medium text-ios-blue">{{ currentVersion }}</span>
           </div>
 
-          <!-- 平台信息 -->
           <div class="flex justify-between">
             <span class="text-ios-gray dark:text-dark-secondary">设备类型</span>
             <span class="text-ios-dark-gray dark:text-dark-text">{{ deviceType }}</span>
           </div>
 
-          <!-- 最新版本 -->
           <div class="flex justify-between">
             <span class="text-ios-gray dark:text-dark-secondary">最新版本</span>
             <span 
@@ -108,7 +108,6 @@
             </span>
           </div>
 
-          <!-- 更新按钮 -->
           <div class="flex flex-col gap-2 mt-3">
             <button
               @click="manualCheckUpdate"
@@ -168,18 +167,15 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
 import { usePlayerStore } from '@/stores/player'
-import { useLanguageStore } from '@/stores/language'
 import { useToastStore } from '@/stores/toast'
 import { UpdateChecker, type UpdateInfo } from '@/services/updateChecker'
 import ThemeToggle from '@/components/ThemeToggle.vue'
 import UpdateDialog from '@/components/UpdateDialog.vue'
 
 const playerStore = usePlayerStore()
-const languageStore = useLanguageStore()
 const toastStore = useToastStore()
-const { t, languages, currentLanguage, setLanguage } = languageStore
 
-const currentVersion = ref('v2026.07.24-105948')
+const currentVersion = ref('v2026.07.24-114207')
 const latestVersion = ref('')
 const downloadUrl = ref('')
 const hasNewVersion = ref(false)
@@ -206,7 +202,7 @@ const manualCheckUpdate = async () => {
   isChecking.value = true
   try {
     const checker = UpdateChecker.getInstance()
-    const result = await checker.checkForUpdate()
+    const result = await checker.checkForUpdate(true) // 强制检查
     
     if (result.hasUpdate) {
       latestVersion.value = result.version
@@ -264,8 +260,9 @@ const clearSleepTimer = () => {
 }
 
 onMounted(() => {
+  // 延迟检查，避免干扰首次加载
   setTimeout(() => {
     manualCheckUpdate()
-  }, 2000)
+  }, 3000)
 })
 </script>
