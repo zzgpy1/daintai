@@ -1,0 +1,66 @@
+apply plugin: 'com.android.application'
+
+android {
+    namespace "com.globalradio.app"
+    compileSdk 34
+
+    defaultConfig {
+        applicationId "com.globalradio.app"
+        minSdk 22
+        targetSdk 34
+        versionCode 1
+        versionName "1.0"
+        testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
+    }
+
+    signingConfigs {
+        debug {
+            storeFile file("debug.keystore")
+            storePassword "android"
+            keyAlias "androiddebugkey"
+            keyPassword "android"
+        }
+        release {
+            // 如果 GitHub Secrets 中有签名信息则使用，否则使用 Debug 签名
+            storeFile file(project.hasProperty("STORE_FILE") ? STORE_FILE : "debug.keystore")
+            storePassword project.hasProperty("STORE_PASSWORD") ? STORE_PASSWORD : "android"
+            keyAlias project.hasProperty("KEY_ALIAS") ? KEY_ALIAS : "androiddebugkey"
+            keyPassword project.hasProperty("KEY_PASSWORD") ? KEY_PASSWORD : "android"
+        }
+    }
+
+    buildTypes {
+        release {
+            signingConfig signingConfigs.release
+            minifyEnabled true
+            shrinkResources true
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+        }
+        debug {
+            signingConfig signingConfigs.debug
+            minifyEnabled false
+            debuggable true
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+}
+
+dependencies {
+    implementation fileTree(include: ['*.jar'], dir: 'libs')
+    implementation "androidx.appcompat:appcompat:$androidxAppCompatVersion"
+    implementation project(':capacitor-android')
+    testImplementation "junit:junit:$junitVersion"
+    androidTestImplementation "androidx.test.ext:junit:$androidxJunitVersion"
+    androidTestImplementation "androidx.test.espresso:espresso-core:$androidxEspressoCoreVersion"
+    implementation project(':capacitor-device')
+    implementation project(':capacitor-haptics')
+    implementation project(':capacitor-keyboard')
+    implementation project(':capacitor-status-bar')
+    implementation project(':jofr-capacitor-media-session')
+}
+
+apply from: 'capacitor.build.gradle'
