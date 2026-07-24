@@ -52,11 +52,16 @@ jobs:
         run: npm install --no-audit --no-fund
       - name: 构建 Web
         run: npm run build
+      - name: 验证构建产物
+        run: |
+          ls -la dist/
+          test -f dist/index.html || (echo "dist/index.html 不存在" && exit 1)
       - name: 打包 Web 产物
         run: |
           cd dist
           zip -r ../web-dist.zip .
           cd ..
+          ls -la web-dist.zip
       - uses: actions/upload-artifact@v4
         with:
           name: web-dist
@@ -70,32 +75,73 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
+
       - name: Setup Java
         uses: actions/setup-java@v4
         with:
           distribution: 'temurin'
           java-version: '17'
+
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
+
       - name: 安装依赖
         run: npm install --no-audit --no-fund
+
       - name: 构建 Web
         run: npm run build
+
+      - name: 验证 Web 构建产物
+        run: |
+          ls -la dist/
+          test -f dist/index.html || (echo "❌ dist/index.html 不存在" && exit 1)
+
       - name: 添加 Android 平台
         run: |
           if [ ! -d "android" ]; then
             npx cap add android
           fi
+          ls -la android/
+
       - name: 同步 Capacitor
         run: npx cap sync android
-      - name: 构建 APK
+
+      - name: 验证 Capacitor 同步结果
+        run: |
+          echo "📂 android/app/src/main/assets/"
+          ls -la android/app/src/main/assets/ || echo "assets 目录不存在"
+          test -f android/app/src/main/assets/index.html && echo "✅ index.html 已复制" || echo "⚠️ index.html 未复制"
+
+      - name: 检查 gradlew
         run: |
           cd android
           chmod +x gradlew
+          ls -la gradlew
+
+      - name: 构建 Debug APK
+        run: |
+          cd android
+          ./gradlew assembleDebug
+
+      - name: 验证 Debug APK
+        run: |
+          DEBUG_PATH="android/app/build/outputs/apk/debug"
+          echo "📂 Debug APK 目录："
+          ls -la $DEBUG_PATH || echo "⚠️ Debug APK 目录不存在"
+          test -f $DEBUG_PATH/app-debug.apk && echo "✅ Debug APK 存在" || echo "⚠️ Debug APK 不存在"
+
+      - name: 构建 Release APK
+        run: |
+          cd android
           ./gradlew assembleRelease
-      - name: 验证并重命名 APK
+
+      - name: 验证并重命名 Release APK
         run: |
           APK_PATH="android/app/build/outputs/apk/release"
+          echo "📂 Release APK 目录："
+          ls -la $APK_PATH || echo "⚠️ Release APK 目录不存在"
+          test -f $APK_PATH/app-release.apk || (echo "❌ Release APK 不存在" && exit 1)
+
           VERSION="${{ github.event.inputs.tag }}"
           if [ -z "$VERSION" ]; then
             VERSION=$(echo ${GITHUB_REF#refs/tags/})
@@ -103,9 +149,10 @@ jobs:
           if [ -z "$VERSION" ]; then
             VERSION="dev"
           fi
-          test -f $APK_PATH/app-release.apk || (echo "APK 不存在" && exit 1)
+
           cp $APK_PATH/app-release.apk $APK_PATH/global-radio-${VERSION}.apk
-          echo "APK: global-radio-${VERSION}.apk"
+          echo "✅ APK 已重命名: global-radio-${VERSION}.apk"
+
       - uses: actions/upload-artifact@v4
         with:
           name: android-apk
@@ -122,12 +169,16 @@ jobs:
       - uses: actions/download-artifact@v4
         with:
           path: artifacts/
+
       - name: 整理产物
         run: |
           mkdir -p release-assets
+          echo "📂 查找所有产物..."
           find artifacts/ -type f -name "*.apk" -exec cp {} release-assets/ \;
           find artifacts/ -type f -name "*.zip" -exec cp {} release-assets/ \;
-          ls -la release-assets/
+          echo "📦 整理后的产物列表："
+          ls -la release-assets/ || echo "⚠️ 没有产物文件"
+
       - name: 获取版本号
         id: get_version
         run: |
@@ -140,6 +191,8 @@ jobs:
           fi
           echo "VERSION=${VERSION}" >> $GITHUB_OUTPUT
           echo "RELEASE_TAG=${VERSION}" >> $GITHUB_OUTPUT
+          echo "版本号: ${VERSION}"
+
       - name: 生成 Release Notes
         run: |
           VERSION="${{ steps.get_version.outputs.VERSION }}"
@@ -156,7 +209,10 @@ jobs:
 
           感谢使用全球电台！
           EOF
+          cat RELEASE_NOTES.md
+
       - name: 创建 Release
+        id: create_release
         uses: actions/create-release@v1
         with:
           tag_name: ${{ steps.get_version.outputs.RELEASE_TAG }}
@@ -166,6 +222,7 @@ jobs:
           prerelease: false
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
       - name: 上传 APK
         uses: actions/upload-release-asset@v1
         with:
