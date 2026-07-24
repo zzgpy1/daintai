@@ -1,66 +1,29 @@
-const { app, BrowserWindow, Menu, shell } = require('electron');
+const { app, BrowserWindow, Menu, shell, ipcMain } = require('electron');
 const path = require('path');
 const fs = require('fs');
+const updater = require('./updater');
 
-// 禁用 FFmpeg 避免 av_strdup 错误
-app.commandLine.appendSwitch('disable-ffmpeg');
-app.disableHardwareAcceleration();
+// ... 其他代码保持不变 ...
 
-let mainWindow;
-
+// 在 createWindow 末尾添加
 function createWindow() {
-  mainWindow = new BrowserWindow({
-    width: 1200,
-    height: 800,
-    minWidth: 800,
-    minHeight: 600,
-    webPreferences: {
-      nodeIntegration: false,
-      contextIsolation: true,
-      sandbox: false,
-    },
-    icon: path.join(__dirname, '../public/favicon.ico'),
-    show: false,
-    frame: true,
-    backgroundColor: '#1a365d',
-  });
+  // ... 现有代码 ...
 
-  // 加载 index.html
-  const indexPath = path.join(__dirname, '../dist/index.html');
-  if (fs.existsSync(indexPath)) {
-    mainWindow.loadFile(indexPath);
-    console.log('加载本地文件:', indexPath);
-  } else {
-    mainWindow.loadURL('http://localhost:4173');
-    console.log('加载开发服务器');
+  // 设置自动更新（仅生产环境）
+  if (app.isPackaged) {
+    updater.setupAutoUpdater(mainWindow);
   }
-
-  mainWindow.once('ready-to-show', () => {
-    mainWindow.show();
-    if (!app.isPackaged) {
-      mainWindow.webContents.openDevTools();
-    }
-  });
-
-  mainWindow.webContents.setWindowOpenHandler(({ url }) => {
-    shell.openExternal(url);
-    return { action: 'deny' };
-  });
-
-  // 设置菜单为 null
-  Menu.setApplicationMenu(null);
 }
 
-app.whenReady().then(createWindow);
-
-app.on('window-all-closed', () => {
-  if (process.platform !== 'darwin') {
-    app.quit();
-  }
+// IPC 更新事件
+ipcMain.on('check-for-updates', () => {
+  updater.checkForUpdates();
 });
 
-app.on('activate', () => {
-  if (BrowserWindow.getAllWindows().length === 0) {
-    createWindow();
-  }
+ipcMain.on('download-update', () => {
+  updater.downloadUpdate();
+});
+
+ipcMain.on('install-update', () => {
+  updater.installUpdate();
 });
