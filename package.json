@@ -6,11 +6,11 @@
   "private": true,
   "type": "module",
   "main": "electron/main.js",
-  {
   "scripts": {
     "version:bump": "node scripts/bump-version.js",
     "prebuild": "npm run version:bump",
-    "build": "vite build"
+    "dev": "vite",
+    "build": "vite build",
     "preview": "vite preview",
     "electron:dev": "npm run build && electron .",
     "electron:build": "npm run build && npx electron-builder",
@@ -40,8 +40,9 @@
     "@capacitor/core": "^5.7.8",
     "@vitejs/plugin-vue": "^4.5.2",
     "autoprefixer": "^10.4.16",
-    "electron": "^27.3.11",
+    "electron": "^28.2.0",
     "electron-builder": "^24.9.1",
+    "electron-updater": "^6.1.7",
     "postcss": "^8.4.32",
     "tailwindcss": "^3.3.6",
     "terser": "^5.43.1",
@@ -58,6 +59,9 @@
     },
     "files": [
       "dist/**/*",
+      "!dist/registerSW.js",
+      "!dist/workbox-*.js",
+      "!dist/manifest.webmanifest",
       "electron/**/*"
     ],
     "extraResources": [
@@ -68,21 +72,8 @@
       }
     ],
     "win": {
-      "target": [
-        {
-          "target": "nsis",
-          "arch": ["x64"]
-        }
-      ],
+      "target": ["nsis", "portable"],
       "icon": "public/favicon.ico"
-    },
-    "nsis": {
-      "oneClick": false,
-      "perMachine": true,
-      "allowToChangeInstallationDirectory": true,
-      "createDesktopShortcut": true,
-      "createStartMenuShortcut": true,
-      "artifactName": "global-radio-${version}-win-setup.exe"
     },
     "mac": {
       "target": ["dmg", "zip"],
@@ -92,6 +83,11 @@
       "target": ["AppImage", "deb"],
       "icon": "public/icon.png",
       "category": "AudioVideo"
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": true,
+      "allowToChangeInstallationDirectory": true
     }
   }
 }
