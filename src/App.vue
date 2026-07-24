@@ -57,11 +57,10 @@ const updateInfo = ref<UpdateInfo>({
 
 const checkUpdate = async () => {
   try {
-    const skippedVersion = localStorage.getItem('skipped_version')
     const checker = UpdateChecker.getInstance()
     const result = await checker.checkForUpdate()
 
-    if (result.hasUpdate && result.version !== skippedVersion) {
+    if (result.hasUpdate) {
       updateInfo.value = result
       showUpdateDialog.value = true
     }
