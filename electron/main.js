@@ -1,29 +1,53 @@
-const { app, BrowserWindow, Menu, shell, ipcMain } = require('electron');
+const { app, BrowserWindow, Menu, shell } = require('electron');
 const path = require('path');
-const fs = require('fs');
-const updater = require('./updater');
 
-// ... 其他代码保持不变 ...
+let mainWindow;
 
-// 在 createWindow 末尾添加
 function createWindow() {
-  // ... 现有代码 ...
+  mainWindow = new BrowserWindow({
+    width: 1200,
+    height: 800,
+    webPreferences: {
+      nodeIntegration: false,
+      contextIsolation: true,
+      preload: path.join(__dirname, 'preload.js')
+    },
+    icon: path.join(__dirname, '../public/favicon.ico'),
+    show: false,
+  });
 
-  // 设置自动更新（仅生产环境）
-  if (app.isPackaged) {
-    updater.setupAutoUpdater(mainWindow);
-  }
+  const isDev = !app.isPackaged;
+  const startUrl = isDev
+    ? 'http://localhost:4173'
+    : `file://${path.join(__dirname, '../dist/index.html')}`;
+
+  mainWindow.loadURL(startUrl);
+
+  mainWindow.once('ready-to-show', () => {
+    mainWindow.show();
+    if (isDev) {
+      mainWindow.webContents.openDevTools();
+    }
+  });
+
+  mainWindow.webContents.setWindowOpenHandler(({ url }) => {
+    shell.openExternal(url);
+    return { action: 'deny' };
+  });
+
+  Menu.setApplicationMenu(null);
 }
 
-// IPC 更新事件
-ipcMain.on('check-for-updates', () => {
-  updater.checkForUpdates();
+app.whenReady().then(createWindow);
+
+app.on('window-all-closed', () => {
+  if (process.platform !== 'darwin') {
+    app.quit();
+  }
 });
 
-ipcMain.on('download-update', () => {
-  updater.downloadUpdate();
-});
-
-ipcMain.on('install-update', () => {
-  updater.installUpdate();
+app.on('activate', () => {
+  if (BrowserWindow.getAllWindows().length === 0) {
+    createWindow();
+  }
 });
