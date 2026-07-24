@@ -115,7 +115,7 @@
               class="w-full p-3 bg-ios-blue text-white rounded-lg hover:bg-blue-600 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <span v-if="isChecking">⏳ 检查中...</span>
-              <span v-else-if="hasNewVersion">🎉 发现新版本 {{ latestVersion }}，点击更新</span>
+              <span v-else-if="hasNewVersion">🎉 发现新版本 {{ latestVersion }}</span>
               <span v-else>🔍 检查更新</span>
             </button>
 
@@ -175,7 +175,7 @@ import UpdateDialog from '@/components/UpdateDialog.vue'
 const playerStore = usePlayerStore()
 const toastStore = useToastStore()
 
-const currentVersion = ref('v2026.07.24-114207')
+const currentVersion = ref('v2026.07.24-124559')
 const latestVersion = ref('')
 const downloadUrl = ref('')
 const hasNewVersion = ref(false)
@@ -202,7 +202,7 @@ const manualCheckUpdate = async () => {
   isChecking.value = true
   try {
     const checker = UpdateChecker.getInstance()
-    const result = await checker.checkForUpdate(true) // 强制检查
+    const result = await checker.checkForUpdate()
     
     if (result.hasUpdate) {
       latestVersion.value = result.version
@@ -260,9 +260,14 @@ const clearSleepTimer = () => {
 }
 
 onMounted(() => {
-  // 延迟检查，避免干扰首次加载
   setTimeout(() => {
     manualCheckUpdate()
   }, 3000)
 })
 </script>
+
+<style scoped>
+.settings-page {
+  padding-bottom: 100px;
+}
+</style>
