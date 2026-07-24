@@ -30,9 +30,6 @@ env:
   ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION: true
 
 jobs:
-  # ============================================
-  # Job 1: 验证项目结构
-  # ============================================
   validate:
     runs-on: ubuntu-latest
     steps:
@@ -45,7 +42,7 @@ jobs:
           echo "验证通过"
 
   # ============================================
-  # Job 2: 构建 Web 产物
+  # 构建 Web 产物
   # ============================================
   build-web:
     runs-on: ubuntu-latest
@@ -75,7 +72,7 @@ jobs:
           path: web-dist.zip
 
   # ============================================
-  # Job 3: 构建 Android APK
+  # 构建 Android APK
   # ============================================
   build-android:
     runs-on: ubuntu-latest
@@ -138,16 +135,16 @@ jobs:
           cd android
           ./gradlew assembleRelease
 
-      - name: 收集 APK 产物
+      - name: 获取版本号并收集 APK
         id: collect_apk
         run: |
-          # 使用统一的版本号格式
+          # 生成版本号（与 create-release 保持一致）
           if [ -n "${{ github.event.inputs.tag }}" ]; then
             VERSION="${{ github.event.inputs.tag }}"
           else
             VERSION="v$(date +'%Y.%m.%d-%H%M%S')"
           fi
-          echo "APK_VERSION=${VERSION}" >> $GITHUB_OUTPUT
+          echo "VERSION=${VERSION}" >> $GITHUB_OUTPUT
 
           mkdir -p apk-outputs
 
@@ -178,7 +175,7 @@ jobs:
           path: apk-outputs/*.apk
 
   # ============================================
-  # Job 4: 构建 Windows EXE
+  # 构建 Windows EXE
   # ============================================
   build-windows:
     runs-on: windows-latest
@@ -231,12 +228,6 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: 验证 Electron 构建产物
-        if: hashFiles('electron/main.js') != ''
-        run: |
-          Write-Host "📂 release 目录内容："
-          Get-ChildItem -Path release/ -Recurse | Select-Object FullName, Length
-
       - name: 收集 Windows 产物
         if: hashFiles('electron/main.js') != ''
         run: |
@@ -247,23 +238,9 @@ jobs:
             if ($_.Length -gt 1MB) {
               $destName = "global-radio-${VERSION}-win-x64.exe"
               Copy-Item -Path $_.FullName -Destination "exe-outputs/$destName"
-              Write-Host "✅ 找到 EXE: $($_.Name) ($([math]::Round($_.Length/1MB, 2)) MB)"
-            } else {
-              Write-Host "⚠️ 跳过小文件: $($_.Name) ($($_.Length) bytes)"
+              Write-Host "✅ EXE: $destName"
             }
           }
-          
-          if ((Get-ChildItem -Path exe-outputs/ -Filter "*.exe").Count -eq 0) {
-            Write-Host "⚠️ 未找到 EXE 文件，尝试查找安装程序..."
-            Get-ChildItem -Path release/ -Recurse -Filter "*.exe" | ForEach-Object {
-              $destName = "global-radio-${VERSION}-win-setup.exe"
-              Copy-Item -Path $_.FullName -Destination "exe-outputs/$destName"
-              Write-Host "✅ 找到安装程序: $($_.Name)"
-            }
-          }
-          
-          Write-Host "📦 exe-outputs 目录内容："
-          Get-ChildItem -Path exe-outputs/
 
       - uses: actions/upload-artifact@v4
         if: hashFiles('electron/main.js') != ''
@@ -272,7 +249,7 @@ jobs:
           path: exe-outputs/*.exe
 
   # ============================================
-  # Job 5: 构建 Docker 镜像
+  # 构建 Docker 镜像
   # ============================================
   build-docker:
     runs-on: ubuntu-latest
@@ -292,13 +269,6 @@ jobs:
           ls -la dist/
       - name: 检查 Dockerfile
         run: test -f Dockerfile || (echo "Dockerfile 不存在" && exit 1)
-      - name: 验证 Docker 用户名
-        run: |
-          if [ -z "${{ secrets.DOCKER_USERNAME }}" ]; then
-            echo "错误: DOCKER_USERNAME 未设置"
-            exit 1
-          fi
-          echo "Docker 用户名: ${{ secrets.DOCKER_USERNAME }}"
       - name: 设置 Docker Buildx
         uses: docker/setup-buildx-action@v3
       - name: 登录 Docker Hub
@@ -315,7 +285,6 @@ jobs:
             VERSION="v$(date +'%Y.%m.%d-%H%M%S')"
           fi
           echo "VERSION=${VERSION}" >> $GITHUB_OUTPUT
-          echo "镜像标签: ${{ secrets.DOCKER_USERNAME }}/global-radio:${VERSION}"
       - name: 构建并推送 AMD64 镜像
         uses: docker/build-push-action@v5
         with:
@@ -338,7 +307,7 @@ jobs:
             ${{ secrets.DOCKER_USERNAME }}/global-radio-arm64:${{ steps.get_version.outputs.VERSION }}
 
   # ============================================
-  # Job 6: 创建 GitHub Release
+  # 创建 GitHub Release
   # ============================================
   create-release:
     needs: [build-web, build-android, build-windows]
@@ -352,24 +321,18 @@ jobs:
         with:
           path: artifacts/
 
-      # ---------- 核心修正：自动生成唯一版本号 ----------
-      - name: 获取版本号（自动生成唯一版本）
+      - name: 获取版本号（与 build-android 保持一致）
         id: get_version
         run: |
-          # 如果用户输入了版本号，使用用户输入的
           if [ -n "${{ github.event.inputs.tag }}" ]; then
             VERSION="${{ github.event.inputs.tag }}"
-            echo "✅ 使用自定义版本号: ${VERSION}"
           else
-            # 否则使用 日期.时间 格式，确保每次唯一
             VERSION="v$(date +'%Y.%m.%d-%H%M%S')"
-            echo "✅ 自动生成版本号: ${VERSION}"
           fi
           echo "VERSION=${VERSION}" >> $GITHUB_OUTPUT
           echo "RELEASE_TAG=${VERSION}" >> $GITHUB_OUTPUT
           echo "版本号: ${VERSION}"
 
-      # ---------- 删除已存在的 Release（避免冲突） ----------
       - name: 删除已存在的 Release（如果 tag 已存在）
         run: |
           TAG="${{ steps.get_version.outputs.RELEASE_TAG }}"
@@ -386,33 +349,52 @@ jobs:
             echo "等待 3 秒确保删除完成..."
             sleep 3
           else
-            echo "✅ Release ${TAG} 不存在，可以直接创建"
+            echo "✅ Release ${TAG} 不存在"
           fi
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      # ---------- 整理产物 ----------
-      - name: 整理产物
+      - name: 整理产物（自动匹配文件名）
         id: prepare_assets
         run: |
           mkdir -p release-assets
-          echo "查找所有产物..."
+          VERSION="${{ steps.get_version.outputs.VERSION }}"
+          
+          echo "📂 查找所有产物..."
           echo "artifacts 目录结构："
-          find artifacts/ -type f -name "*.apk" -print
-          find artifacts/ -type f -name "*.exe" -print
-          find artifacts/ -type f -name "*.zip" -print
-
-          # 复制 APK
-          find artifacts/ -type f -name "*.apk" -exec cp {} release-assets/ \;
-          # 复制 EXE
-          find artifacts/ -type f -name "*.exe" -exec cp {} release-assets/ \;
+          find artifacts/ -type f -print
+          
+          # 复制并重命名 APK
+          APK_FILE=$(find artifacts/ -type f -name "*.apk" | head -1)
+          if [ -n "$APK_FILE" ]; then
+            cp "$APK_FILE" "release-assets/global-radio-${VERSION}.apk"
+            echo "✅ APK: $APK_FILE -> global-radio-${VERSION}.apk"
+          else
+            echo "❌ 未找到 APK 文件"
+            exit 1
+          fi
+          
+          # 复制并重命名 EXE
+          EXE_FILE=$(find artifacts/ -type f -name "*.exe" | head -1)
+          if [ -n "$EXE_FILE" ]; then
+            cp "$EXE_FILE" "release-assets/global-radio-${VERSION}.exe"
+            echo "✅ EXE: $EXE_FILE -> global-radio-${VERSION}.exe"
+          else
+            echo "⚠️ 未找到 EXE 文件"
+          fi
+          
           # 复制 ZIP
-          find artifacts/ -type f -name "*.zip" -exec cp {} release-assets/ \;
+          ZIP_FILE=$(find artifacts/ -type f -name "*.zip" | head -1)
+          if [ -n "$ZIP_FILE" ]; then
+            cp "$ZIP_FILE" "release-assets/web-dist-${VERSION}.zip"
+            echo "✅ ZIP: $ZIP_FILE -> web-dist-${VERSION}.zip"
+          else
+            echo "⚠️ 未找到 ZIP 文件"
+          fi
+          
+          echo "📦 release-assets 目录内容："
+          ls -la release-assets/
 
-          echo "release-assets 目录内容："
-          ls -la release-assets/ || echo "没有产物文件"
-
-      # ---------- 生成 Release Notes ----------
       - name: 生成 Release Notes
         run: |
           VERSION="${{ steps.get_version.outputs.VERSION }}"
@@ -441,7 +423,6 @@ jobs:
           EOF
           cat RELEASE_NOTES.md
 
-      # ---------- 创建 Release ----------
       - name: 创建 Release
         id: create_release
         uses: actions/create-release@v1
@@ -454,7 +435,6 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      # ---------- 上传 APK ----------
       - name: 上传 APK
         uses: actions/upload-release-asset@v1
         with:
@@ -465,24 +445,23 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      # ---------- 上传 Windows EXE ----------
       - name: 上传 Windows EXE
+        if: hashFiles('release-assets/global-radio-${{ steps.get_version.outputs.VERSION }}.exe') != ''
         uses: actions/upload-release-asset@v1
         with:
           upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: release-assets/global-radio-${{ steps.get_version.outputs.VERSION }}-win-x64.exe
-          asset_name: global-radio-${{ steps.get_version.outputs.VERSION }}-win-x64.exe
+          asset_path: release-assets/global-radio-${{ steps.get_version.outputs.VERSION }}.exe
+          asset_name: global-radio-${{ steps.get_version.outputs.VERSION }}.exe
           asset_content_type: application/vnd.microsoft.portable-executable
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      # ---------- 上传 Web 产物 ----------
       - name: 上传 Web 产物
-        if: hashFiles('release-assets/web-dist.zip') != ''
+        if: hashFiles('release-assets/web-dist-${{ steps.get_version.outputs.VERSION }}.zip') != ''
         uses: actions/upload-release-asset@v1
         with:
           upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: release-assets/web-dist.zip
+          asset_path: release-assets/web-dist-${{ steps.get_version.outputs.VERSION }}.zip
           asset_name: web-dist-${{ steps.get_version.outputs.VERSION }}.zip
           asset_content_type: application/zip
         env:
