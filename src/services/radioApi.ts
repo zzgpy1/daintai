@@ -1,42 +1,60 @@
-import type { RadioStation, ApiResponse } from '@/types/radio'
-
-const API_BASE = 'https://de1.api.radio-browser.info'
-
-export const radioAPI = {
-  async searchStations(params: any = {}): Promise<RadioStation[]> {
-    const query = new URLSearchParams()
+// 在 searchStations 方法中增加中文搜索优化
+async searchStations(params: RadioSearchParams = {}): Promise<RadioStation[]> {
+  return this.retryWithFallback(async () => {
+    const searchParams: any = {}
+    
     Object.entries(params).forEach(([key, value]) => {
-      if (value) query.append(key, String(value))
+      if (value !== undefined && value !== null && value !== '') {
+        let processedValue = value.toString().trim()
+        
+        // 检测是否为中文字符
+        const hasChinese = /[\u4e00-\u9fff]/.test(processedValue)
+        if (hasChinese) {
+          processedValue = processedValue.normalize('NFC')
+        }
+        searchParams[key] = processedValue
+      }
     })
-    const response = await fetch(`${API_BASE}/json/stations/search?${query}`)
-    if (!response.ok) throw new Error('搜索失败')
-    return response.json()
-  },
 
-  async getTopStations(limit: number = 50): Promise<ApiResponse<RadioStation[]>> {
-    const response = await fetch(`${API_BASE}/json/stations/topvote/${limit}`)
-    if (!response.ok) throw new Error('获取热门电台失败')
-    const data = await response.json()
-    return { success: true, data, source: 'radio-browser' }
-  },
+    // 如果搜索中文，增加模糊匹配参数
+    if (searchParams.name && /[\u4e00-\u9fff]/.test(searchParams.name)) {
+      // 使用 tag 和 name 联合搜索
+      const [nameResults, tagResults] = await Promise.all([
+        this.currentAPI.get('/json/stations/search', { 
+          params: { ...searchParams, limit: searchParams.limit || 50, hidebroken: true },
+          headers: { 'User-Agent': this.userAgent }
+        }),
+        this.currentAPI.get('/json/stations/search', {
+          params: { 
+            tag: searchParams.name, 
+            order: 'random', 
+            limit: Math.ceil((searchParams.limit || 50) / 2),
+            hidebroken: true 
+          },
+          headers: { 'User-Agent': this.userAgent }
+        })
+      ])
 
-  async getLatestStations(limit: number = 50): Promise<RadioStation[]> {
-    const response = await fetch(`${API_BASE}/json/stations/lastchange/${limit}`)
-    if (!response.ok) throw new Error('获取最新电台失败')
-    return response.json()
-  },
+      const merged = new Map()
+      ;[...nameResults.data, ...tagResults.data].forEach((station: RadioStation) => {
+        if (!merged.has(station.stationuuid)) {
+          merged.set(station.stationuuid, station)
+        }
+      })
+      
+      const result = Array.from(merged.values()).slice(0, searchParams.limit || 50)
+      return result
+    }
 
-  async getRandomStations(limit: number = 50): Promise<ApiResponse<RadioStation[]>> {
-    const response = await fetch(`${API_BASE}/json/stations/search?order=random&limit=${limit}&hidebroken=true`)
-    if (!response.ok) throw new Error('获取随机电台失败')
-    const data = await response.json()
-    return { success: true, data, source: 'radio-browser' }
-  },
-
-  async getStationByUUID(uuid: string): Promise<RadioStation | null> {
-    const response = await fetch(`${API_BASE}/json/stations/byuuid/${uuid}`)
-    if (!response.ok) return null
-    const data = await response.json()
-    return data.length > 0 ? data[0] : null
-  }
+    const response = await this.currentAPI.get('/json/stations/search', {
+      params: searchParams,
+      headers: {
+        'Accept-Charset': 'UTF-8',
+        'Content-Type': 'application/json; charset=UTF-8',
+        'User-Agent': this.userAgent
+      }
+    })
+    
+    return response.data || []
+  })
 }
