@@ -1,12 +1,14 @@
 {
   "name": "global-radio",
-  "version": "20250724-001",
+  "version": "2026.07.24-133007",
   "description": "全球电台 - 跨平台在线电台应用",
   "author": "GlobalRadio Team",
   "private": true,
   "type": "module",
   "main": "electron/main.js",
   "scripts": {
+    "version:bump": "node scripts/version-bump.js",
+    "prebuild": "npm run version:bump",
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
