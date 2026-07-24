@@ -30,6 +30,9 @@ env:
   ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION: true
 
 jobs:
+  # ============================================
+  # Job 1: 验证项目结构
+  # ============================================
   validate:
     runs-on: ubuntu-latest
     steps:
@@ -41,6 +44,9 @@ jobs:
           test -f index.html || (echo "index.html 不存在" && exit 1)
           echo "验证通过"
 
+  # ============================================
+  # Job 2: 构建 Web 产物
+  # ============================================
   build-web:
     runs-on: ubuntu-latest
     needs: validate
@@ -68,6 +74,9 @@ jobs:
           name: web-dist
           path: web-dist.zip
 
+  # ============================================
+  # Job 3: 构建 Android APK
+  # ============================================
   build-android:
     runs-on: ubuntu-latest
     needs: validate
@@ -155,6 +164,9 @@ jobs:
           name: android-apk
           path: apk-outputs/*.apk
 
+  # ============================================
+  # Job 4: 构建 Windows EXE
+  # ============================================
   build-windows:
     runs-on: windows-latest
     needs: validate
@@ -225,6 +237,9 @@ jobs:
           name: windows-exe
           path: exe-outputs/*.exe
 
+  # ============================================
+  # Job 5: 构建 Docker 镜像
+  # ============================================
   build-docker:
     runs-on: ubuntu-latest
     needs: build-web
@@ -287,6 +302,9 @@ jobs:
             ${{ secrets.DOCKER_USERNAME }}/global-radio-arm64:latest
             ${{ secrets.DOCKER_USERNAME }}/global-radio-arm64:${{ steps.get_version.outputs.VERSION }}
 
+  # ============================================
+  # Job 6: 创建 GitHub Release
+  # ============================================
   create-release:
     needs: [build-web, build-android, build-windows]
     runs-on: ubuntu-latest
@@ -299,6 +317,9 @@ jobs:
         with:
           path: artifacts/
 
+      # ============================================
+      # 获取版本号
+      # ============================================
       - name: 获取版本号
         id: get_version
         run: |
@@ -311,11 +332,30 @@ jobs:
           echo "RELEASE_TAG=${CLEAN_VERSION}" >> $GITHUB_OUTPUT
           echo "版本号: ${CLEAN_VERSION}"
 
+      # ============================================
+      # 调试：显示所有 artifacts 内容
+      # ============================================
+      - name: 调试 - 显示 artifacts 目录
+        run: |
+          echo "📂 artifacts 目录结构："
+          find artifacts/ -type f | head -100
+          echo ""
+          echo "📦 查找 APK 文件："
+          find artifacts/ -name "*.apk" -exec ls -la {} \;
+          echo ""
+          echo "📦 查找 EXE 文件："
+          find artifacts/ -name "*.exe" -exec ls -la {} \;
+          echo ""
+          echo "📦 查找 ZIP 文件："
+          find artifacts/ -name "*.zip" -exec ls -la {} \;
+
+      # ============================================
+      # 删除已存在的 Release（避免冲突）
+      # ============================================
       - name: 删除已存在的 Release
         run: |
           TAG="${{ steps.get_version.outputs.RELEASE_TAG }}"
           echo "检查 Release ${TAG} 是否已存在..."
-
           RESPONSE=$(curl -s -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
             "https://api.github.com/repos/${{ github.repository }}/releases/tags/${TAG}")
 
@@ -333,14 +373,20 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
+      # ============================================
+      # 整理产物（使用通配符复制所有文件）
+      # ============================================
       - name: 整理产物
         id: prepare_assets
         run: |
           mkdir -p release-assets
-          echo "查找所有产物..."
-          find artifacts/ -type f -name "*.apk" -exec cp {} release-assets/ \;
-          find artifacts/ -type f -name "*.exe" -exec cp {} release-assets/ \;
-          find artifacts/ -type f -name "*.zip" -exec cp {} release-assets/ \;
+          echo "复制所有 APK 文件..."
+          find artifacts/ -name "*.apk" -exec cp {} release-assets/ \; -print
+          echo "复制所有 EXE 文件..."
+          find artifacts/ -name "*.exe" -exec cp {} release-assets/ \; -print
+          echo "复制所有 ZIP 文件..."
+          find artifacts/ -name "*.zip" -exec cp {} release-assets/ \; -print
+          echo ""
           echo "release-assets 目录内容："
           ls -la release-assets/ || echo "没有产物文件"
 
@@ -372,6 +418,9 @@ jobs:
           EOF
           cat RELEASE_NOTES.md
 
+      # ============================================
+      # 创建 Release
+      # ============================================
       - name: 创建 Release
         id: create_release
         uses: actions/create-release@v1
@@ -384,15 +433,18 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
+      # ============================================
+      # 上传所有 APK
+      # ============================================
       - name: 上传 APK
+        if: hashFiles('release-assets/*.apk') != ''
         run: |
           UPLOAD_URL="${{ steps.create_release.outputs.upload_url }}"
-          VERSION="${{ steps.get_version.outputs.VERSION }}"
-
+          echo "上传 APK 文件到 Release..."
           for FILE in release-assets/*.apk; do
             if [ -f "$FILE" ]; then
               FILENAME=$(basename "$FILE")
-              echo "上传 $FILENAME..."
+              echo "📤 上传 $FILENAME..."
               curl -X POST \
                 -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
                 -H "Content-Type: application/vnd.android.package-archive" \
@@ -403,14 +455,18 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
+      # ============================================
+      # 上传所有 EXE
+      # ============================================
       - name: 上传 Windows EXE
+        if: hashFiles('release-assets/*.exe') != ''
         run: |
           UPLOAD_URL="${{ steps.create_release.outputs.upload_url }}"
-
+          echo "上传 EXE 文件到 Release..."
           for FILE in release-assets/*.exe; do
             if [ -f "$FILE" ]; then
               FILENAME=$(basename "$FILE")
-              echo "上传 $FILENAME..."
+              echo "📤 上传 $FILENAME..."
               curl -X POST \
                 -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
                 -H "Content-Type: application/vnd.microsoft.portable-executable" \
@@ -421,15 +477,20 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
+      # ============================================
+      # 上传所有 ZIP
+      # ============================================
       - name: 上传 Web 产物
+        if: hashFiles('release-assets/*.zip') != ''
         run: |
           UPLOAD_URL="${{ steps.create_release.outputs.upload_url }}"
-
+          echo "上传 ZIP 文件到 Release..."
           for FILE in release-assets/*.zip; do
             if [ -f "$FILE" ]; then
               FILENAME=$(basename "$FILE")
+              # 跳过 Source code 文件
               if [[ "$FILENAME" != "Source"* ]]; then
-                echo "上传 $FILENAME..."
+                echo "📤 上传 $FILENAME..."
                 curl -X POST \
                   -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
                   -H "Content-Type: application/zip" \
@@ -440,3 +501,19 @@ jobs:
           done
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      # ============================================
+      # 检查是否有产物
+      # ============================================
+      - name: 检查产物
+        run: |
+          echo "检查 release-assets 目录..."
+          ls -la release-assets/ || echo "目录为空"
+          if [ ! "$(ls -A release-assets/)" ]; then
+            echo "⚠️ 警告：没有找到任何产物文件！"
+            echo "请检查 build-android 和 build-windows Job 是否成功生成文件"
+            exit 1
+          else
+            echo "✅ 找到了产物文件："
+            ls -la release-assets/
+          fi
