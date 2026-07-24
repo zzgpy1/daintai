@@ -26,7 +26,11 @@ fs.writeFileSync(packagePath, JSON.stringify(packageJson, null, 2) + '\n');
 console.log(`✅ 版本已更新为: v${newVersion}`);
 
 // 生成 version.txt 供客户端检测
-const versionPath = path.join(__dirname, '../public/version.txt');
+const publicDir = path.join(__dirname, '../public');
+if (!fs.existsSync(publicDir)) {
+  fs.mkdirSync(publicDir, { recursive: true });
+}
+const versionPath = path.join(publicDir, 'version.txt');
 fs.writeFileSync(versionPath, newVersion);
 console.log(`✅ version.txt 已生成: ${newVersion}`);
 
@@ -37,7 +41,7 @@ const buildInfo = {
   buildNumber: process.env.GITHUB_RUN_NUMBER || 'local'
 };
 fs.writeFileSync(
-  path.join(__dirname, '../public/build.json'),
+  path.join(publicDir, 'build.json'),
   JSON.stringify(buildInfo, null, 2)
 );
 console.log(`✅ 构建信息已生成: ${buildInfo.buildTime}`);
