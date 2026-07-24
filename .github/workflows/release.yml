@@ -1,5 +1,4 @@
 name: Release
-run-name: Release by @${{ github.actor }}
 
 on:
   push:
@@ -293,6 +292,7 @@ jobs:
 
           echo "release-assets 目录内容："
           ls -la release-assets/
+
           test -f "release-assets/global-radio-${{ steps.get_version.outputs.VERSION }}.apk" || (echo "目标 APK 不存在！" && exit 1)
 
       - name: 生成 Release Notes
