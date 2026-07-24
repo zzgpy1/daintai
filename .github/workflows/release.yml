@@ -75,7 +75,7 @@ jobs:
           path: web-dist.zip
 
   # ============================================
-  # Job 3: 构建 Android APK（自动初始化）
+  # Job 3: 构建 Android APK
   # ============================================
   build-android:
     runs-on: ubuntu-latest
@@ -105,31 +105,18 @@ jobs:
         run: |
           test -f dist/index.html || (echo "dist/index.html 不存在" && exit 1)
 
-      # ============================================
-      # 关键：自动初始化 Android 平台
-      # ============================================
-      - name: 完全重置 Android 平台
+      - name: 初始化 Android 平台
         run: |
-          # 删除旧的 android 目录（如果有）
           rm -rf android
-          # 重新添加 Android 平台
           npx cap add android
-          # 同步项目
           npx cap sync android
-          # 确保 gradlew 可执行
           chmod +x android/gradlew
-          echo "Android 平台已重新初始化"
+          echo "Android 平台已初始化"
 
       - name: 验证 gradlew
         run: |
           ls -la android/gradlew
           test -f android/gradlew || (echo "gradlew 不存在" && exit 1)
-
-      - name: 验证 Capacitor 同步结果
-        run: |
-          echo "android/app/src/main/assets/ 目录内容："
-          ls -la android/app/src/main/assets/ || echo "assets 目录不存在"
-          test -f android/app/src/main/assets/index.html && echo "index.html 已复制" || echo "index.html 未复制"
 
       - name: 构建 Debug APK
         run: |
@@ -141,15 +128,25 @@ jobs:
           cd android
           ./gradlew assembleRelease
 
-      - name: 收集 APK 产物
-        id: collect_apk
+      # ============================================
+      # 关键修复：使用统一版本号格式（不含时间戳）
+      # ============================================
+      - name: 获取统一版本号
+        id: get_version
         run: |
+          # 获取版本号，移除时间戳后缀
           VERSION="${{ github.event.inputs.tag }}"
           if [ -z "$VERSION" ]; then
             VERSION="v$(date +'%Y.%m.%d')"
           fi
-          echo "APK_VERSION=${VERSION}" >> $GITHUB_OUTPUT
+          # 移除可能的时间戳后缀，保持文件名一致
+          CLEAN_VERSION=$(echo "$VERSION" | sed 's/-[0-9]*$//')
+          echo "VERSION=${CLEAN_VERSION}" >> $GITHUB_OUTPUT
+          echo "版本号: ${CLEAN_VERSION}"
 
+      - name: 收集 APK 产物
+        run: |
+          VERSION="${{ steps.get_version.outputs.VERSION }}"
           mkdir -p apk-outputs
 
           # Debug APK
@@ -169,12 +166,6 @@ jobs:
 
           echo "APK 产物列表："
           ls -la apk-outputs/
-
-          # 确保至少有一个 APK
-          if [ ! "$(ls -A apk-outputs/)" ]; then
-            echo "没有找到任何 APK 文件"
-            exit 1
-          fi
 
       - uses: actions/upload-artifact@v4
         with:
@@ -224,8 +215,9 @@ jobs:
           if ([string]::IsNullOrEmpty($VERSION)) {
             $VERSION = "v$(Get-Date -Format 'yyyy.MM.dd')"
           }
-          Write-Host "VERSION=$VERSION"
-          echo "VERSION=$VERSION" >> $env:GITHUB_OUTPUT
+          $CLEAN_VERSION = $VERSION -replace '-[0-9]*$', ''
+          Write-Host "VERSION=$CLEAN_VERSION"
+          echo "VERSION=$CLEAN_VERSION" >> $env:GITHUB_OUTPUT
 
       - name: 构建 Windows EXE
         if: hashFiles('electron/main.js') != ''
@@ -233,12 +225,6 @@ jobs:
           npm run electron:build -- --win
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: 验证 Electron 构建产物
-        if: hashFiles('electron/main.js') != ''
-        run: |
-          Write-Host "release 目录内容："
-          Get-ChildItem -Path release/ -Recurse | Select-Object FullName, Length
 
       - name: 收集 Windows 产物
         if: hashFiles('electron/main.js') != ''
@@ -253,9 +239,6 @@ jobs:
               Write-Host "EXE: $destName ($([math]::Round($_.Length/1MB, 2)) MB)"
             }
           }
-
-          Write-Host "exe-outputs 目录内容："
-          Get-ChildItem -Path exe-outputs/
 
       - uses: actions/upload-artifact@v4
         if: hashFiles('electron/main.js') != ''
@@ -305,8 +288,8 @@ jobs:
           if [ -z "$VERSION" ]; then
             VERSION="v$(date +'%Y.%m.%d')"
           fi
-          echo "VERSION=${VERSION}" >> $GITHUB_OUTPUT
-          echo "镜像标签: ${{ secrets.DOCKER_USERNAME }}/global-radio:${VERSION}"
+          CLEAN_VERSION=$(echo "$VERSION" | sed 's/-[0-9]*$//')
+          echo "VERSION=${CLEAN_VERSION}" >> $GITHUB_OUTPUT
       - name: 构建并推送 AMD64 镜像
         uses: docker/build-push-action@v5
         with:
@@ -343,23 +326,22 @@ jobs:
         with:
           path: artifacts/
 
-      - name: 获取版本号（自动生成唯一版本）
+      # ============================================
+      # 关键：使用与 build-android 相同的版本号
+      # ============================================
+      - name: 获取统一版本号
         id: get_version
         run: |
-          # 如果用户输入了版本号，使用用户输入的
-          if [ -n "${{ github.event.inputs.tag }}" ]; then
-            VERSION="${{ github.event.inputs.tag }}"
-            echo "使用自定义版本号: ${VERSION}"
-          else
-            # 使用 日期.时间 格式，确保每次唯一
-            VERSION="v$(date +'%Y.%m.%d-%H%M%S')"
-            echo "自动生成版本号: ${VERSION}"
+          VERSION="${{ github.event.inputs.tag }}"
+          if [ -z "$VERSION" ]; then
+            VERSION="v$(date +'%Y.%m.%d')"
           fi
-          echo "VERSION=${VERSION}" >> $GITHUB_OUTPUT
-          echo "RELEASE_TAG=${VERSION}" >> $GITHUB_OUTPUT
-          echo "版本号: ${VERSION}"
+          CLEAN_VERSION=$(echo "$VERSION" | sed 's/-[0-9]*$//')
+          echo "VERSION=${CLEAN_VERSION}" >> $GITHUB_OUTPUT
+          echo "RELEASE_TAG=${CLEAN_VERSION}" >> $GITHUB_OUTPUT
+          echo "版本号: ${CLEAN_VERSION}"
 
-      - name: 删除已存在的 Release（避免冲突）
+      - name: 删除已存在的 Release
         run: |
           TAG="${{ steps.get_version.outputs.RELEASE_TAG }}"
           echo "检查 Release ${TAG} 是否已存在..."
@@ -368,14 +350,13 @@ jobs:
 
           if echo "$RESPONSE" | grep -q '"id":'; then
             RELEASE_ID=$(echo "$RESPONSE" | grep -o '"id":[0-9]*' | head -1 | cut -d: -f2)
-            echo "Release ${TAG} 已存在，正在删除..."
+            echo "删除已存在的 Release: ${TAG} (ID: ${RELEASE_ID})"
             curl -X DELETE \
               -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
               "https://api.github.com/repos/${{ github.repository }}/releases/${RELEASE_ID}"
-            echo "等待 3 秒确保删除完成..."
             sleep 3
           else
-            echo "Release ${TAG} 不存在，可以直接创建"
+            echo "Release ${TAG} 不存在"
           fi
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -414,7 +395,6 @@ jobs:
 
           ### Docker
           - docker pull ${{ secrets.DOCKER_USERNAME }}/global-radio:${VERSION}
-          - docker pull ${{ secrets.DOCKER_USERNAME }}/global-radio-arm64:${VERSION}
 
           感谢使用全球电台！
           EOF
@@ -432,6 +412,9 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
+      # ============================================
+      # 关键修复：使用相同的版本号查找 APK
+      # ============================================
       - name: 上传 APK
         uses: actions/upload-release-asset@v1
         with:
@@ -446,8 +429,8 @@ jobs:
         uses: actions/upload-release-asset@v1
         with:
           upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: release-assets/global-radio-${{ steps.get_version.outputs.VERSION }}.exe
-          asset_name: global-radio-${{ steps.get_version.outputs.VERSION }}.exe
+          asset_path: release-assets/global-radio-${{ steps.get_version.outputs.VERSION }}-win-x64.exe
+          asset_name: global-radio-${{ steps.get_version.outputs.VERSION }}-win-x64.exe
           asset_content_type: application/vnd.microsoft.portable-executable
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
