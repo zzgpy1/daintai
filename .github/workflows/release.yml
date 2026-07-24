@@ -16,7 +16,7 @@ on:
         required: false
         default: true
       build_docker:
-        description: '是否构建 Docker 镜像（需要配置 Docker Hub 密钥）'
+        description: '是否构建 Docker 镜像（需要配置 DOCKER_USERNAME 和 DOCKER_PASSWORD 密钥）'
         type: boolean
         required: false
         default: false
@@ -55,11 +55,12 @@ jobs:
         run: npm run build
       - name: 验证构建产物
         run: test -f dist/index.html || (echo "❌ dist/index.html 不存在" && exit 1)
-      - name: 打包 Web 产物为 zip
+      - name: 打包 Web 产物
         run: |
           cd dist
           zip -r ../web-dist.zip .
           cd ..
+          ls -la web-dist.zip
       - uses: actions/upload-artifact@v4
         with:
           name: web-dist
@@ -97,22 +98,25 @@ jobs:
           cd android
           chmod +x gradlew
           ./gradlew assembleRelease
-      - name: 验证 APK 存在
+      - name: 验证并重命名 APK
         run: |
           APK_PATH="android/app/build/outputs/apk/release"
           echo "📂 检查 APK 目录："
-          ls -la $APK_PATH || echo "⚠️ APK 目录不存在"
-          test -f $APK_PATH/*.apk || (echo "❌ APK 不存在" && exit 1)
-          # 重命名 APK 方便识别
-          VERSION=${{ github.event.inputs.tag }}
+          ls -la $APK_PATH
+          test -f $APK_PATH/app-release.apk || (echo "❌ APK 不存在" && exit 1)
+          
+          # 获取版本号
+          VERSION="${{ github.event.inputs.tag }}"
           if [ -z "$VERSION" ]; then
             VERSION=$(echo ${GITHUB_REF#refs/tags/})
           fi
           if [ -z "$VERSION" ]; then
             VERSION="dev"
           fi
+          
+          # 重命名 APK
           cp $APK_PATH/app-release.apk $APK_PATH/global-radio-${VERSION}.apk
-          echo "✅ APK 存在"
+          echo "✅ APK 重命名为: global-radio-${VERSION}.apk"
       - uses: actions/upload-artifact@v4
         with:
           name: android-apk
@@ -132,14 +136,16 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: web-dist
-          path: dist/
-      - name: 解压 Web 产物
+          path: .
+      - name: 解压 Web 产物到 dist
         run: |
-          if [ -f "dist/web-dist.zip" ]; then
-            cd dist
-            unzip web-dist.zip
+          if [ -f "web-dist.zip" ]; then
+            unzip web-dist.zip -d dist
             rm web-dist.zip
-            cd ..
+            echo "✅ Web 产物已解压到 dist/"
+          else
+            echo "⚠️ web-dist.zip 不存在"
+            exit 1
           fi
       - name: 检查 Dockerfile
         run: |
@@ -157,7 +163,7 @@ jobs:
       - name: 获取版本号
         id: get_version
         run: |
-          VERSION=${{ github.event.inputs.tag }}
+          VERSION="${{ github.event.inputs.tag }}"
           if [ -z "$VERSION" ]; then
             VERSION=$(echo ${GITHUB_REF#refs/tags/})
           fi
@@ -165,6 +171,7 @@ jobs:
             VERSION="dev"
           fi
           echo "VERSION=${VERSION}" >> $GITHUB_OUTPUT
+          echo "✅ 版本号: ${VERSION}"
       - name: 构建并推送 AMD64 镜像
         uses: docker/build-push-action@v5
         with:
@@ -186,7 +193,7 @@ jobs:
             ${{ env.DOCKER_IMAGE_ARM64 }}:latest
             ${{ env.DOCKER_IMAGE_ARM64 }}:${{ steps.get_version.outputs.VERSION }}
 
-  # 5. 创建 GitHub Release（修正权限问题）
+  # 5. 创建 GitHub Release（使用 GitHub CLI，更稳定）
   create-release:
     needs: [build-web, build-android]
     runs-on: ubuntu-latest
@@ -206,10 +213,16 @@ jobs:
           find artifacts/ -type f -name "*.zip" -exec cp {} release-assets/ \;
           echo "📦 整理后的产物列表："
           ls -la release-assets/ || echo "⚠️ 没有产物文件"
+          
+          # 如果只有 zip 文件，说明 APK 可能没有被正确复制
+          if [ ! "$(ls -A release-assets/)" ]; then
+            echo "❌ 没有找到任何产物文件！"
+            exit 1
+          fi
       - name: 获取版本号
         id: get_version
         run: |
-          VERSION=${{ github.event.inputs.tag }}
+          VERSION="${{ github.event.inputs.tag }}"
           if [ -z "$VERSION" ]; then
             VERSION=$(echo ${GITHUB_REF#refs/tags/})
           fi
@@ -218,16 +231,18 @@ jobs:
           fi
           echo "VERSION=${VERSION}" >> $GITHUB_OUTPUT
           echo "RELEASE_TAG=${VERSION}" >> $GITHUB_OUTPUT
+          echo "✅ 版本号: ${VERSION}"
       - name: 检查 Release 是否存在
         id: check_release
         run: |
-          TAG=${{ steps.get_version.outputs.RELEASE_TAG }}
+          TAG="${{ steps.get_version.outputs.RELEASE_TAG }}"
           echo "🔍 检查 Release ${TAG} 是否存在..."
-          # 使用 GitHub API 检查 Release 是否存在
-          RESPONSE=$(curl -s -o /dev/null -w "%{http_code}" \
+          # 使用 GitHub API 检查
+          HTTP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
             -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
             "https://api.github.com/repos/${{ github.repository }}/releases/tags/${TAG}")
-          if [ "$RESPONSE" = "200" ]; then
+          
+          if [ "$HTTP_STATUS" = "200" ]; then
             echo "exists=true" >> $GITHUB_OUTPUT
             echo "⚠️ Release ${TAG} 已存在，跳过创建"
           else
@@ -237,20 +252,23 @@ jobs:
       - name: 生成 Release Notes
         if: steps.check_release.outputs.exists == 'false'
         run: |
-          VERSION=${{ steps.get_version.outputs.VERSION }}
+          VERSION="${{ steps.get_version.outputs.VERSION }}"
           cat > RELEASE_NOTES.md << 'EOF'
           # 全球电台 v${VERSION}
 
           ## 📦 下载说明
 
           ### 📱 Android
-          - `global-radio-${VERSION}.apk` - APK 安装包
+          - 下载 `global-radio-${VERSION}.apk` 安装到手机
 
           ### 🌐 Web
           - 在线演示: https://aabb.live
 
+          ### 🐳 Docker（如有）
+          - `docker pull superneed/global-radio:${VERSION}`
+
           ---
-          感谢使用全球电台！
+          感谢使用全球电台！如有问题请反馈至 [Issues](https://github.com/moli-xia/global-radio/issues)
           EOF
           sed -i "s/\${VERSION}/${VERSION}/g" RELEASE_NOTES.md
           cat RELEASE_NOTES.md
@@ -260,12 +278,17 @@ jobs:
           TAG="${{ steps.get_version.outputs.RELEASE_TAG }}"
           VERSION="${{ steps.get_version.outputs.VERSION }}"
           
+          echo "📝 创建 Release: ${TAG}"
+          
           # 使用 GitHub CLI 创建 Release
           gh release create "$TAG" \
             --title "全球电台 v${VERSION}" \
             --notes-file RELEASE_NOTES.md \
             --target "${{ github.sha }}" \
-            release-assets/*.apk release-assets/*.zip
+            release-assets/*.apk release-assets/*.zip 2>&1 || {
+              echo "⚠️ gh CLI 创建失败，尝试备选方案..."
+              exit 1
+            }
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - name: 备选方案 - 使用 API 创建 Release
@@ -274,12 +297,23 @@ jobs:
           TAG="${{ steps.get_version.outputs.RELEASE_TAG }}"
           VERSION="${{ steps.get_version.outputs.VERSION }}"
           
-          # 使用 curl 创建 Release
+          echo "🔄 使用 API 创建 Release..."
+          
+          # 检查是否已存在
+          EXISTING=$(curl -s -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
+            "https://api.github.com/repos/${{ github.repository }}/releases/tags/${TAG}")
+          
+          if echo "$EXISTING" | grep -q "id"; then
+            echo "⚠️ Release 已存在，跳过创建"
+            exit 0
+          fi
+          
+          # 创建 Release
           RELEASE_DATA=$(cat <<EOF
           {
             "tag_name": "${TAG}",
             "name": "全球电台 v${VERSION}",
-            "body": "## 📦 下载说明\n\n### 📱 Android\n- 请下载 APK 文件\n\n### 🌐 Web\n- 在线演示: https://aabb.live",
+            "body": "## 📦 下载说明\n\n### 📱 Android\n- 下载 APK 文件\n\n### 🌐 Web\n- 在线演示: https://aabb.live",
             "draft": false,
             "prerelease": false
           }
@@ -292,20 +326,20 @@ jobs:
             "https://api.github.com/repos/${{ github.repository }}/releases" \
             -d "$RELEASE_DATA")
           
-          echo "Release 创建响应："
           echo "$RESPONSE"
           
           # 获取 upload_url 并上传产物
           UPLOAD_URL=$(echo "$RESPONSE" | grep -o '"upload_url":"[^"]*"' | sed 's/"upload_url":"//g' | sed 's/"{?name,label}"//g')
           
           if [ -n "$UPLOAD_URL" ]; then
-            for FILE in release-assets/*.apk; do
+            for FILE in release-assets/*; do
               if [ -f "$FILE" ]; then
-                echo "上传 $FILE..."
+                FILENAME=$(basename "$FILE")
+                echo "📤 上传 ${FILENAME}..."
                 curl -X POST \
                   -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
                   -H "Content-Type: application/octet-stream" \
-                  "${UPLOAD_URL}?name=$(basename $FILE)" \
+                  "${UPLOAD_URL}?name=${FILENAME}" \
                   --data-binary "@$FILE"
               fi
             done
