@@ -10,8 +10,10 @@ export interface UpdateInfo {
 
 export class UpdateChecker {
   private static instance: UpdateChecker
-  private currentVersion: string = 'v2026.07.24-105948'
-  private checkedVersion: string = ''
+  // 固定当前版本，避免频繁检查
+  private currentVersion: string = 'v2026.07.24-114207'
+  private lastCheckTime: number = 0
+  private checkInterval: number = 3600000 // 1小时检查一次
 
   static getInstance(): UpdateChecker {
     if (!UpdateChecker.instance) {
@@ -20,9 +22,21 @@ export class UpdateChecker {
     return UpdateChecker.instance
   }
 
-  async checkForUpdate(): Promise<UpdateInfo> {
+  async checkForUpdate(force: boolean = false): Promise<UpdateInfo> {
     try {
-      // 防止重复检查同一版本
+      // 防止频繁检查
+      const now = Date.now()
+      if (!force && (now - this.lastCheckTime) < this.checkInterval) {
+        return {
+          hasUpdate: false,
+          version: '',
+          downloadUrl: '',
+          releaseDate: ''
+        }
+      }
+      this.lastCheckTime = now
+
+      // 检查是否用户跳过了此版本
       const skippedVersion = localStorage.getItem('skipped_version')
       
       const response = await fetch(
@@ -36,22 +50,9 @@ export class UpdateChecker {
       const data = await response.json()
       const latestVersion = data.tag_name || ''
 
-      // 如果已经检查过这个版本，不再提示
-      if (this.checkedVersion === latestVersion) {
-        return {
-          hasUpdate: false,
-          version: latestVersion,
-          downloadUrl: '',
-          releaseDate: ''
-        }
-      }
-      this.checkedVersion = latestVersion
-
-      // 比较版本号
-      const hasUpdate = this.compareVersions(latestVersion, this.currentVersion) > 0
-      
-      // 如果用户跳过了这个版本，不再提示
-      const finalHasUpdate = hasUpdate && latestVersion !== skippedVersion
+      // 如果当前版本已经是最新，或者用户跳过了此版本
+      const isSameVersion = this.compareVersions(latestVersion, this.currentVersion) <= 0
+      const isSkipped = latestVersion === skippedVersion
 
       const apkAsset = data.assets?.find(
         (asset: any) => 
@@ -61,7 +62,7 @@ export class UpdateChecker {
       )
 
       return {
-        hasUpdate: finalHasUpdate,
+        hasUpdate: !isSameVersion && !isSkipped,
         version: latestVersion,
         downloadUrl: apkAsset?.browser_download_url || '',
         releaseDate: data.published_at || '',
