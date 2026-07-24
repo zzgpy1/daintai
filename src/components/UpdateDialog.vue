@@ -5,15 +5,9 @@
         <div class="w-16 h-16 bg-green-100 dark:bg-green-900/30 rounded-full flex items-center justify-center mx-auto mb-4">
           <ArrowDownTrayIcon class="w-8 h-8 text-green-500" />
         </div>
-        <h3 class="text-lg font-semibold text-ios-dark-gray dark:text-dark-text">
-          发现新版本
-        </h3>
-        <p class="text-sm text-ios-gray dark:text-dark-secondary mt-2">
-          版本 {{ updateInfo.version }} 可用
-        </p>
-        <p class="text-xs text-ios-gray dark:text-dark-secondary mt-1">
-          {{ formatDate(updateInfo.releaseDate) }}
-        </p>
+        <h3 class="text-lg font-semibold text-ios-dark-gray dark:text-dark-text">发现新版本</h3>
+        <p class="text-sm text-ios-gray dark:text-dark-secondary mt-2">版本 {{ updateInfo.version }} 可用</p>
+        <p class="text-xs text-ios-gray dark:text-dark-secondary mt-1">{{ formatDate(updateInfo.releaseDate) }}</p>
       </div>
 
       <div class="flex flex-col gap-3">
@@ -31,7 +25,6 @@
           稍后提醒
         </button>
         <button
-          v-if="!showAgain"
           @click="skipVersion"
           class="w-full p-2 text-xs text-ios-gray dark:text-dark-secondary hover:text-ios-blue transition-colors"
         >
@@ -43,17 +36,13 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, watch } from 'vue'
 import { ArrowDownTrayIcon } from '@heroicons/vue/24/outline'
 import { useToastStore } from '@/stores/toast'
+import type { UpdateInfo } from '@/services/updateChecker'
 
 const props = defineProps<{
-  updateInfo: {
-    hasUpdate: boolean
-    version: string
-    downloadUrl: string
-    releaseDate: string
-  }
+  updateInfo: UpdateInfo
 }>()
 
 const emit = defineEmits<{
@@ -64,18 +53,21 @@ const emit = defineEmits<{
 
 const toastStore = useToastStore()
 const showDialog = ref(true)
-const showAgain = ref(false)
 
 const formatDate = (dateStr: string) => {
   if (!dateStr) return ''
-  const date = new Date(dateStr)
-  return date.toLocaleDateString('zh-CN', {
-    year: 'numeric',
-    month: 'long',
-    day: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit'
-  })
+  try {
+    const date = new Date(dateStr)
+    return date.toLocaleDateString('zh-CN', {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    })
+  } catch {
+    return ''
+  }
 }
 
 const closeDialog = () => {
@@ -85,18 +77,22 @@ const closeDialog = () => {
 
 const downloadUpdate = () => {
   if (props.updateInfo.downloadUrl) {
-    // 在浏览器中打开下载链接
     window.open(props.updateInfo.downloadUrl, '_blank')
-    toastStore.showSuccess('正在下载更新，请稍候...')
+    toastStore.showSuccess('正在下载更新...')
     showDialog.value = false
     emit('download')
   }
 }
 
 const skipVersion = () => {
-  // 保存跳过的版本号到本地
-  localStorage.setItem('skipped_version', props.updateInfo.version)
-  showDialog.value = false
-  emit('skip')
+  if (props.updateInfo.version) {
+    localStorage.setItem('skipped_version', props.updateInfo.version)
+    showDialog.value = false
+    emit('skip')
+  }
 }
+
+watch(() => props.updateInfo, () => {
+  showDialog.value = true
+}, { deep: true })
 </script>
