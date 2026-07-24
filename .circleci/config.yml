@@ -1,0 +1,74 @@
+version: 2.1
+
+orbs:
+  node: circleci/node@5
+  docker: circleci/docker@2
+
+workflows:
+  build-and-deploy:
+    jobs:
+      - build
+      - docker-build:
+          requires:
+            - build
+          filters:
+            branches:
+              only: main
+      - deploy:
+          requires:
+            - docker-build
+          filters:
+            branches:
+              only: main
+
+jobs:
+  build:
+    docker:
+      - image: cimg/node:20.0
+    steps:
+      - checkout
+      - node/install-packages:
+          pkg-manager: npm
+      - run:
+          name: Build
+          command: npm run build
+          environment:
+            NODE_OPTIONS: --max-old-space-size=4096
+      - persist_to_workspace:
+          root: .
+          paths:
+            - dist
+      - store_artifacts:
+          path: dist
+          destination: dist
+
+  docker-build:
+    docker:
+      - image: cimg/node:20.0
+    steps:
+      - checkout
+      - setup_remote_docker:
+          docker_layer_caching: true
+      - run:
+          name: Build Docker image
+          command: |
+            docker build -t global-radio:latest .
+            docker tag global-radio:latest $DOCKER_USERNAME/global-radio:latest
+      - run:
+          name: Push Docker image
+          command: |
+            echo $DOCKER_PASSWORD | docker login -u $DOCKER_USERNAME --password-stdin
+            docker push $DOCKER_USERNAME/global-radio:latest
+
+  deploy:
+    docker:
+      - image: cimg/base:stable
+    steps:
+      - checkout
+      - attach_workspace:
+          at: .
+      - run:
+          name: Deploy to server
+          command: |
+            sudo apt-get update && sudo apt-get install -y rsync
+            rsync -avz --delete dist/ $SSH_USER@$DEPLOY_HOST:/var/www/global-radio/
