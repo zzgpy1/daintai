@@ -1,5 +1,4 @@
-const { app, BrowserWindow, Menu, shell, ipcMain } = require('electron');
-const { autoUpdater } = require('electron-updater');
+const { app, BrowserWindow, Menu, shell } = require('electron');
 const path = require('path');
 const fs = require('fs');
 
@@ -21,6 +20,7 @@ function createWindow() {
     backgroundColor: '#1a365d',
   });
 
+  // 加载 index.html
   const indexPath = path.join(__dirname, '../dist/index.html');
   if (fs.existsSync(indexPath)) {
     mainWindow.loadFile(indexPath);
@@ -43,13 +43,7 @@ function createWindow() {
   Menu.setApplicationMenu(null);
 }
 
-app.whenReady().then(() => {
-  createWindow();
-  // 检查更新
-  if (app.isPackaged) {
-    autoUpdater.checkForUpdatesAndNotify();
-  }
-});
+app.whenReady().then(createWindow);
 
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') {
@@ -61,22 +55,4 @@ app.on('activate', () => {
   if (BrowserWindow.getAllWindows().length === 0) {
     createWindow();
   }
-});
-
-// 自动更新事件
-autoUpdater.on('update-available', () => {
-  mainWindow.webContents.send('update-available');
-});
-
-autoUpdater.on('update-downloaded', () => {
-  mainWindow.webContents.send('update-downloaded');
-});
-
-// IPC 通信
-ipcMain.handle('get-version', () => {
-  return app.getVersion();
-});
-
-ipcMain.handle('restart-to-update', () => {
-  autoUpdater.quitAndInstall();
 });
