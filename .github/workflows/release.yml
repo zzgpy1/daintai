@@ -118,9 +118,6 @@ jobs:
           cd android
           ./gradlew assembleRelease
 
-      # ============================================
-      # 统一版本号：仅使用日期，不带时间戳
-      # ============================================
       - name: 获取版本号
         id: get_version
         run: |
@@ -128,7 +125,6 @@ jobs:
           if [ -z "$VERSION" ]; then
             VERSION="v$(date +'%Y.%m.%d')"
           fi
-          # 移除所有时间戳后缀
           CLEAN_VERSION=$(echo "$VERSION" | sed 's/-[0-9]*$//')
           echo "VERSION=${CLEAN_VERSION}" >> $GITHUB_OUTPUT
           echo "版本号: ${CLEAN_VERSION}"
@@ -303,9 +299,6 @@ jobs:
         with:
           path: artifacts/
 
-      # ============================================
-      # 使用与 build-android 相同的版本号
-      # ============================================
       - name: 获取版本号
         id: get_version
         run: |
@@ -322,6 +315,7 @@ jobs:
         run: |
           TAG="${{ steps.get_version.outputs.RELEASE_TAG }}"
           echo "检查 Release ${TAG} 是否已存在..."
+
           RESPONSE=$(curl -s -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
             "https://api.github.com/repos/${{ github.repository }}/releases/tags/${TAG}")
 
@@ -331,26 +325,13 @@ jobs:
             curl -X DELETE \
               -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
               "https://api.github.com/repos/${{ github.repository }}/releases/${RELEASE_ID}"
-            sleep 3
+            echo "等待 5 秒确保删除完成..."
+            sleep 5
           else
-            echo "Release ${TAG} 不存在"
+            echo "Release ${TAG} 不存在，可以直接创建"
           fi
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      # ============================================
-      # 关键修复：显示所有 artifacts 内容用于调试
-      # ============================================
-      - name: 调试 - 显示所有 artifacts
-        run: |
-          echo "📂 artifacts 目录结构："
-          find artifacts/ -type f | head -50
-          echo ""
-          echo "📦 查找 APK 文件："
-          find artifacts/ -name "*.apk" -exec ls -la {} \;
-          echo ""
-          echo "📦 查找 EXE 文件："
-          find artifacts/ -name "*.exe" -exec ls -la {} \;
 
       - name: 整理产物
         id: prepare_assets
@@ -403,15 +384,11 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      # ============================================
-      # 使用通配符查找并上传所有 APK
-      # ============================================
       - name: 上传 APK
         run: |
           UPLOAD_URL="${{ steps.create_release.outputs.upload_url }}"
           VERSION="${{ steps.get_version.outputs.VERSION }}"
-          
-          # 查找 release-assets 中的所有 APK
+
           for FILE in release-assets/*.apk; do
             if [ -f "$FILE" ]; then
               FILENAME=$(basename "$FILE")
@@ -429,7 +406,7 @@ jobs:
       - name: 上传 Windows EXE
         run: |
           UPLOAD_URL="${{ steps.create_release.outputs.upload_url }}"
-          
+
           for FILE in release-assets/*.exe; do
             if [ -f "$FILE" ]; then
               FILENAME=$(basename "$FILE")
@@ -447,11 +424,10 @@ jobs:
       - name: 上传 Web 产物
         run: |
           UPLOAD_URL="${{ steps.create_release.outputs.upload_url }}"
-          
+
           for FILE in release-assets/*.zip; do
             if [ -f "$FILE" ]; then
               FILENAME=$(basename "$FILE")
-              # 跳过可能存在的 Source code 文件
               if [[ "$FILENAME" != "Source"* ]]; then
                 echo "上传 $FILENAME..."
                 curl -X POST \
