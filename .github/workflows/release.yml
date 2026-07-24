@@ -72,7 +72,7 @@ jobs:
           path: web-dist.zip
 
   # ============================================
-  # 构建 Android APK（已签名）
+  # 构建 Android APK
   # ============================================
   build-android:
     runs-on: ubuntu-latest
@@ -94,6 +94,7 @@ jobs:
 
       - name: 生成 Debug 签名密钥
         run: |
+          mkdir -p android/app
           cd android/app
           if [ ! -f "debug.keystore" ]; then
             keytool -genkey -v -keystore debug.keystore -storepass android -alias androiddebugkey -keypass android -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=Android Debug, O=Android, C=US"
@@ -120,7 +121,7 @@ jobs:
           chmod +x gradlew
           ./gradlew assembleDebug
 
-      - name: 构建 Release APK（已签名）
+      - name: 构建 Release APK
         run: |
           cd android
           chmod +x gradlew
@@ -138,14 +139,12 @@ jobs:
 
           mkdir -p apk-outputs
 
-          # Debug APK
           DEBUG_APK="android/app/build/outputs/apk/debug/app-debug.apk"
           if [ -f "$DEBUG_APK" ]; then
             cp "$DEBUG_APK" "apk-outputs/global-radio-${VERSION}-debug.apk"
             echo "Debug APK: global-radio-${VERSION}-debug.apk"
           fi
 
-          # Release APK（已签名）
           RELEASE_APK="android/app/build/outputs/apk/release/app-release.apk"
           if [ -f "$RELEASE_APK" ]; then
             cp "$RELEASE_APK" "apk-outputs/global-radio-${VERSION}.apk"
@@ -167,7 +166,7 @@ jobs:
           path: apk-outputs/*.apk
 
   # ============================================
-  # 构建 Windows EXE（便携版 + 完整依赖）
+  # 构建 Windows EXE
   # ============================================
   build-windows:
     runs-on: windows-latest
@@ -181,7 +180,6 @@ jobs:
       - name: 安装依赖
         run: |
           npm install --no-audit --no-fund
-          # 确保 electron 完整安装
           npm install electron --no-audit --no-fund
 
       - name: 构建 Web
@@ -190,9 +188,9 @@ jobs:
       - name: 验证构建产物
         run: |
           if (Test-Path dist/index.html) {
-            Write-Host "✅ dist/index.html 存在"
+            Write-Host "dist/index.html 存在"
           } else {
-            Write-Host "❌ dist/index.html 不存在"
+            Write-Host "dist/index.html 不存在"
             exit 1
           }
 
@@ -210,40 +208,30 @@ jobs:
       - name: 检查 Electron 配置
         run: |
           if (Test-Path electron/main.js) {
-            Write-Host "✅ electron/main.js 存在"
+            Write-Host "electron/main.js 存在"
           } else {
-            Write-Host "⚠️ electron/main.js 不存在，跳过"
+            Write-Host "electron/main.js 不存在，跳过"
             exit 0
           }
 
       - name: 构建 Windows EXE（便携版）
         if: hashFiles('electron/main.js') != ''
         run: |
-          # 清理旧构建
           Remove-Item -Recurse -Force -ErrorAction SilentlyContinue release/
-          # 构建便携版 EXE
           npm run electron:build -- --win portable
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: 验证构建产物
-        if: hashFiles('electron/main.js') != ''
-        run: |
-          Write-Host "📂 release 目录内容："
-          Get-ChildItem -Path release/ -Recurse | Select-Object FullName, Length
 
       - name: 收集 Windows 产物
         if: hashFiles('electron/main.js') != ''
         run: |
           $VERSION = "${{ steps.get_version.outputs.VERSION }}"
           New-Item -ItemType Directory -Force -Path exe-outputs
-          
-          # 查找 EXE 文件（便携版）
           Get-ChildItem -Path release/ -Recurse -Filter "*.exe" | ForEach-Object {
             if ($_.Length -gt 1MB) {
               $destName = "global-radio-${VERSION}-win-portable.exe"
               Copy-Item -Path $_.FullName -Destination "exe-outputs/$destName"
-              Write-Host "✅ EXE: $destName ($([math]::Round($_.Length/1MB, 2)) MB)"
+              Write-Host "EXE: $destName"
             }
           }
 
@@ -364,31 +352,28 @@ jobs:
           mkdir -p release-assets
           VERSION="${{ steps.get_version.outputs.VERSION }}"
           
-          echo "📂 查找所有产物..."
+          echo "查找所有产物..."
           find artifacts/ -type f -print
           
-          # APK
           APK_FILE=$(find artifacts/ -type f -name "*.apk" | head -1)
           if [ -n "$APK_FILE" ]; then
             cp "$APK_FILE" "release-assets/global-radio-${VERSION}.apk"
-            echo "✅ APK: global-radio-${VERSION}.apk"
+            echo "APK: global-radio-${VERSION}.apk"
           fi
           
-          # EXE
           EXE_FILE=$(find artifacts/ -type f -name "*.exe" | head -1)
           if [ -n "$EXE_FILE" ]; then
             cp "$EXE_FILE" "release-assets/global-radio-${VERSION}-win-portable.exe"
-            echo "✅ EXE: global-radio-${VERSION}-win-portable.exe"
+            echo "EXE: global-radio-${VERSION}-win-portable.exe"
           fi
           
-          # ZIP
           ZIP_FILE=$(find artifacts/ -type f -name "*.zip" | head -1)
           if [ -n "$ZIP_FILE" ]; then
             cp "$ZIP_FILE" "release-assets/web-dist-${VERSION}.zip"
-            echo "✅ ZIP: web-dist-${VERSION}.zip"
+            echo "ZIP: web-dist-${VERSION}.zip"
           fi
           
-          echo "📦 release-assets 目录内容："
+          echo "release-assets 目录内容："
           ls -la release-assets/
 
       - name: 生成 Release Notes
