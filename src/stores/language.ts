@@ -21,7 +21,6 @@ export const useLanguageStore = defineStore('language', () => {
     return supportedLanguages.find(lang => lang.code === currentLanguage.value) || supportedLanguages[0]
   })
 
-  // 切换语言
   const setLanguage = (lang: SupportedLanguage) => {
     currentLanguage.value = lang
     locale.value = lang
@@ -29,13 +28,11 @@ export const useLanguageStore = defineStore('language', () => {
     document.documentElement.lang = lang
   }
 
-  // 初始化语言
   const initLanguage = async () => {
     const savedLang = localStorage.getItem('language') as SupportedLanguage
     if (savedLang && (savedLang === 'zh' || savedLang === 'en')) {
       currentLanguage.value = savedLang
     } else {
-      // 检测浏览器语言
       const browserLang = navigator.language.split('-')[0]
       if (browserLang === 'zh' || browserLang === 'en') {
         currentLanguage.value = browserLang as SupportedLanguage
@@ -45,7 +42,6 @@ export const useLanguageStore = defineStore('language', () => {
     document.documentElement.lang = currentLanguage.value
   }
 
-  // 翻译函数
   const translate = (key: string, params?: Record<string, any>): string => {
     try {
       return t(key, params)
@@ -55,14 +51,9 @@ export const useLanguageStore = defineStore('language', () => {
   }
 
   return {
-    // 状态
     currentLanguage,
     supportedLanguages,
-    
-    // 计算属性
     currentLanguageInfo,
-    
-    // 方法
     setLanguage,
     initLanguage,
     t: translate
