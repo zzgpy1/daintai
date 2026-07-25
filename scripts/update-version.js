@@ -3,15 +3,22 @@
 import fs from 'fs'
 import path from 'path'
 import { execSync } from 'child_process'
+import readline from 'readline'
+
+const rl = readline.createInterface({
+  input: process.stdin,
+  output: process.stdout
+})
 
 const colors = {
   reset: '\x1b[0m',
   green: '\x1b[32m',
   yellow: '\x1b[33m',
-  blue: '\x1b[34m'
+  blue: '\x1b[34m',
+  cyan: '\x1b[36m'
 }
 
-console.log(`${colors.blue}📦 版本号更新工具${colors.reset}\n`)
+console.log(`${colors.cyan}📦 版本号更新工具${colors.reset}\n`)
 
 // 读取package.json
 const packagePath = path.join(process.cwd(), 'package.json')
@@ -29,12 +36,6 @@ console.log(`  ${colors.cyan}1.${colors.reset} 补丁版本 (${major}.${minor}.$
 console.log(`  ${colors.cyan}2.${colors.reset} 次版本 (${major}.${minor + 1}.0)`)
 console.log(`  ${colors.cyan}3.${colors.reset} 主版本 (${major + 1}.0.0)`)
 console.log(`  ${colors.cyan}4.${colors.reset} 自定义版本`)
-
-import readline from 'readline'
-const rl = readline.createInterface({
-  input: process.stdin,
-  output: process.stdout
-})
 
 rl.question(`\n请选择 [1-4]: `, (choice) => {
   let newVersion = ''
@@ -71,10 +72,11 @@ function updateVersion(newVersion) {
   packageJson.version = newVersion
   fs.writeFileSync(packagePath, JSON.stringify(packageJson, null, 2))
 
-  // 更新其他需要版本号的文件
+  // 更新其他文件
   const filesToUpdate = [
     'src/config/app.config.ts',
-    'public/manifest.json'
+    'public/manifest.json',
+    'capacitor.config.ts'
   ]
 
   for (const file of filesToUpdate) {
