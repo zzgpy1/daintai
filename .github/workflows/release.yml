@@ -10,7 +10,6 @@ permissions:
   contents: write
   packages: write
 
-# 设置环境变量以允许使用 Node 20（如果需要）
 env:
   ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION: true
 
@@ -23,18 +22,28 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20'  # 使用 Node 20 LTS
-          cache: 'npm'
-          cache-dependency-path: 'package-lock.json'  # 明确指定 lock 文件路径
+          node-version: '20'
+      
+      - name: Generate package-lock.json if missing
+        run: |
+          if [ ! -f package-lock.json ]; then
+            echo "📦 package-lock.json 不存在，正在生成..."
+            npm install --package-lock-only
+            echo "✅ package-lock.json 已生成"
+          else
+            echo "✅ package-lock.json 已存在"
+          fi
+      
+      - name: Cache npm dependencies
+        uses: actions/cache@v3
+        with:
+          path: ~/.npm
+          key: ${{ runner.os }}-node-${{ hashFiles('package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-node-
       
       - name: Install dependencies
-        run: |
-          # 如果 lock 文件不存在，生成一个
-          if [ ! -f package-lock.json ]; then
-            echo "⚠️ package-lock.json 不存在，正在生成..."
-            npm install --package-lock-only
-          fi
-          npm ci
+        run: npm ci
       
       - name: Build Web
         run: npm run build
@@ -72,15 +81,25 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '20'
-          cache: 'npm'
-          cache-dependency-path: 'package-lock.json'
       
-      - name: Install dependencies
+      - name: Generate package-lock.json if missing
         run: |
           if [ ! -f package-lock.json ]; then
+            echo "📦 package-lock.json 不存在，正在生成..."
             npm install --package-lock-only
+            echo "✅ package-lock.json 已生成"
           fi
-          npm ci
+      
+      - name: Cache npm dependencies
+        uses: actions/cache@v3
+        with:
+          path: ~/.npm
+          key: ${{ runner.os }}-node-${{ hashFiles('package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-node-
+      
+      - name: Install dependencies
+        run: npm ci
       
       - name: Build Electron
         run: npm run electron:build
@@ -110,8 +129,22 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '20'
-          cache: 'npm'
-          cache-dependency-path: 'package-lock.json'
+      
+      - name: Generate package-lock.json if missing
+        run: |
+          if [ ! -f package-lock.json ]; then
+            echo "📦 package-lock.json 不存在，正在生成..."
+            npm install --package-lock-only
+            echo "✅ package-lock.json 已生成"
+          fi
+      
+      - name: Cache npm dependencies
+        uses: actions/cache@v3
+        with:
+          path: ~/.npm
+          key: ${{ runner.os }}-node-${{ hashFiles('package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-node-
       
       - name: Setup Java
         uses: actions/setup-java@v4
@@ -123,11 +156,7 @@ jobs:
         uses: android-actions/setup-android@v3
       
       - name: Install dependencies
-        run: |
-          if [ ! -f package-lock.json ]; then
-            npm install --package-lock-only
-          fi
-          npm ci
+        run: npm ci
       
       - name: Build Android
         run: npm run build:android
@@ -194,7 +223,7 @@ jobs:
       - name: List artifacts
         run: |
           echo "📦 下载的构建产物:"
-          find artifacts/ -type f -name "*.AppImage" -o -name "*.exe" -o -name "*.dmg" -o -name "*.apk" | sort
+          find artifacts/ -type f \( -name "*.AppImage" -o -name "*.exe" -o -name "*.dmg" -o -name "*.apk" \) | sort || echo "没有找到构建产物"
       
       - name: Get version from tag
         id: get_version
