@@ -1,40 +1,130 @@
-name: Build
+name: Build and Release
 
 on:
   push:
-    branches: [ main, develop ]
-  pull_request:
-    branches: [ main ]
+    tags:
+      - 'v*'
   workflow_dispatch:
 
 jobs:
-  build:
-    runs-on: ubuntu-latest  # 使用 Ubuntu，命令更兼容
-    
+  # 1. Web 构建与 Docker 发布
+  build-web:
+    runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v4
-    
-    - name: Setup Node.js
-      uses: actions/setup-node@v4
-      with:
-        node-version: 20
-    
-    - name: Clean and Install
-      run: |
-        npm cache clean --force
-        rm -rf node_modules package-lock.json
-        npm install --no-package-lock --legacy-peer-deps --no-audit --no-fund --ignore-scripts
-      env:
-        ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION: true
-    
-    - name: Build
-      run: |
-        npx vite build
-      env:
-        NODE_OPTIONS: --max-old-space-size=4096
-    
-    - name: Upload build artifacts
-      uses: actions/upload-artifact@v4
-      with:
-        name: dist
-        path: dist/
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 18
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build Web
+        run: npm run build
+
+      - name: Upload Web Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: web-dist
+          path: dist/
+          retention-days: 7
+
+  # 2. 桌面应用构建
+  build-desktop:
+    strategy:
+      matrix:
+        os: [windows-latest, macos-latest, ubuntu-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 18
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build Electron
+        run: npm run electron:build
+
+      - name: Upload Desktop Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: global-radio-${{ matrix.os }}
+          path: release/
+          retention-days: 7
+
+  # 3. Android APK 构建（修复关键点）
+  build-android:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 18
+          cache: npm
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+        with:
+          packages: 'platforms;android-34'
+
+      - name: Install dependencies
+        run: npm ci
+
+      # --- 关键修复：增加执行权限并详细构建 ---
+      - name: Make Gradlew executable
+        run: chmod +x android/gradlew
+
+      - name: Build Android APK (Debug)
+        run: |
+          npm run build
+          npx cap sync android
+          cd android
+          ./gradlew assembleDebug --no-daemon
+          # 如果 Release 构建失败，可先用 Debug 测试
+          # ./gradlew assembleRelease --no-daemon
+
+      - name: Find and Upload APK
+        id: upload_apk
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-apk
+          # 路径指向构建出的 APK 文件
+          path: android/app/build/outputs/apk/debug/*.apk
+          retention-days: 7
+        # 即使构建有警告，也继续上传（如果文件存在）
+        continue-on-error: false
+
+  # 4. 发布 Release（整合所有产物）
+  release:
+    needs: [build-web, build-desktop, build-android]
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/')
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: artifacts/**/*
+          generate_release_notes: true
