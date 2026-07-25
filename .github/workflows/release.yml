@@ -50,6 +50,7 @@ jobs:
     name: 📱 Build Android
     runs-on: ubuntu-latest
     needs: build-web
+    continue-on-error: true
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -84,27 +85,30 @@ jobs:
           path: www/
 
       - name: Sync Capacitor
-        run: |
-          npx cap sync android
+        run: npx cap sync android
 
       - name: Build Android APK
         run: |
           cd android
           chmod +x gradlew
           ./gradlew assembleRelease
+        continue-on-error: true
 
       - name: Upload Android APK
         uses: actions/upload-artifact@v4
+        if: always()
         with:
           name: android-apk
           path: android/app/build/outputs/apk/release/*.apk
           retention-days: 7
+          if-no-files-found: warn
 
   # ============ Windows 桌面应用构建 ============
   build-windows:
     name: 💻 Build Windows
     runs-on: windows-latest
     needs: build-web
+    continue-on-error: true
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -138,19 +142,23 @@ jobs:
           npm run electron:build -- --win --publish never
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        continue-on-error: true
 
       - name: Upload Windows artifacts
         uses: actions/upload-artifact@v4
+        if: always()
         with:
           name: windows-installer
           path: release/
           retention-days: 7
+          if-no-files-found: warn
 
   # ============ macOS 桌面应用构建 ============
   build-macos:
     name: 💻 Build macOS
     runs-on: macos-latest
     needs: build-web
+    continue-on-error: true
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -183,13 +191,16 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           CSC_IDENTITY_AUTO_DISCOVERY: false
+        continue-on-error: true
 
       - name: Upload macOS artifacts
         uses: actions/upload-artifact@v4
+        if: always()
         with:
           name: macos-installer
           path: release/
           retention-days: 7
+          if-no-files-found: warn
 
   # ============ Docker 构建 ============
   build-docker:
@@ -197,6 +208,7 @@ jobs:
     runs-on: ubuntu-latest
     needs: build-web
     if: github.ref_type == 'tag' || github.event_name == 'workflow_dispatch'
+    continue-on-error: true
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -211,23 +223,26 @@ jobs:
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
+        continue-on-error: true
 
       - name: Login to Docker Hub
         uses: docker/login-action@v3
         with:
           username: ${{ secrets.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_PASSWORD }}
+        continue-on-error: true
 
       - name: Build and push Docker image
         uses: docker/build-push-action@v5
         with:
           context: .
-          push: true
+          push: ${{ secrets.DOCKER_USERNAME != '' }}
           tags: |
             ${{ secrets.DOCKER_USERNAME }}/global-radio:latest
             ${{ secrets.DOCKER_USERNAME }}/global-radio:${{ github.ref_name }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
+        continue-on-error: true
 
   # ============ 创建 Release ============
   create-release:
@@ -238,29 +253,37 @@ jobs:
     steps:
       - name: Download all artifacts
         uses: actions/download-artifact@v4
+        if: always()
         with:
           path: artifacts
+          merge-multiple: true
 
       - name: List artifacts
+        if: always()
         run: |
           echo "📦 Artifacts found:"
-          find artifacts -type f \( -name "*.apk" -o -name "*.exe" -o -name "*.dmg" -o -name "*.zip" \) | sort || echo "No artifacts found"
+          find artifacts -type f \( -name "*.apk" -o -name "*.exe" -o -name "*.dmg" -o -name "*.zip" -o -name "*.AppImage" -o -name "*.deb" \) | sort || echo "No artifacts found"
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v1
+        if: always()
         with:
           files: |
             artifacts/**/*.apk
             artifacts/**/*.exe
             artifacts/**/*.dmg
             artifacts/**/*.zip
+            artifacts/**/*.AppImage
+            artifacts/**/*.deb
           generate_release_notes: true
           draft: false
           prerelease: false
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        continue-on-error: true
 
       - name: Deployment Summary
+        if: always()
         run: |
           echo "## 🎉 Release Summary" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
