@@ -23,7 +23,7 @@
     <div v-if="favoritesStore.count > 0" class="container-responsive p-4">
       <div class="flex items-center justify-between mb-4">
         <span class="text-sm text-ios-gray dark:text-dark-secondary">
-          {{ $t('favorites.total') }}: {{ favoritesStore.count }} {{ $t('favorites.stations') }}
+          {{ $t('favorites.total') || '总计' }}: {{ favoritesStore.count }} {{ $t('favorites.stations') || '个电台' }}
         </span>
       </div>
       
@@ -33,7 +33,7 @@
           :key="station.stationuuid"
           :station="station"
           @play="playStation"
-          @favorite="removeFavorite"
+          @favorite="handleRemoveFavorite"
           @share="openShareModal"
         />
       </div>
@@ -66,7 +66,7 @@
           <button @click="showClearDialog = false" class="flex-1 ios-button bg-gray-100 dark:bg-dark-gray text-ios-dark-gray dark:text-dark-text py-3 rounded-ios font-medium">
             {{ $t('favorites.cancel') }}
           </button>
-          <button @click="clearAllFavorites" class="flex-1 ios-button bg-ios-red text-white py-3 rounded-ios font-medium">
+          <button @click="handleClearAllFavorites" class="flex-1 ios-button bg-ios-red text-white py-3 rounded-ios font-medium">
             {{ $t('favorites.clear') }}
           </button>
         </div>
@@ -108,11 +108,13 @@ const playStation = (station: RadioStation) => {
   playerStore.playStation(station)
 }
 
-const removeFavorite = (station: RadioStation) => {
+// 使用 favoritesStore 的方法
+const handleRemoveFavorite = (station: RadioStation) => {
   favoritesStore.removeFavorite(station.stationuuid)
+  toastStore.showSuccess('已移除收藏')
 }
 
-const clearAllFavorites = () => {
+const handleClearAllFavorites = () => {
   favoritesStore.clearFavorites()
   showClearDialog.value = false
   toastStore.showSuccess('已清空所有收藏')
