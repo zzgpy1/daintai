@@ -23,9 +23,16 @@ jobs:
       with:
         node-version: ${{ matrix.node-version }}
         cache: 'npm'
+        cache-dependency-path: '**/package.json'  # 使用 package.json 而不是 lockfile
     
     - name: Install dependencies
-      run: npm install
+      run: |
+        echo "🧹 清理缓存..."
+        npm cache clean --force
+        rm -rf node_modules
+        
+        echo "📦 安装依赖..."
+        npm install
       env:
         NODE_OPTIONS: --max-old-space-size=4096
     
