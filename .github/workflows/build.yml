@@ -19,13 +19,16 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '20'
+          registry-url: 'https://registry.npmjs.org'
       
       - name: Generate package-lock.json if missing
         run: |
           if [ ! -f package-lock.json ]; then
             echo "📦 package-lock.json 不存在，正在生成..."
-            npm install --package-lock-only
+            npm install --package-lock-only --legacy-peer-deps
             echo "✅ package-lock.json 已生成"
+          else
+            echo "✅ package-lock.json 已存在"
           fi
       
       - name: Cache npm dependencies
@@ -37,7 +40,7 @@ jobs:
             ${{ runner.os }}-node-
       
       - name: Install dependencies
-        run: npm ci
+        run: npm ci --legacy-peer-deps
       
       - name: Lint
         run: |
