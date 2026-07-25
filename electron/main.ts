@@ -6,7 +6,9 @@ import * as url from 'url'
 let mainWindow: BrowserWindow | null = null
 let tray: Tray | null = null
 
+// ============================================
 // 创建窗口
+// ============================================
 function createWindow(): void {
   mainWindow = new BrowserWindow({
     width: 1200,
@@ -52,13 +54,18 @@ function createWindow(): void {
   setupAutoUpdater()
 }
 
+// ============================================
 // 创建托盘
+// ============================================
 function createTray(): void {
-  tray = new Tray(path.join(__dirname, 'build/icon.png'))
+  const iconPath = path.join(__dirname, 'build/icon.png')
+  tray = new Tray(iconPath)
+  
   const contextMenu = Menu.buildFromTemplate([
     { label: '显示主窗口', click: () => mainWindow?.show() },
     { label: '退出', click: () => app.quit() }
   ])
+  
   tray.setToolTip('全球电台')
   tray.setContextMenu(contextMenu)
   tray.on('click', () => {
@@ -66,7 +73,9 @@ function createTray(): void {
   })
 }
 
+// ============================================
 // 创建菜单
+// ============================================
 function createMenu(): void {
   const template: any[] = [
     {
@@ -129,7 +138,9 @@ function createMenu(): void {
   Menu.setApplicationMenu(menu)
 }
 
+// ============================================
 // 设置自动更新
+// ============================================
 function setupAutoUpdater(): void {
   autoUpdater.setFeedURL({
     provider: 'github',
@@ -155,7 +166,9 @@ function setupAutoUpdater(): void {
   autoUpdater.checkForUpdatesAndNotify()
 }
 
+// ============================================
 // IPC通信
+// ============================================
 ipcMain.handle('get-version', () => app.getVersion())
 ipcMain.handle('get-platform', () => process.platform)
 
@@ -163,7 +176,9 @@ ipcMain.handle('install-update', () => {
   autoUpdater.quitAndInstall()
 })
 
+// ============================================
 // 应用生命周期
+// ============================================
 app.whenReady().then(createWindow)
 
 app.on('window-all-closed', () => {
