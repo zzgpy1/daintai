@@ -10,7 +10,6 @@ const rl = readline.createInterface({
   output: process.stdout
 })
 
-// 颜色输出
 const colors = {
   reset: '\x1b[0m',
   red: '\x1b[31m',
@@ -33,12 +32,10 @@ console.log(`${colors.blue}当前版本: ${colors.green}v${currentVersion}${colo
 // 询问新版本号
 rl.question(`${colors.yellow}请输入新版本号 (直接回车跳过): ${colors.reset}`, (newVersion) => {
   if (newVersion) {
-    // 更新版本号
     packageJson.version = newVersion
     fs.writeFileSync(packagePath, JSON.stringify(packageJson, null, 2))
     console.log(`${colors.green}✅ 版本号已更新为 v${newVersion}${colors.reset}\n`)
     
-    // 提交版本更新
     try {
       execSync(`git add package.json`, { stdio: 'inherit' })
       execSync(`git commit -m "chore: bump version to v${newVersion}"`, { stdio: 'inherit' })
@@ -51,23 +48,25 @@ rl.question(`${colors.yellow}请输入新版本号 (直接回车跳过): ${color
 
   // 构建选项
   console.log(`${colors.blue}请选择构建目标:${colors.reset}`)
-  console.log(`  ${colors.cyan}1.${colors.reset} 全平台构建 (Web + Electron + Android)`)
+  console.log(`  ${colors.cyan}1.${colors.reset} 全平台构建 (Web + Electron + Android + Docker)`)
   console.log(`  ${colors.cyan}2.${colors.reset} 仅 Web`)
-  console.log(`  ${colors.cyan}3.${colors.reset} 仅 Electron`)
-  console.log(`  ${colors.cyan}4.${colors.reset} 仅 Android`)
-  console.log(`  ${colors.cyan}5.${colors.reset} Docker 镜像`)
-  console.log(`  ${colors.cyan}6.${colors.reset} 全部 (包括Docker)`)
+  console.log(`  ${colors.cyan}3.${colors.reset} 仅 Windows`)
+  console.log(`  ${colors.cyan}4.${colors.reset} 仅 macOS`)
+  console.log(`  ${colors.cyan}5.${colors.reset} 仅 Linux`)
+  console.log(`  ${colors.cyan}6.${colors.reset} 仅 Android`)
+  console.log(`  ${colors.cyan}7.${colors.reset} Docker 镜像`)
 
-  rl.question(`\n${colors.yellow}请选择 [1-6]: ${colors.reset}`, (choice) => {
+  rl.question(`\n${colors.yellow}请选择 [1-7]: ${colors.reset}`, (choice) => {
     console.log('')
 
-    const commands = {
-      '1': ['npm run build'],
+    const commands: Record<string, string[]> = {
+      '1': ['npm run build', 'npm run electron:build:win', 'npm run electron:build:mac', 'npm run electron:build:linux', 'npm run build:android', 'npm run docker:build'],
       '2': ['npm run build'],
-      '3': ['npm run electron:build'],
-      '4': ['npm run build:android'],
-      '5': ['npm run docker:build', 'npm run docker:push'],
-      '6': ['npm run build', 'npm run electron:build', 'npm run build:android', 'npm run docker:build', 'npm run docker:push']
+      '3': ['npm run electron:build:win'],
+      '4': ['npm run electron:build:mac'],
+      '5': ['npm run electron:build:linux'],
+      '6': ['npm run build:android'],
+      '7': ['npm run docker:build', 'npm run docker:push']
     }
 
     const selected = commands[choice]
