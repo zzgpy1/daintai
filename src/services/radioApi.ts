@@ -1,12 +1,6 @@
-import axios, { AxiosInstance, AxiosError } from 'axios'
+import axios, { AxiosInstance } from 'axios'
+import type { RadioStation, RadioSearchParams, Country, Tag } from '@/types/radio'
 import { API_CONFIG } from '@/config/api.config'
-import type { 
-  RadioStation, 
-  RadioSearchParams, 
-  Country, 
-  Language, 
-  Tag 
-} from '@/types/radio'
 
 // ============================================
 // 重试配置
@@ -45,24 +39,17 @@ class RadioAPI {
       }
     })
 
-    // 请求拦截器
     instance.interceptors.request.use(
       (config) => {
-        // 添加请求时间戳防止缓存
-        config.params = {
-          ...config.params,
-          _t: Date.now()
-        }
+        config.params = { ...config.params, _t: Date.now() }
         return config
       },
       (error) => Promise.reject(error)
     )
 
-    // 响应拦截器
     instance.interceptors.response.use(
       (response) => response,
       (error) => {
-        // 网络错误重试
         if (error.code === 'ECONNABORTED' || error.code === 'ERR_NETWORK') {
           return this.handleRetry(error.config)
         }
@@ -114,7 +101,7 @@ class RadioAPI {
       await this.tryFallbackProviders()
     } catch (error) {
       console.error('❌ API初始化失败:', error)
-      this.isInitialized = true // 标记为已初始化避免无限重试
+      this.isInitialized = true
     }
   }
 
@@ -164,7 +151,6 @@ class RadioAPI {
   private setCache(key: string, data: any): void {
     this.cache.set(key, { data, timestamp: Date.now() })
     
-    // LRU缓存清理
     if (this.cache.size > API_CONFIG.cacheMaxSize) {
       const keys = Array.from(this.cache.keys())
       const toRemove = keys.slice(0, Math.floor(keys.length * 0.2))
@@ -189,7 +175,6 @@ class RadioAPI {
       return data
     } catch (error) {
       console.error('搜索电台失败:', error)
-      // 返回空数组而不是抛出异常
       return []
     }
   }
@@ -302,11 +287,11 @@ class RadioAPI {
     }
   }
 
-  async getLanguages(): Promise<Language[]> {
+  async getLanguages(): Promise<{ name: string; iso_639: string; stationcount: number }[]> {
     await this.initPromise
     
     const cacheKey = 'languages'
-    const cached = this.getFromCache<Language[]>(cacheKey)
+    const cached = this.getFromCache<{ name: string; iso_639: string; stationcount: number }[]>(cacheKey)
     if (cached) return cached
 
     try {
@@ -355,8 +340,8 @@ class RadioAPI {
   async recordClick(stationUuid: string): Promise<void> {
     try {
       await this.instance.get(`/json/url/${stationUuid}`)
-    } catch (error) {
-      // 静默失败，不影响主流程
+    } catch {
+      // 静默失败
     }
   }
 
@@ -391,11 +376,9 @@ class RadioAPI {
     this.cache.clear()
   }
 
-  // 等待初始化完成
   async waitForInit(): Promise<void> {
     await this.initPromise
   }
 }
 
-// 导出单例
 export const radioAPI = new RadioAPI()
