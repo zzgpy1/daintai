@@ -75,29 +75,27 @@ jobs:
       - name: Install Capacitor
         run: |
           npm install -g @capacitor/cli @capacitor/core @capacitor/android
+
+      - name: Install dependencies
+        run: |
+          npm cache clean --force
+          rm -rf node_modules package-lock.json
           npm install --no-package-lock --legacy-peer-deps --no-audit --no-fund --ignore-scripts
-        env:
-          ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION: true
 
       - name: Download Web build
         uses: actions/download-artifact@v4
         with:
           name: web-dist
-          path: dist/
+          path: www/  # 关键修复：Capacitor 默认查找 ./www 目录
 
       - name: Sync Capacitor
-        run: |
-          npx cap sync android
-        env:
-          ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION: true
+        run: npx cap sync android
 
       - name: Build Android APK
         run: |
           cd android
           chmod +x gradlew
           ./gradlew assembleRelease
-        env:
-          ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION: true
 
       - name: Upload Android APK
         uses: actions/upload-artifact@v4
@@ -132,8 +130,6 @@ jobs:
       - name: Install dependencies
         run: |
           npm install --no-package-lock --legacy-peer-deps --no-audit --no-fund --ignore-scripts
-        env:
-          ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION: true
 
       - name: Download Web build
         uses: actions/download-artifact@v4
@@ -146,7 +142,6 @@ jobs:
           npm run electron:build -- --win --publish never
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION: true
 
       - name: Upload Windows artifacts
         uses: actions/upload-artifact@v4
@@ -179,8 +174,6 @@ jobs:
       - name: Install dependencies
         run: |
           npm install --no-package-lock --legacy-peer-deps --no-audit --no-fund --ignore-scripts
-        env:
-          ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION: true
 
       - name: Download Web build
         uses: actions/download-artifact@v4
@@ -194,7 +187,6 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           CSC_IDENTITY_AUTO_DISCOVERY: false
-          ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION: true
 
       - name: Upload macOS artifacts
         uses: actions/upload-artifact@v4
@@ -203,64 +195,12 @@ jobs:
           path: release/
           retention-days: 7
 
-  # ============ Linux 桌面应用构建 ============
-  build-linux:
-    name: 💻 Build Linux
-    runs-on: ubuntu-latest
-    needs: build-web
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: ${{ env.NODE_VERSION }}
-
-      - name: Install Linux build dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y rpm
-
-      - name: Clean cache
-        run: |
-          npm cache clean --force
-          rm -rf node_modules package-lock.json
-
-      - name: Install dependencies
-        run: |
-          npm install --no-package-lock --legacy-peer-deps --no-audit --no-fund --ignore-scripts
-        env:
-          ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION: true
-
-      - name: Download Web build
-        uses: actions/download-artifact@v4
-        with:
-          name: web-dist
-          path: dist/
-
-      - name: Build Electron (Linux)
-        run: |
-          npm run electron:build -- --linux --publish never
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION: true
-
-      - name: Upload Linux artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: linux-installer
-          path: release/
-          retention-days: 7
-
   # ============ Docker 构建 ============
   build-docker:
     name: 🐳 Build Docker
     runs-on: ubuntu-latest
     needs: build-web
-    if: github.ref_type == 'tag'
+    if: github.ref_type == 'tag' && secrets.DOCKER_USERNAME != ''
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -281,27 +221,24 @@ jobs:
         with:
           username: ${{ secrets.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_PASSWORD }}
-        continue-on-error: true
 
       - name: Build and push Docker image
         uses: docker/build-push-action@v5
         with:
           context: .
-          push: ${{ secrets.DOCKER_USERNAME != '' }}
+          push: true
           tags: |
             ${{ secrets.DOCKER_USERNAME }}/global-radio:latest
             ${{ secrets.DOCKER_USERNAME }}/global-radio:${{ github.ref_name }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
-        continue-on-error: true
 
   # ============ 创建 Release ============
   create-release:
     name: 📦 Create Release
     runs-on: ubuntu-latest
-    needs: [build-web, build-android, build-windows, build-macos, build-linux, build-docker]
+    needs: [build-web, build-android, build-windows, build-macos, build-docker]
     if: always() && github.ref_type == 'tag'
-
     steps:
       - name: Download all artifacts
         uses: actions/download-artifact@v4
@@ -311,7 +248,7 @@ jobs:
       - name: List artifacts
         run: |
           echo "📦 Artifacts found:"
-          find artifacts -type f \( -name "*.apk" -o -name "*.exe" -o -name "*.dmg" -o -name "*.AppImage" -o -name "*.deb" -o -name "*.zip" \) | sort || echo "No artifacts found"
+          find artifacts -type f \( -name "*.apk" -o -name "*.exe" -o -name "*.dmg" -o -name "*.zip" \) | sort || echo "No artifacts found"
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v1
@@ -320,26 +257,9 @@ jobs:
             artifacts/**/*.apk
             artifacts/**/*.exe
             artifacts/**/*.dmg
-            artifacts/**/*.AppImage
-            artifacts/**/*.deb
             artifacts/**/*.zip
-            artifacts/**/*.dmg
           generate_release_notes: true
           draft: false
           prerelease: false
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        continue-on-error: false
-
-      - name: Deployment Summary
-        run: |
-          echo "## 🎉 Release Summary" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "| Platform | Status | Artifact |" >> $GITHUB_STEP_SUMMARY
-          echo "|----------|--------|----------|" >> $GITHUB_STEP_SUMMARY
-          echo "| Web | ✅ | web-dist |" >> $GITHUB_STEP_SUMMARY
-          echo "| Android | ${{ needs.build-android.result }} | android-apk |" >> $GITHUB_STEP_SUMMARY
-          echo "| Windows | ${{ needs.build-windows.result }} | windows-installer |" >> $GITHUB_STEP_SUMMARY
-          echo "| macOS | ${{ needs.build-macos.result }} | macos-installer |" >> $GITHUB_STEP_SUMMARY
-          echo "| Linux | ${{ needs.build-linux.result }} | linux-installer |" >> $GITHUB_STEP_SUMMARY
-          echo "| Docker | ${{ needs.build-docker.result }} | docker-image |" >> $GITHUB_STEP_SUMMARY
