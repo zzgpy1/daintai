@@ -37,6 +37,10 @@ function getFirstLetter(name: string): string {
   const cleanName = name.trim().replace(/[^a-zA-Z0-9\u4e00-\u9fa5]/g, '')
   if (!cleanName) return '?'
   const firstChar = cleanName.charAt(0).toUpperCase()
+  // 如果是中文字符，直接返回
+  if (/[\u4e00-\u9fa5]/.test(firstChar)) {
+    return firstChar
+  }
   return firstChar
 }
 
@@ -53,7 +57,7 @@ export function generateStationIcon(stationName: string) {
   }
 }
 
-// 生成图标数据URL
+// 生成图标数据URL (SVG格式)
 export function generateIconDataUrl(stationName: string): string {
   const icon = generateStationIcon(stationName)
   
@@ -69,7 +73,7 @@ export function generateIconDataUrl(stationName: string): string {
   return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`
 }
 
-// 生成简单的文本图标
+// 生成简单的文本图标 (带指定背景色)
 export function generateSimpleIcon(letter: string, bgColor?: string): string {
   const bg = bgColor || '#3B82F6'
   const char = letter || '?'
