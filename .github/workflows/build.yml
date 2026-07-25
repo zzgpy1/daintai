@@ -8,6 +8,7 @@ on:
 
 env:
   ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION: true
+  NODE_VERSION: '20'
 
 jobs:
   build:
@@ -18,21 +19,17 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
-          registry-url: 'https://registry.npmjs.org'
+          node-version: ${{ env.NODE_VERSION }}
       
-      - name: Generate package-lock.json if missing
+      - name: Create package-lock.json if not exists
         run: |
           if [ ! -f package-lock.json ]; then
             echo "📦 package-lock.json 不存在，正在生成..."
-            npm install --package-lock-only --legacy-peer-deps
-            echo "✅ package-lock.json 已生成"
-          else
-            echo "✅ package-lock.json 已存在"
+            npm install --package-lock-only
           fi
       
       - name: Cache npm dependencies
-        uses: actions/cache@v3
+        uses: actions/cache@v4
         with:
           path: ~/.npm
           key: ${{ runner.os }}-node-${{ hashFiles('package-lock.json') }}
@@ -40,7 +37,7 @@ jobs:
             ${{ runner.os }}-node-
       
       - name: Install dependencies
-        run: npm ci --legacy-peer-deps
+        run: npm ci
       
       - name: Lint
         run: |
