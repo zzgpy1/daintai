@@ -1,5 +1,10 @@
 <template>
   <div id="app" class="min-h-screen bg-ios-light-gray dark:bg-dark-bg">
+    <!-- 网络状态提示 -->
+    <div v-if="!isOnline" class="fixed top-0 left-0 right-0 z-50 bg-ios-red text-white text-center py-1.5 text-xs font-medium">
+      {{ $t('common.offline') }}
+    </div>
+    
     <!-- 背景特效 -->
     <BackgroundEffects />
     
@@ -7,7 +12,7 @@
     <TopNavigation />
     
     <!-- 主内容区域 -->
-    <main class="app-main">
+    <main class="app-main" :class="{ 'mt-6': !isOnline }">
       <router-view v-slot="{ Component }">
         <transition
           mode="out-in"
@@ -41,7 +46,7 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted } from 'vue'
+import { ref, onMounted, onUnmounted } from 'vue'
 import { useThemeStore } from '@/stores/theme'
 import { useLanguageStore } from '@/stores/language'
 import { usePlayerStore } from '@/stores/player'
@@ -64,6 +69,23 @@ const playerStore = usePlayerStore()
 const historyStore = useHistoryStore()
 const favoritesStore = useFavoritesStore()
 
+// 网络状态
+const isOnline = ref(navigator.onLine)
+
+// ============================================
+// 网络状态监听
+// ============================================
+const handleOnline = () => {
+  isOnline.value = true
+}
+
+const handleOffline = () => {
+  isOnline.value = false
+}
+
+// ============================================
+// 应用生命周期
+// ============================================
 onMounted(async () => {
   // 初始化主题
   themeStore.init()
@@ -80,23 +102,32 @@ onMounted(async () => {
   // 恢复播放器状态
   playerStore.restoreFromStorage()
   
-  // 注册Service Worker（生产环境）
-  if (import.meta.env.PROD && 'serviceWorker' in navigator) {
-    navigator.serviceWorker.register('/sw.js')
-  }
+  // 注册网络事件
+  window.addEventListener('online', handleOnline)
+  window.addEventListener('offline', handleOffline)
+})
+
+onUnmounted(() => {
+  // 清理事件监听
+  window.removeEventListener('online', handleOnline)
+  window.removeEventListener('offline', handleOffline)
+  
+  // 清理播放器资源
+  playerStore.cleanup()
 })
 </script>
 
 <style scoped>
 .app-main {
-  padding-top: 72px; /* TopNavigation高度 */
-  padding-bottom: 88px; /* BottomNavigation高度 */
+  padding-top: 72px;
+  padding-bottom: 88px;
   min-height: 100vh;
+  transition: margin-top 0.3s ease;
 }
 
 @media (max-width: 767px) {
   .app-main {
-    padding-top: 0; /* 移动端无顶部导航 */
+    padding-top: 0;
     padding-bottom: 88px;
   }
 }
