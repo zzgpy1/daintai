@@ -24,14 +24,8 @@ export default defineConfig({
         ]
       },
       workbox: {
-        // 只缓存这些类型的文件，不包含 json
         globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2}'],
-        // 忽略不需要的文件
-        globIgnores: [
-          '**/node_modules/**/*',
-          'sw.js',
-          'workbox-*.js'
-        ],
+        globIgnores: ['**/node_modules/**/*', 'sw.js', 'workbox-*.js'],
         maximumFileSizeToCacheInBytes: 3000000,
         runtimeCaching: [
           {
