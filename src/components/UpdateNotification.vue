@@ -24,6 +24,9 @@
               <p class="text-sm text-ios-gray dark:text-dark-secondary mt-1">
                 点击"立即更新"开始下载最新版本
               </p>
+              <p v-if="newVersion" class="text-xs text-ios-blue mt-1">
+                版本: {{ newVersion }}
+              </p>
             </div>
             <button
               @click="showUpdate = false"
@@ -64,52 +67,141 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted } from 'react'
+import { ref, onMounted, onUnmounted } from 'vue'
 import { ArrowPathIcon, XMarkIcon } from '@heroicons/vue/24/outline'
 import { platform } from '@/utils/platform'
+import { useToastStore } from '@/stores/toast'
 
+const toastStore = useToastStore()
 const showUpdate = ref(false)
 const downloadProgress = ref(0)
+const newVersion = ref('')
 
 // 监听更新事件
 let cleanupFns: (() => void)[] = []
 
-const checkForUpdates = () => {
-  // Electron平台使用自动更新
+// ============================================
+// 检查更新（Web端）
+// ============================================
+const checkWebUpdate = async () => {
+  try {
+    // 检查 Service Worker 是否有更新
+    if ('serviceWorker' in navigator) {
+      const registration = await navigator.serviceWorker.getRegistration()
+      if (registration) {
+        await registration.update()
+        // 检查是否有等待中的 worker
+        if (registration.waiting) {
+          showUpdate.value = true
+          newVersion.value = '最新版本'
+        }
+      }
+    }
+    
+    // 检查 PWA manifest 更新
+    const manifestUrl = '/manifest.json'
+    try {
+      const response = await fetch(manifestUrl, { cache: 'no-store' })
+      const manifest = await response.json()
+      if (manifest.version) {
+        // 与本地版本比较
+        const localVersion = localStorage.getItem('app-version') || '2.0.0'
+        if (manifest.version !== localVersion) {
+          newVersion.value = manifest.version
+          showUpdate.value = true
+        }
+      }
+    } catch (e) {
+      // 忽略
+    }
+  } catch (error) {
+    console.error('检查更新失败:', error)
+  }
+}
+
+// ============================================
+// Electron 更新监听
+// ============================================
+const setupElectronUpdate = () => {
   if (platform.isDesktop() && window.electronAPI) {
     const unsubAvailable = window.electronAPI.onUpdateAvailable(() => {
       showUpdate.value = true
+      newVersion.value = '最新版本'
     })
+    
     const unsubDownloaded = window.electronAPI.onUpdateDownloaded(() => {
       showUpdate.value = true
       downloadProgress.value = 100
     })
+    
     const unsubError = window.electronAPI.onUpdateError((error) => {
       console.error('更新错误:', error)
+      toastStore.showError('检查更新失败: ' + error)
     })
+    
     cleanupFns.push(unsubAvailable, unsubDownloaded, unsubError)
   }
 }
 
+// ============================================
+// 执行更新
+// ============================================
 const updateNow = () => {
   if (platform.isDesktop() && window.electronAPI) {
+    // Electron 更新
     window.electronAPI.installUpdate()
   } else if (platform.isMobile()) {
-    // Capacitor更新
-    // 使用 @capacitor/updater 插件
-    import('@capacitor/updater').then(({ Updater }) => {
-      Updater.downloadUpdate()
-        .then(() => {
-          showUpdate.value = false
-          Updater.reloadApp()
+    // Capacitor 更新 - 使用 App 插件检查版本
+    import('@capacitor/app').then(({ App }) => {
+      App.getInfo().then((info) => {
+        // 检查是否有新版本（通过API检查）
+        // 这里可以调用后端API获取最新版本号
+        toastStore.showInfo('正在检查更新...')
+        // 如果有更新，提示用户去应用商店更新
+        toastStore.showInfo('请前往应用商店更新')
+        showUpdate.value = false
+      })
+    }).catch(() => {
+      // Web 更新 - 刷新页面
+      if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.ready.then((registration) => {
+          if (registration.waiting) {
+            registration.waiting.postMessage({ type: 'SKIP_WAITING' })
+            window.location.reload()
+          }
         })
-        .catch(console.error)
+      }
     })
+  } else {
+    // Web 更新 - 刷新页面
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.ready.then((registration) => {
+        if (registration.waiting) {
+          registration.waiting.postMessage({ type: 'SKIP_WAITING' })
+          window.location.reload()
+        } else {
+          window.location.reload()
+        }
+      })
+    } else {
+      window.location.reload()
+    }
   }
 }
 
+// ============================================
+// 初始化
+// ============================================
 onMounted(() => {
-  checkForUpdates()
+  if (platform.isDesktop()) {
+    setupElectronUpdate()
+  } else {
+    // Web 端定期检查更新
+    checkWebUpdate()
+    // 每5分钟检查一次
+    const interval = setInterval(checkWebUpdate, 5 * 60 * 1000)
+    cleanupFns.push(() => clearInterval(interval))
+  }
 })
 
 onUnmounted(() => {
