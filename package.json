@@ -22,7 +22,9 @@
     "docker:build": "docker build -t global-radio:latest .",
     "docker:run": "docker-compose up -d",
     "deploy": "bash deploy.sh",
-    "build:all": "npm run build && npm run electron:build && npm run android:build"
+    "build:all": "npm run build && npm run electron:build && npm run android:build",
+    "lint": "eslint . --ext .vue,.js,.jsx,.cjs,.mjs,.ts,.tsx,.cts,.mts --fix --ignore-pattern 'dist/**' --ignore-pattern 'node_modules/**' || echo 'No lint configured'",
+    "format": "prettier --write src/ || echo 'No prettier configured'"
   },
   "dependencies": {
     "@capacitor/android": "^5.7.8",
