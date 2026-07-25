@@ -12,6 +12,7 @@ permissions:
 
 env:
   ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION: true
+  NODE_VERSION: '20'
 
 jobs:
   build-web:
@@ -22,22 +23,18 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
-          registry-url: 'https://registry.npmjs.org'
+          node-version: ${{ env.NODE_VERSION }}
+          # 移除 cache 配置，手动处理依赖安装
       
-      - name: Generate package-lock.json if missing
+      - name: Create package-lock.json if not exists
         run: |
           if [ ! -f package-lock.json ]; then
             echo "📦 package-lock.json 不存在，正在生成..."
-            # 先安装缺失的依赖，只生成 lock 文件
-            npm install --package-lock-only --legacy-peer-deps
-            echo "✅ package-lock.json 已生成"
-          else
-            echo "✅ package-lock.json 已存在"
+            npm install --package-lock-only
           fi
       
       - name: Cache npm dependencies
-        uses: actions/cache@v3
+        uses: actions/cache@v4
         with:
           path: ~/.npm
           key: ${{ runner.os }}-node-${{ hashFiles('package-lock.json') }}
@@ -45,7 +42,7 @@ jobs:
             ${{ runner.os }}-node-
       
       - name: Install dependencies
-        run: npm ci --legacy-peer-deps
+        run: npm ci
       
       - name: Build Web
         run: npm run build
@@ -82,19 +79,16 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
-          registry-url: 'https://registry.npmjs.org'
+          node-version: ${{ env.NODE_VERSION }}
       
-      - name: Generate package-lock.json if missing
+      - name: Create package-lock.json if not exists
         run: |
           if [ ! -f package-lock.json ]; then
-            echo "📦 package-lock.json 不存在，正在生成..."
-            npm install --package-lock-only --legacy-peer-deps
-            echo "✅ package-lock.json 已生成"
+            npm install --package-lock-only
           fi
       
       - name: Cache npm dependencies
-        uses: actions/cache@v3
+        uses: actions/cache@v4
         with:
           path: ~/.npm
           key: ${{ runner.os }}-node-${{ hashFiles('package-lock.json') }}
@@ -102,7 +96,7 @@ jobs:
             ${{ runner.os }}-node-
       
       - name: Install dependencies
-        run: npm ci --legacy-peer-deps
+        run: npm ci
       
       - name: Build Electron
         run: npm run electron:build
@@ -131,24 +125,24 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
-          registry-url: 'https://registry.npmjs.org'
+          node-version: ${{ env.NODE_VERSION }}
       
-      - name: Generate package-lock.json if missing
+      - name: Create package-lock.json if not exists
         run: |
           if [ ! -f package-lock.json ]; then
-            echo "📦 package-lock.json 不存在，正在生成..."
-            npm install --package-lock-only --legacy-peer-deps
-            echo "✅ package-lock.json 已生成"
+            npm install --package-lock-only
           fi
       
       - name: Cache npm dependencies
-        uses: actions/cache@v3
+        uses: actions/cache@v4
         with:
           path: ~/.npm
           key: ${{ runner.os }}-node-${{ hashFiles('package-lock.json') }}
           restore-keys: |
             ${{ runner.os }}-node-
+      
+      - name: Install dependencies
+        run: npm ci
       
       - name: Setup Java
         uses: actions/setup-java@v4
@@ -158,9 +152,6 @@ jobs:
       
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
-      
-      - name: Install dependencies
-        run: npm ci --legacy-peer-deps
       
       - name: Build Android
         run: npm run build:android
@@ -227,7 +218,7 @@ jobs:
       - name: List artifacts
         run: |
           echo "📦 下载的构建产物:"
-          find artifacts/ -type f \( -name "*.AppImage" -o -name "*.exe" -o -name "*.dmg" -o -name "*.apk" \) | sort || echo "没有找到构建产物"
+          find artifacts/ -type f \( -name "*.AppImage" -o -name "*.exe" -o -name "*.dmg" -o -name "*.apk" \) | sort || echo "没有找到产物"
       
       - name: Get version from tag
         id: get_version
@@ -241,10 +232,10 @@ jobs:
           name: v${{ steps.get_version.outputs.version }}
           tag_name: ${{ github.ref_name }}
           files: |
-            artifacts/electron-linux/*.AppImage
-            artifacts/electron-windows/*.exe
-            artifacts/electron-macos/*.dmg
-            artifacts/android-apk/*.apk
+            artifacts/electron-linux/*.AppImage || true
+            artifacts/electron-windows/*.exe || true
+            artifacts/electron-macos/*.dmg || true
+            artifacts/android-apk/*.apk || true
           draft: false
           prerelease: false
           generate_release_notes: true
