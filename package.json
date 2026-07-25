@@ -6,27 +6,27 @@
   "author": "GlobalRadio",
   "license": "MIT",
   "type": "module",
+  {
   "scripts": {
     "dev": "vite",
-    "build": "vite build",
-    "build:clean": "rm -rf dist && vite build",
+    "build": "vue-tsc && vite build",
     "preview": "vite preview",
-    "electron:dev": "vite build && electron .",
-    "electron:build": "vite build && electron-builder",
-    "electron:build:win": "vite build && electron-builder --win",
-    "electron:build:mac": "vite build && electron-builder --mac",
-    "electron:build:linux": "vite build && electron-builder --linux",
+    "electron:dev": "NODE_ENV=development electron .",
+    "electron:build": "npm run build && electron-builder",
+    "electron:build:win": "npm run build && electron-builder --win --x64",
+    "electron:build:mac": "npm run build && electron-builder --mac",
+    "electron:build:linux": "npm run build && electron-builder --linux",
     "android:sync": "npx cap sync android",
     "android:open": "npx cap open android",
-    "android:build": "vite build && npx cap sync android && cd android && ./gradlew assembleRelease",
-    "android:debug": "vite build && npx cap sync android && cd android && ./gradlew assembleDebug",
+    "android:build": "npm run build && npx cap sync android && cd android && chmod +x gradlew && ./gradlew assembleRelease --no-daemon",
+    "android:debug": "npm run build && npx cap sync android && cd android && chmod +x gradlew && ./gradlew assembleDebug --no-daemon",
     "docker:build": "docker build -t global-radio:latest .",
+    "docker:push": "docker tag global-radio:latest superneed/global-radio:latest && docker push superneed/global-radio:latest",
     "docker:run": "docker-compose up -d",
     "deploy": "bash deploy.sh",
-    "build:all": "vite build && npm run electron:build && npm run android:build",
-    "clean": "rm -rf dist node_modules",
-    "clean:cache": "npm cache clean --force"
-  },
+    "build:all": "npm run build && npm run electron:build && npm run android:build"
+  }
+}
   "dependencies": {
     "@capacitor/android": "^5.7.8",
     "@capacitor/core": "^5.7.8",
