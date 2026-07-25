@@ -3,11 +3,19 @@ import { API_CONFIG } from '@/config/api.config'
 import type { 
   RadioStation, 
   RadioSearchParams, 
-  ApiResponse, 
   Country, 
   Language, 
   Tag 
 } from '@/types/radio'
+
+// ============================================
+// 重试配置
+// ============================================
+const RETRY_CONFIG = {
+  maxRetries: 3,
+  retryDelay: 1000,
+  backoffFactor: 2
+}
 
 class RadioAPI {
   private instance: AxiosInstance
@@ -15,58 +23,122 @@ class RadioAPI {
   private cacheTTL = API_CONFIG.radioBrowser.cacheTTL
   private currentProvider = API_CONFIG.radioBrowser.baseURL
   private isInitialized = false
+  private initPromise: Promise<void> | null = null
+  private isRetrying = false
 
   constructor() {
-    this.instance = axios.create({
-      baseURL: this.currentProvider,
+    this.instance = this.createInstance(this.currentProvider)
+    this.initPromise = this.initialize()
+  }
+
+  // ============================================
+  // 创建axios实例
+  // ============================================
+  private createInstance(baseURL: string): AxiosInstance {
+    const instance = axios.create({
+      baseURL,
       timeout: API_CONFIG.radioBrowser.timeout,
       headers: {
         'User-Agent': 'GlobalRadio/2.0',
-        'Accept': 'application/json'
+        'Accept': 'application/json',
+        'Accept-Encoding': 'gzip, deflate'
       }
     })
-    this.initialize()
+
+    // 请求拦截器
+    instance.interceptors.request.use(
+      (config) => {
+        // 添加请求时间戳防止缓存
+        config.params = {
+          ...config.params,
+          _t: Date.now()
+        }
+        return config
+      },
+      (error) => Promise.reject(error)
+    )
+
+    // 响应拦截器
+    instance.interceptors.response.use(
+      (response) => response,
+      (error) => {
+        // 网络错误重试
+        if (error.code === 'ECONNABORTED' || error.code === 'ERR_NETWORK') {
+          return this.handleRetry(error.config)
+        }
+        return Promise.reject(error)
+      }
+    )
+
+    return instance
   }
 
-  private async initialize() {
+  // ============================================
+  // 重试逻辑
+  // ============================================
+  private async handleRetry(config: any): Promise<any> {
+    if (!config || this.isRetrying) return Promise.reject(new Error('Network error'))
+    
+    this.isRetrying = true
+    const retryCount = config.__retryCount || 0
+    
+    if (retryCount >= RETRY_CONFIG.maxRetries) {
+      this.isRetrying = false
+      return Promise.reject(new Error(`Max retries (${RETRY_CONFIG.maxRetries}) exceeded`))
+    }
+    
+    config.__retryCount = retryCount + 1
+    
+    const delay = RETRY_CONFIG.retryDelay * Math.pow(RETRY_CONFIG.backoffFactor, retryCount)
+    await new Promise(resolve => setTimeout(resolve, delay))
+    
+    this.isRetrying = false
+    return this.instance.request(config)
+  }
+
+  // ============================================
+  // 初始化API
+  // ============================================
+  private async initialize(): Promise<void> {
+    if (this.isInitialized) return
+
     try {
-      await this.testConnection()
-      this.isInitialized = true
-      console.log('✅ Radio API 初始化成功')
-    } catch (error) {
+      const connected = await this.testConnection(this.currentProvider)
+      if (connected) {
+        this.isInitialized = true
+        console.log('✅ Radio API 初始化成功')
+        return
+      }
+      
       console.warn('⚠️ 主API不可用，尝试备用...')
       await this.tryFallbackProviders()
+    } catch (error) {
+      console.error('❌ API初始化失败:', error)
+      this.isInitialized = true // 标记为已初始化避免无限重试
     }
   }
 
-  private async testConnection(): Promise<boolean> {
+  private async testConnection(baseURL: string): Promise<boolean> {
     try {
-      await this.instance.get('/json/stats')
+      const testInstance = this.createInstance(baseURL)
+      await testInstance.get('/json/stats', { timeout: 5000 })
       return true
     } catch {
       return false
     }
   }
 
-  private async tryFallbackProviders() {
+  private async tryFallbackProviders(): Promise<void> {
     for (const provider of API_CONFIG.fallbackProviders) {
       try {
-        const testInstance = axios.create({
-          baseURL: provider,
-          timeout: 5000
-        })
-        await testInstance.get('/json/stats')
-        this.currentProvider = provider
-        this.instance = axios.create({
-          baseURL: provider,
-          timeout: API_CONFIG.radioBrowser.timeout,
-          headers: {
-            'User-Agent': 'GlobalRadio/2.0'
-          }
-        })
-        console.log(`✅ 切换至备用API: ${provider}`)
-        this.isInitialized = true
-        return
+        const connected = await this.testConnection(provider)
+        if (connected) {
+          this.currentProvider = provider
+          this.instance = this.createInstance(provider)
+          console.log(`✅ 切换至备用API: ${provider}`)
+          this.isInitialized = true
+          return
+        }
       } catch {
         continue
       }
@@ -74,6 +146,9 @@ class RadioAPI {
     console.error('❌ 所有API提供商均不可用')
   }
 
+  // ============================================
+  // 缓存管理
+  // ============================================
   private getCacheKey(params: any): string {
     return JSON.stringify(params)
   }
@@ -88,16 +163,21 @@ class RadioAPI {
 
   private setCache(key: string, data: any): void {
     this.cache.set(key, { data, timestamp: Date.now() })
-    // 缓存限制
-    if (this.cache.size > 100) {
+    
+    // LRU缓存清理
+    if (this.cache.size > API_CONFIG.cacheMaxSize) {
       const keys = Array.from(this.cache.keys())
-      const toRemove = keys.slice(0, 20)
+      const toRemove = keys.slice(0, Math.floor(keys.length * 0.2))
       toRemove.forEach(k => this.cache.delete(k))
     }
   }
 
-  // 搜索电台
+  // ============================================
+  // API方法
+  // ============================================
   async searchStations(params: RadioSearchParams): Promise<RadioStation[]> {
+    await this.initPromise
+    
     const cacheKey = this.getCacheKey({ ...params, action: 'search' })
     const cached = this.getFromCache<RadioStation[]>(cacheKey)
     if (cached) return cached
@@ -109,12 +189,14 @@ class RadioAPI {
       return data
     } catch (error) {
       console.error('搜索电台失败:', error)
+      // 返回空数组而不是抛出异常
       return []
     }
   }
 
-  // 获取热门电台
   async getTopStations(limit: number = 50): Promise<RadioStation[]> {
+    await this.initPromise
+    
     const cacheKey = `top_${limit}`
     const cached = this.getFromCache<RadioStation[]>(cacheKey)
     if (cached) return cached
@@ -132,8 +214,9 @@ class RadioAPI {
     }
   }
 
-  // 获取最新电台
   async getLatestStations(limit: number = 50): Promise<RadioStation[]> {
+    await this.initPromise
+    
     const cacheKey = `latest_${limit}`
     const cached = this.getFromCache<RadioStation[]>(cacheKey)
     if (cached) return cached
@@ -151,8 +234,9 @@ class RadioAPI {
     }
   }
 
-  // 获取随机电台
   async getRandomStations(limit: number = 50): Promise<RadioStation[]> {
+    await this.initPromise
+    
     const cacheKey = `random_${limit}`
     const cached = this.getFromCache<RadioStation[]>(cacheKey)
     if (cached) return cached
@@ -170,8 +254,9 @@ class RadioAPI {
     }
   }
 
-  // 按国家获取电台
   async getStationsByCountry(countryCode: string, limit: number = 50): Promise<RadioStation[]> {
+    await this.initPromise
+    
     try {
       const response = await this.instance.get(
         `${API_CONFIG.radioBrowser.endpoints.byCountry}/${countryCode}`,
@@ -184,8 +269,9 @@ class RadioAPI {
     }
   }
 
-  // 按标签获取电台
   async getStationsByTag(tag: string, limit: number = 50): Promise<RadioStation[]> {
+    await this.initPromise
+    
     try {
       const response = await this.instance.get(
         `${API_CONFIG.radioBrowser.endpoints.byTag}/${tag}`,
@@ -198,8 +284,9 @@ class RadioAPI {
     }
   }
 
-  // 获取国家列表
   async getCountries(): Promise<Country[]> {
+    await this.initPromise
+    
     const cacheKey = 'countries'
     const cached = this.getFromCache<Country[]>(cacheKey)
     if (cached) return cached
@@ -215,8 +302,9 @@ class RadioAPI {
     }
   }
 
-  // 获取语言列表
   async getLanguages(): Promise<Language[]> {
+    await this.initPromise
+    
     const cacheKey = 'languages'
     const cached = this.getFromCache<Language[]>(cacheKey)
     if (cached) return cached
@@ -232,8 +320,9 @@ class RadioAPI {
     }
   }
 
-  // 获取标签列表
   async getTags(): Promise<Tag[]> {
+    await this.initPromise
+    
     const cacheKey = 'tags'
     const cached = this.getFromCache<Tag[]>(cacheKey)
     if (cached) return cached
@@ -251,8 +340,9 @@ class RadioAPI {
     }
   }
 
-  // 根据UUID获取单个电台
   async getStationByUUID(uuid: string): Promise<RadioStation | null> {
+    await this.initPromise
+    
     try {
       const response = await this.instance.get(`/json/stations/byuuid/${uuid}`)
       return response.data.length > 0 ? response.data[0] : null
@@ -262,27 +352,26 @@ class RadioAPI {
     }
   }
 
-  // 记录点击
   async recordClick(stationUuid: string): Promise<void> {
     try {
       await this.instance.get(`/json/url/${stationUuid}`)
     } catch (error) {
-      // 静默失败
+      // 静默失败，不影响主流程
     }
   }
 
-  // 投票
   async voteForStation(stationUuid: string): Promise<boolean> {
     try {
       const response = await this.instance.get(`/json/vote/${stationUuid}`)
       return response.data.ok === 'true'
-    } catch (error) {
+    } catch {
       return false
     }
   }
 
-  // 获取API状态
   async getAPIStatus(): Promise<any> {
+    await this.initPromise
+    
     try {
       const response = await this.instance.get(API_CONFIG.radioBrowser.endpoints.stats)
       return {
@@ -298,10 +387,15 @@ class RadioAPI {
     }
   }
 
-  // 清除缓存
   clearCache(): void {
     this.cache.clear()
   }
+
+  // 等待初始化完成
+  async waitForInit(): Promise<void> {
+    await this.initPromise
+  }
 }
 
+// 导出单例
 export const radioAPI = new RadioAPI()
