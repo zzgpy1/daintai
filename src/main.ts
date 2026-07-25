@@ -1,4 +1,3 @@
-// src/main.ts
 import { createApp } from 'vue'
 import { createPinia } from 'pinia'
 import { createI18n } from 'vue-i18n'
@@ -6,16 +5,11 @@ import router from './router'
 import App from './App.vue'
 import './style.css'
 
-// ============================================
-// 导入语言包 - 只导入已存在的文件
-// 注意：如果后续需要添加其他语言，请先在 locales 目录下创建对应的 json 文件
-// ============================================
+// 导入语言包（仅使用 zh 和 en）
 import zh from './locales/zh.json'
 import en from './locales/en.json'
 
-// ============================================
 // 创建i18n实例
-// ============================================
 const i18n = createI18n({
   legacy: false,
   locale: localStorage.getItem('language') || 'zh',
@@ -38,16 +32,20 @@ app.use(i18n)
 // ============================================
 app.config.errorHandler = (err, instance, info) => {
   console.error('❌ 全局错误:', err)
+  console.error('组件:', instance)
+  console.error('信息:', info)
+  
   if (import.meta.env.DEV) {
-    console.error('组件:', instance)
-    console.error('信息:', info)
     console.error('详细错误栈:', (err as Error).stack)
+  }
+  
+  if (import.meta.env.PROD) {
+    // 可以集成错误上报服务
+    // reportError(err, instance, info)
   }
 }
 
-// ============================================
 // 未捕获的Promise错误处理
-// ============================================
 window.addEventListener('unhandledrejection', (event) => {
   console.error('❌ 未处理的Promise拒绝:', event.reason)
   event.preventDefault()
@@ -65,6 +63,26 @@ window.addEventListener('offline', () => {
   console.warn('⚠️ 网络已断开')
   window.dispatchEvent(new CustomEvent('network-offline'))
 })
+
+// ============================================
+// 性能监测
+// ============================================
+if (import.meta.env.DEV) {
+  if ('PerformanceObserver' in window) {
+    try {
+      const observer = new PerformanceObserver((list) => {
+        for (const entry of list.getEntries()) {
+          if (entry.duration > 50) {
+            console.warn('⚠️ 长任务检测:', entry)
+          }
+        }
+      })
+      observer.observe({ entryTypes: ['longtask'] })
+    } catch (e) {
+      // 忽略不支持的情况
+    }
+  }
+}
 
 // ============================================
 // 挂载应用
