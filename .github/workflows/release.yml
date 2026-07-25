@@ -20,18 +20,30 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 18
+          # 不强制要求 lock 文件
           cache: 'npm'
-          # 如果找不到 lock 文件，不会报错
           cache-dependency-path: '**/package-lock.json'
+      
+      - name: Check for lock file
+        id: check-lock
+        run: |
+          if [ -f package-lock.json ]; then
+            echo "has_lock=true" >> $GITHUB_OUTPUT
+            echo "✅ package-lock.json found"
+          else
+            echo "has_lock=false" >> $GITHUB_OUTPUT
+            echo "⚠️ package-lock.json not found, will generate it"
+          fi
       
       - name: Install dependencies
         run: |
-          # 如果存在 package-lock.json 则使用 npm ci，否则使用 npm install
           if [ -f package-lock.json ]; then
+            echo "📦 Using npm ci with lock file"
             npm ci
           else
+            echo "📦 Using npm install (no lock file)"
             npm install
-            # 生成 package-lock.json 以便后续缓存
+            # 生成 lock 文件供后续使用
             npm install --package-lock-only
           fi
       
