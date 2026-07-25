@@ -24,7 +24,13 @@ export default defineConfig({
         ]
       },
       workbox: {
-        globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2}'],
+        // 修正 globPattern 确保匹配实际文件
+        globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2,json}'],
+        globIgnores: [
+          '**/node_modules/**/*',
+          'sw.js',
+          'workbox-*.js'
+        ],
         runtimeCaching: [
           {
             urlPattern: /^https:\/\/.*\.radio-browser\.info\/.*/i,
@@ -37,7 +43,9 @@ export default defineConfig({
               }
             }
           }
-        ]
+        ],
+        // 清理过期的缓存
+        cleanupOutdatedCaches: true
       }
     })
   ],
