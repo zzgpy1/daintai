@@ -100,16 +100,6 @@
           <span class="text-sm text-ios-gray dark:text-dark-secondary">
             {{ $t('search.results') }}: {{ filteredStations.length }} {{ $t('search.stations') }}
           </span>
-          <select
-            v-model="sortOrder"
-            class="px-2 py-1 text-sm bg-gray-100 dark:bg-dark-gray rounded-ios border-none focus:ring-2 focus:ring-ios-blue"
-            @change="sortStations"
-          >
-            <option value="name">{{ $t('browse.sortByName') }}</option>
-            <option value="country">{{ $t('browse.sortByCountry') }}</option>
-            <option value="votes">{{ $t('browse.sortByVotes') }}</option>
-            <option value="random">{{ $t('browse.sortByRandom') }}</option>
-          </select>
         </div>
         
         <StationCard
@@ -148,7 +138,7 @@
         </div>
       </div>
       
-      <!-- 初始状态 - 显示热门搜索 -->
+      <!-- 初始状态 -->
       <div v-else class="space-y-6">
         <!-- 热门搜索 -->
         <div>
@@ -201,9 +191,8 @@ import { useRouter } from 'vue-router'
 import { useRadioStore } from '@/stores/radio'
 import { usePlayerStore } from '@/stores/player'
 import { useFavoritesStore } from '@/stores/favorites'
-import { useLanguageStore } from '@/stores/language'
-import { useToastStore } from '@/stores/toast'
 import type { RadioStation } from '@/types/radio'
+import { QUICK_FILTERS, POPULAR_SEARCHES } from '@/utils/constants'
 
 import {
   ArrowLeftIcon,
@@ -219,36 +208,27 @@ const router = useRouter()
 const radioStore = useRadioStore()
 const playerStore = usePlayerStore()
 const favoritesStore = useFavoritesStore()
-const languageStore = useLanguageStore()
-const toastStore = useToastStore()
 
 // 状态
 const searchQuery = ref('')
 const selectedCountry = ref('')
 const selectedLanguage = ref('')
-const sortOrder = ref('random')
 const searched = ref(false)
 const isLoadingMore = ref(false)
 const isShareModalVisible = ref(false)
 const stationToShare = ref<RadioStation | null>(null)
 const activeFilter = ref('')
 
-// 快速筛选
-const quickFilters = [
-  { key: 'music', label: languageStore.t('search.music') },
-  { key: 'news', label: languageStore.t('search.news') },
-  { key: 'talk', label: languageStore.t('search.talk') },
-  { key: 'sport', label: languageStore.t('search.sport') }
-]
-
-// 热门搜索
-const popularSearches = ['BBC', 'NPR', '中国之声', 'Music', 'News', 'Radio']
+// 使用常量
+const quickFilters = QUICK_FILTERS
+const popularSearches = POPULAR_SEARCHES
 
 // 数据
 const isLoading = computed(() => radioStore.isLoadingStations)
 const filteredStations = computed(() => radioStore.filteredStations)
 const hasMore = computed(() => radioStore.hasMore)
 
+// 使用 computed 获取响应式数据
 const countries = computed(() => radioStore.countries)
 const languages = computed(() => radioStore.languages)
 const tags = computed(() => radioStore.tags)
@@ -287,10 +267,6 @@ const resetFilters = () => {
   activeFilter.value = ''
   radioStore.resetSearch()
   searched.value = false
-}
-
-const sortStations = () => {
-  // 排序逻辑
 }
 
 const loadMore = async () => {
