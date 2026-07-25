@@ -53,17 +53,10 @@ const settingsStore = useSettingsStore()
 const isOpen = ref(false)
 const dropdownRef = ref<HTMLElement | null>(null)
 
+// 仅保留中文和英文
 const languages = [
   { code: 'zh', name: '中文', flag: '🇨🇳' },
-  { code: 'en', name: 'English', flag: '🇬🇧' },
-  { code: 'es', name: 'Español', flag: '🇪🇸' },
-  { code: 'fr', name: 'Français', flag: '🇫🇷' },
-  { code: 'de', name: 'Deutsch', flag: '🇩🇪' },
-  { code: 'ja', name: '日本語', flag: '🇯🇵' },
-  { code: 'ko', name: '한국어', flag: '🇰🇷' },
-  { code: 'ru', name: 'Русский', flag: '🇷🇺' },
-  { code: 'ar', name: 'العربية', flag: '🇸🇦' },
-  { code: 'pt', name: 'Português', flag: '🇵🇹' }
+  { code: 'en', name: 'English', flag: '🇬🇧' }
 ]
 
 const currentLanguage = computed(() => settingsStore.language)
