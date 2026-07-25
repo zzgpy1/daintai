@@ -1,6 +1,6 @@
 // src/utils/iconGenerator.ts
 
-// 颜色组合
+// 预定义的颜色组合
 const colorCombinations = [
   { bg: '#FF6B6B', text: '#FFFFFF' },
   { bg: '#4ECDC4', text: '#FFFFFF' },
@@ -20,7 +20,7 @@ const colorCombinations = [
   { bg: '#F9E79F', text: '#2D3436' }
 ]
 
-// 字符串哈希
+// 获取字符串哈希值
 function getStringHash(str: string): number {
   let hash = 0
   for (let i = 0; i < str.length; i++) {
@@ -40,7 +40,7 @@ function getFirstLetter(name: string): string {
   return firstChar
 }
 
-// 生成电台图标
+// 生成电台图标数据
 export function generateStationIcon(stationName: string) {
   const hash = getStringHash(stationName)
   const colorIndex = hash % colorCombinations.length
@@ -69,15 +69,19 @@ export function generateIconDataUrl(stationName: string): string {
   return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`
 }
 
-// 生成简单的文本图标（当不需要SVG时）
+// 生成简单的文本图标
 export function generateSimpleIcon(letter: string, bgColor?: string): string {
   const bg = bgColor || '#3B82F6'
-  return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(`
+  const char = letter || '?'
+  
+  const svg = `
     <svg width="64" height="64" xmlns="http://www.w3.org/2000/svg">
       <rect width="64" height="64" fill="${bg}" rx="12"/>
       <text x="32" y="42" font-family="system-ui, -apple-system, sans-serif" 
             font-size="28" font-weight="600" text-anchor="middle" 
-            fill="white">${letter || '?'}</text>
+            fill="white">${char}</text>
     </svg>
-  `)}`
+  `
+  
+  return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`
 }
