@@ -1,3 +1,4 @@
+// src/main.ts
 import { createApp } from 'vue'
 import { createPinia } from 'pinia'
 import { createI18n } from 'vue-i18n'
@@ -44,7 +45,9 @@ app.config.errorHandler = (err, instance, info) => {
   }
 }
 
+// ============================================
 // 未捕获的Promise错误处理
+// ============================================
 window.addEventListener('unhandledrejection', (event) => {
   console.error('❌ 未处理的Promise拒绝:', event.reason)
   event.preventDefault()
