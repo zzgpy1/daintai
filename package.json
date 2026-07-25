@@ -9,6 +9,7 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
+    "build:lock": "npm install --package-lock-only",
     "preview": "vite preview",
     "electron:dev": "npm run build && electron .",
     "electron:build": "npm run build && electron-builder",
@@ -23,8 +24,9 @@
     "docker:run": "docker-compose up -d",
     "deploy": "bash deploy.sh",
     "build:all": "npm run build && npm run electron:build && npm run android:build",
-    "lint": "eslint . --ext .vue,.js,.jsx,.cjs,.mjs,.ts,.tsx,.cts,.mts --fix --ignore-pattern 'dist/**' --ignore-pattern 'node_modules/**' || echo 'No lint configured'",
-    "format": "prettier --write src/ || echo 'No prettier configured'"
+    "lint": "eslint . --ext .vue,.js,.jsx,.cjs,.mjs,.ts,.tsx,.cts,.mts --fix || echo 'No eslint config found'",
+    "format": "prettier --write src/ || echo 'No prettier config found'",
+    "test": "echo 'No tests configured yet'"
   },
   "dependencies": {
     "@capacitor/android": "^5.7.8",
@@ -66,16 +68,25 @@
       "electron/**/*"
     ],
     "win": {
-      "target": ["nsis", "portable"],
+      "target": [
+        "nsis",
+        "portable"
+      ],
       "icon": "public/icon.ico"
     },
     "mac": {
-      "target": ["dmg", "zip"],
+      "target": [
+        "dmg",
+        "zip"
+      ],
       "icon": "public/icon.icns",
       "category": "public.app-category.music"
     },
     "linux": {
-      "target": ["AppImage", "deb"],
+      "target": [
+        "AppImage",
+        "deb"
+      ],
       "icon": "public/icon.png",
       "category": "AudioVideo"
     },
@@ -85,5 +96,8 @@
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true
     }
+  },
+  "optionalDependencies": {
+    "@capacitor/cli": "^5.7.8"
   }
 }
