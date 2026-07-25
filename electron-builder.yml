@@ -8,11 +8,24 @@ files:
   - dist/**/*
   - electron/**/*
 
+# 关键配置：确保所有资源被打包
+extraResources:
+  - from: dist/
+    to: dist/
+    filter:
+      - '**/*'
+
 win:
   target:
-    - nsis
-    - portable
+    - target: nsis
+      arch:
+        - x64
+    - target: portable
+      arch:
+        - x64
   icon: public/icon.ico
+  publisherName: GlobalRadio
+  artifactName: ${productName}-${version}-win.${ext}
 
 mac:
   target:
@@ -20,6 +33,9 @@ mac:
     - zip
   icon: public/icon.icns
   category: public.app-category.music
+  artifactName: ${productName}-${version}-mac.${ext}
+  hardenedRuntime: true
+  gatekeeperAssess: false
 
 linux:
   target:
@@ -27,9 +43,31 @@ linux:
     - deb
   icon: public/icon.png
   category: AudioVideo
+  artifactName: ${productName}-${version}-linux.${ext}
 
 nsis:
   oneClick: false
   allowToChangeInstallationDirectory: true
   createDesktopShortcut: true
   createStartMenuShortcut: true
+  shortcutName: 全球电台
+  installerIcon: public/icon.ico
+  uninstallerIcon: public/icon.ico
+  license: LICENSE
+  artifactName: ${productName}-${version}-setup.${ext}
+
+portable:
+  artifactName: ${productName}-${version}-portable.${ext}
+
+dmg:
+  contents:
+    - x: 110
+      y: 150
+    - x: 240
+      y: 150
+      type: link
+      path: /Applications
+
+publish:
+  - provider: github
+    releaseType: release
