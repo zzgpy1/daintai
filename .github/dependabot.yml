@@ -1,0 +1,11 @@
+# .github/dependabot.yml
+version: 2
+updates:
+  - package-ecosystem: "npm"
+    directory: "/"
+    schedule:
+      interval: "daily"
+    # 添加以下配置，让 Dependabot 在更新时忽略 package-lock.json
+    versioning-strategy: "lockfile-only"  # 或者设置为 'increase' 等
+    # 更彻底的方案是使用以下命令，但请注意这可能会增加 PR 的变动
+    # 命令: "npm install --package-lock-only --ignore-scripts"
