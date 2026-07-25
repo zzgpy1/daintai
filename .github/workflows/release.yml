@@ -101,47 +101,67 @@ jobs:
       - name: Sync Capacitor
         run: npx cap sync android
 
-      - name: Fix Gradle version
+      - name: Verify Capacitor sync
         run: |
-          cd android
-          # 修改 gradle-wrapper.properties 使用兼容版本
-          if [ -f "gradle/wrapper/gradle-wrapper.properties" ]; then
-            sed -i 's/gradle-9.*-all.zip/gradle-8.0.2-all.zip/g' gradle/wrapper/gradle-wrapper.properties
-            sed -i 's/gradle-8.*-all.zip/gradle-8.0.2-all.zip/g' gradle/wrapper/gradle-wrapper.properties
-          fi
-          cat gradle/wrapper/gradle-wrapper.properties || echo "File not found"
+          echo "Checking android directory after sync:"
+          ls -la android/
+          ls -la android/app/ || echo "app directory not found"
 
-      - name: Generate Gradle Wrapper
+      - name: Setup Gradle Wrapper
         run: |
           cd android
+          
+          # 如果 gradlew 不存在，创建它
           if [ ! -f "gradlew" ]; then
-            echo "⚠️ gradlew not found, generating with Gradle 8.0.2..."
-            # 使用 Gradle 8.0.2 生成 wrapper
-            curl -L -o gradle-wrapper.zip https://github.com/gradle/gradle/archive/refs/tags/v8.0.2.zip
-            unzip -o gradle-wrapper.zip
-            cp -r gradle-8.0.2/gradle gradle-8.0.2/gradlew gradle-8.0.2/gradlew.bat ./
-            rm -rf gradle-8.0.2 gradle-wrapper.zip
+            echo "📦 Creating gradle wrapper..."
+            # 下载 gradle-wrapper.jar
+            mkdir -p gradle/wrapper
+            curl -L -o gradle/wrapper/gradle-wrapper.jar https://raw.githubusercontent.com/gradle/gradle/v8.0.2/gradle/wrapper/gradle-wrapper.jar
+            # 创建 gradle-wrapper.properties
+            cat > gradle/wrapper/gradle-wrapper.properties << 'EOF'
+distributionBase=GRADLE_USER_HOME
+distributionPath=wrapper/dists
+distributionUrl=https\://services.gradle.org/distributions/gradle-8.0.2-all.zip
+zipStoreBase=GRADLE_USER_HOME
+zipStorePath=wrapper/dists
+EOF
+            # 创建 gradlew 脚本
+            cat > gradlew << 'EOF'
+#!/bin/sh
+exec java -cp "$(dirname "$0")/gradle/wrapper/gradle-wrapper.jar" org.gradle.wrapper.GradleWrapperMain "$@"
+EOF
             chmod +x gradlew
+            echo "✅ Gradle wrapper created"
           else
-            echo "✅ gradlew found"
+            echo "✅ gradlew already exists"
             chmod +x gradlew
           fi
-          # 确保使用 Gradle 8.0.2
-          ./gradlew --version
+          
+          # 显示 gradle 版本
+          ./gradlew --version || echo "Gradle wrapper check failed"
 
       - name: Build Android APK
         run: |
           cd android
           chmod +x gradlew
-          # 使用 --warning-mode all 查看详细错误
-          ./gradlew assembleRelease --warning-mode all
+          # 使用具体任务，避免 assembleRelease 依赖问题
+          ./gradlew :app:assembleRelease --stacktrace
         continue-on-error: true
 
       - name: Check APK output
         run: |
-          echo "Checking APK output..."
-          ls -la android/app/build/outputs/apk/release/ 2>/dev/null || echo "No APK found"
-          find android -name "*.apk" 2>/dev/null || echo "No APK files found"
+          echo "🔍 Checking APK output..."
+          find android -name "*.apk" 2>/dev/null | while read apk; do
+            echo "Found APK: $apk"
+            ls -la "$apk"
+          done
+          
+          # 如果找不到 APK，检查构建输出
+          if [ ! -f "android/app/build/outputs/apk/release/app-release.apk" ]; then
+            echo "⚠️ APK not found in expected location"
+            echo "Contents of build directory:"
+            find android/app/build -type f 2>/dev/null | head -20 || echo "Build directory not found"
+          fi
 
       - name: Upload Android APK
         uses: actions/upload-artifact@v4
@@ -153,6 +173,7 @@ jobs:
             android/**/*.apk
           retention-days: 7
           if-no-files-found: warn
+          compression-level: 0
 
   # ============ Windows 桌面应用构建 ============
   build-windows:
