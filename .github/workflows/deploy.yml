@@ -1,149 +1,55 @@
-name: Deploy
+name: 🚀 Deploy
 
 on:
   push:
     branches: [ main ]
   workflow_dispatch:
-    inputs:
-      environment:
-        description: '部署环境'
-        required: true
-        default: 'production'
-        type: choice
-        options:
-          - production
-          - staging
 
-# 关键：设置正确的权限
 permissions:
-  contents: write
+  contents: read
   pages: write
   id-token: write
-  deployments: write
 
 jobs:
   build:
-    name:  Build
+    name: 📦 Build
     runs-on: ubuntu-latest
     steps:
-    - name: Checkout code
+    - name: Checkout
       uses: actions/checkout@v4
-      with:
-        fetch-depth: 0
     
     - name: Setup Node.js
       uses: actions/setup-node@v4
       with:
         node-version: 20
     
-    - name: Clean install
+    - name: Install dependencies
       run: |
         npm cache clean --force
         rm -rf node_modules package-lock.json
         npm install --no-package-lock --legacy-peer-deps --no-audit --no-fund --ignore-scripts
     
-    - name: Build project
-      run: |
-        npx vite build
+    - name: Build
+      run: npx vite build
       env:
         NODE_OPTIONS: --max-old-space-size=4096
     
-    - name: Upload build artifacts
-      uses: actions/upload-artifact@v4
+    - name: Upload Pages artifact
+      uses: actions/upload-pages-artifact@v3
       with:
-        name: dist
         path: dist/
-        retention-days: 7
 
-  deploy-gh-pages:
-    name:  Deploy to GitHub Pages
+  deploy:
+    name: 🌐 Deploy to GitHub Pages
     runs-on: ubuntu-latest
     needs: build
     if: github.ref == 'refs/heads/main'
     
-    permissions:
-      contents: write
-      pages: write
-      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
     
     steps:
-    - name: Download build artifacts
-      uses: actions/download-artifact@v4
-      with:
-        name: dist
-        path: dist/
-    
-    # 方案1：使用 peaceiris/actions-gh-pages（需要配置个人访问令牌）
-    - name: Deploy to GitHub Pages (with PAT)
-      uses: peaceiris/actions-gh-pages@v3
-      with:
-        github_token: ${{ secrets.GITHUB_TOKEN }}
-        publish_dir: ./dist
-        publish_branch: gh-pages
-        force_orphan: true
-        user_name: 'github-actions[bot]'
-        user_email: 'github-actions[bot]@users.noreply.github.com'
-      continue-on-error: true
-
-    # 方案2：使用官方 actions/deploy-pages（推荐）
-    - name: Setup Pages
-      if: always()
-      uses: actions/configure-pages@v4
-    
-    - name: Upload Pages artifact
-      if: always()
-      uses: actions/upload-pages-artifact@v3
-      with:
-        path: dist/
-    
     - name: Deploy to GitHub Pages
-      if: always()
       id: deployment
       uses: actions/deploy-pages@v4
-
-  deploy-vercel:
-    name:  Deploy to Vercel
-    runs-on: ubuntu-latest
-    needs: build
-    if: secrets.VERCEL_TOKEN != '' && github.ref == 'refs/heads/main'
-    
-    steps:
-    - name: Download build artifacts
-      uses: actions/download-artifact@v4
-      with:
-        name: dist
-        path: dist/
-    
-    - name: Deploy to Vercel
-      uses: amondnet/vercel-action@v25
-      with:
-        vercel-token: ${{ secrets.VERCEL_TOKEN }}
-        vercel-org-id: ${{ secrets.VERCEL_ORG_ID }}
-        vercel-project-id: ${{ secrets.VERCEL_PROJECT_ID }}
-        vercel-args: '--prod'
-
-  deploy-netlify:
-    name: Deploy to Netlify
-    runs-on: ubuntu-latest
-    needs: build
-    if: secrets.NETLIFY_AUTH_TOKEN != '' && github.ref == 'refs/heads/main'
-    
-    steps:
-    - name: Download build artifacts
-      uses: actions/download-artifact@v4
-      with:
-        name: dist
-        path: dist/
-    
-    - name: Deploy to Netlify
-      uses: nwtgck/actions-netlify@v2.0
-      with:
-        publish-dir: './dist'
-        production-branch: main
-        github-token: ${{ secrets.GITHUB_TOKEN }}
-        deploy-message: "Deploy from GitHub Actions"
-        enable-pull-request-comment: false
-        enable-commit-comment: true
-      env:
-        NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
-        NETLIFY_SITE_ID: ${{ secrets.NETLIFY_SITE_ID }}
