@@ -1,4 +1,3 @@
-// vite.config.ts
 import { defineConfig } from 'vite'
 import vue from '@vitejs/plugin-vue'
 import { VitePWA } from 'vite-plugin-pwa'
@@ -25,17 +24,15 @@ export default defineConfig({
         ]
       },
       workbox: {
-        // 修复警告：明确指定要缓存的文件模式
-        globPatterns: [
-          '**/*.{js,css,html}',
-          '**/*.{ico,png,svg}',
-          '**/*.{woff,woff2,ttf,eot}'
-        ],
+        // 只缓存这些类型的文件，不包含 json
+        globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2}'],
+        // 忽略不需要的文件
         globIgnores: [
           '**/node_modules/**/*',
           'sw.js',
           'workbox-*.js'
         ],
+        maximumFileSizeToCacheInBytes: 3000000,
         runtimeCaching: [
           {
             urlPattern: /^https:\/\/.*\.radio-browser\.info\/.*/i,
