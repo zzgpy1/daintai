@@ -2,12 +2,12 @@ import { defineStore } from 'pinia'
 import { ref, watch } from 'vue'
 
 export type ThemeMode = 'light' | 'dark' | 'system'
-export type Language = 'zh' | 'en' | 'es' | 'fr' | 'de' | 'ja' | 'ko' | 'ru' | 'ar' | 'pt'
+export type Language = 'zh' | 'en'
 
 export const useSettingsStore = defineStore('settings', () => {
   // 主题设置
   const theme = ref<ThemeMode>((localStorage.getItem('theme') as ThemeMode) || 'system')
-  const language = ref<Language>((localStorage.getItem('language') as Language) || 'zh')
+  const language = ref<Language>((localStorage.getItem('language') as Language) || 'en')
   
   // 播放设置
   const volume = ref<number>(parseFloat(localStorage.getItem('volume') || '0.8'))
@@ -101,7 +101,7 @@ export const useSettingsStore = defineStore('settings', () => {
   // 重置所有设置
   const resetSettings = () => {
     theme.value = 'system'
-    language.value = 'zh'
+    language.value = 'en'
     volume.value = 0.8
     isMuted.value = false
     autoPlayNext.value = true
