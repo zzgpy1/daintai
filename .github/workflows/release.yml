@@ -257,31 +257,14 @@ jobs:
           cache-to: type=gha,mode=max
         continue-on-error: true
 
-  # ============ 创建 Release ============
-  create-release:
-    name: 📦 Create Release
+  # ============ 打包产物（压缩各平台安装包） ============
+  package-artifacts:
+    name: 📦 Package Artifacts
     runs-on: ubuntu-latest
-    needs: [build-web, build-android, build-windows, build-macos]
-    if: |
-      always() && (
-        github.ref_type == 'tag' || 
-        github.event_name == 'workflow_dispatch'
-      )
-    permissions:
-      contents: write
+    needs: [build-android, build-windows, build-macos]
+    if: always()
+    continue-on-error: true
     steps:
-      - name: Determine tag name
-        id: tag
-        run: |
-          if [ "${{ github.ref_type }}" == "tag" ]; then
-            echo "tag_name=${{ github.ref_name }}" >> $GITHUB_OUTPUT
-            echo "release_name=Release ${{ github.ref_name }}" >> $GITHUB_OUTPUT
-          else
-            echo "tag_name=${{ github.event.inputs.tag_name }}" >> $GITHUB_OUTPUT
-            echo "release_name=${{ github.event.inputs.release_name }}" >> $GITHUB_OUTPUT
-          fi
-
-      # 分别下载各个平台的产物
       - name: Download Android APK
         uses: actions/download-artifact@v4
         with:
@@ -303,30 +286,75 @@ jobs:
           path: artifacts/macos/
         continue-on-error: true
 
-      # 注意：不下载 web-dist，避免网页文件被上传
-
-      - name: List artifacts
+      - name: Create release package
         run: |
-          echo "📦 Artifacts found:"
-          echo "Android:"
-          ls -la artifacts/android/ 2>/dev/null || echo "  (none)"
-          echo ""
-          echo "Windows:"
-          ls -la artifacts/windows/ 2>/dev/null || echo "  (none)"
-          echo ""
-          echo "macOS:"
-          ls -la artifacts/macos/ 2>/dev/null || echo "  (none)"
+          mkdir -p release-packages
+          
+          # Android
+          if [ -d "artifacts/android" ] && [ "$(ls -A artifacts/android)" ]; then
+            cp artifacts/android/*.apk release-packages/ 2>/dev/null || true
+          fi
+          
+          # Windows
+          if [ -d "artifacts/windows" ] && [ "$(ls -A artifacts/windows)" ]; then
+            cp artifacts/windows/*.exe release-packages/ 2>/dev/null || true
+          fi
+          
+          # macOS
+          if [ -d "artifacts/macos" ] && [ "$(ls -A artifacts/macos)" ]; then
+            cp artifacts/macos/*.dmg release-packages/ 2>/dev/null || true
+            cp artifacts/macos/*.zip release-packages/ 2>/dev/null || true
+          fi
+          
+          echo "Files in release-packages:"
+          ls -la release-packages/
+
+      - name: Upload release packages
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-packages
+          path: release-packages/
+          retention-days: 7
+
+  # ============ 创建 Release ============
+  create-release:
+    name: 📦 Create Release
+    runs-on: ubuntu-latest
+    needs: [package-artifacts]
+    if: |
+      always() && (
+        github.ref_type == 'tag' || 
+        github.event_name == 'workflow_dispatch'
+      )
+    permissions:
+      contents: write
+    steps:
+      - name: Determine tag name
+        id: tag
+        run: |
+          if [ "${{ github.ref_type }}" == "tag" ]; then
+            echo "tag_name=${{ github.ref_name }}" >> $GITHUB_OUTPUT
+            echo "release_name=Release ${{ github.ref_name }}" >> $GITHUB_OUTPUT
+          else
+            echo "tag_name=${{ github.event.inputs.tag_name }}" >> $GITHUB_OUTPUT
+            echo "release_name=${{ github.event.inputs.release_name }}" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Download release packages
+        uses: actions/download-artifact@v4
+        with:
+          name: release-packages
+          path: release-packages/
+
+      - name: List files
+        run: |
+          echo "📦 Release packages:"
+          ls -la release-packages/ || echo "No files found"
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          files: |
-            artifacts/**/*.apk
-            artifacts/**/*.exe
-            artifacts/**/*.dmg
-            artifacts/**/*.zip
-            artifacts/**/*.AppImage
-            artifacts/**/*.deb
+          files: release-packages/*
           generate_release_notes: true
           draft: false
           prerelease: false
@@ -339,10 +367,11 @@ jobs:
         run: |
           echo "## 🎉 Release Summary" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "| Platform | Status | Artifact |" >> $GITHUB_STEP_SUMMARY
-          echo "|----------|--------|----------|" >> $GITHUB_STEP_SUMMARY
-          echo "| Android | ${{ needs.build-android.result }} | android-apk |" >> $GITHUB_STEP_SUMMARY
-          echo "| Windows | ${{ needs.build-windows.result }} | windows-installer |" >> $GITHUB_STEP_SUMMARY
-          echo "| macOS | ${{ needs.build-macos.result }} | macos-installer |" >> $GITHUB_STEP_SUMMARY
+          echo "| Platform | Status |" >> $GITHUB_STEP_SUMMARY
+          echo "|----------|--------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Android | ${{ needs.build-android.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Windows | ${{ needs.build-windows.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| macOS | ${{ needs.build-macos.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Docker | ${{ needs.build-docker.result }} |" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "🔗 Release: https://github.com/${{ github.repository }}/releases/tag/${{ steps.tag.outputs.tag_name }}" >> $GITHUB_STEP_SUMMARY
