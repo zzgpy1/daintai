@@ -101,67 +101,34 @@ jobs:
       - name: Sync Capacitor
         run: npx cap sync android
 
-      - name: Verify Capacitor sync
-        run: |
-          echo "Checking android directory after sync:"
-          ls -la android/
-          ls -la android/app/ || echo "app directory not found"
-
       - name: Setup Gradle Wrapper
         run: |
           cd android
-          
-          # 如果 gradlew 不存在，创建它
           if [ ! -f "gradlew" ]; then
-            echo "📦 Creating gradle wrapper..."
-            # 下载 gradle-wrapper.jar
             mkdir -p gradle/wrapper
             curl -L -o gradle/wrapper/gradle-wrapper.jar https://raw.githubusercontent.com/gradle/gradle/v8.0.2/gradle/wrapper/gradle-wrapper.jar
-            # 创建 gradle-wrapper.properties
             cat > gradle/wrapper/gradle-wrapper.properties << 'EOF'
-distributionBase=GRADLE_USER_HOME
-distributionPath=wrapper/dists
-distributionUrl=https\://services.gradle.org/distributions/gradle-8.0.2-all.zip
-zipStoreBase=GRADLE_USER_HOME
-zipStorePath=wrapper/dists
-EOF
-            # 创建 gradlew 脚本
+          distributionBase=GRADLE_USER_HOME
+          distributionPath=wrapper/dists
+          distributionUrl=https\://services.gradle.org/distributions/gradle-8.0.2-all.zip
+          zipStoreBase=GRADLE_USER_HOME
+          zipStorePath=wrapper/dists
+          EOF
             cat > gradlew << 'EOF'
-#!/bin/sh
-exec java -cp "$(dirname "$0")/gradle/wrapper/gradle-wrapper.jar" org.gradle.wrapper.GradleWrapperMain "$@"
-EOF
+          #!/bin/sh
+          exec java -cp "$(dirname "$0")/gradle/wrapper/gradle-wrapper.jar" org.gradle.wrapper.GradleWrapperMain "$@"
+          EOF
             chmod +x gradlew
-            echo "✅ Gradle wrapper created"
           else
-            echo "✅ gradlew already exists"
             chmod +x gradlew
           fi
-          
-          # 显示 gradle 版本
-          ./gradlew --version || echo "Gradle wrapper check failed"
 
       - name: Build Android APK
         run: |
           cd android
           chmod +x gradlew
-          # 使用具体任务，避免 assembleRelease 依赖问题
           ./gradlew :app:assembleRelease --stacktrace
         continue-on-error: true
-
-      - name: Check APK output
-        run: |
-          echo "🔍 Checking APK output..."
-          find android -name "*.apk" 2>/dev/null | while read apk; do
-            echo "Found APK: $apk"
-            ls -la "$apk"
-          done
-          
-          # 如果找不到 APK，检查构建输出
-          if [ ! -f "android/app/build/outputs/apk/release/app-release.apk" ]; then
-            echo "⚠️ APK not found in expected location"
-            echo "Contents of build directory:"
-            find android/app/build -type f 2>/dev/null | head -20 || echo "Build directory not found"
-          fi
 
       - name: Upload Android APK
         uses: actions/upload-artifact@v4
@@ -173,7 +140,6 @@ EOF
             android/**/*.apk
           retention-days: 7
           if-no-files-found: warn
-          compression-level: 0
 
   # ============ Windows 桌面应用构建 ============
   build-windows:
@@ -349,24 +315,18 @@ EOF
       - name: Copy artifacts to release directory
         run: |
           echo "📦 Copying artifacts..."
-          
-          # Android
           if [ -d "artifacts/android" ] && [ "$(ls -A artifacts/android 2>/dev/null)" ]; then
             cp -v artifacts/android/*.apk release-packages/ 2>/dev/null || true
             echo "✅ Android APK copied"
           else
             echo "⚠️ No Android APK found"
           fi
-          
-          # Windows
           if [ -d "artifacts/windows" ] && [ "$(ls -A artifacts/windows 2>/dev/null)" ]; then
             cp -v artifacts/windows/*.exe release-packages/ 2>/dev/null || true
             echo "✅ Windows installer copied"
           else
             echo "⚠️ No Windows installer found"
           fi
-          
-          # macOS
           if [ -d "artifacts/macos" ] && [ "$(ls -A artifacts/macos 2>/dev/null)" ]; then
             cp -v artifacts/macos/*.dmg release-packages/ 2>/dev/null || true
             cp -v artifacts/macos/*.zip release-packages/ 2>/dev/null || true
@@ -374,8 +334,6 @@ EOF
           else
             echo "⚠️ No macOS installer found"
           fi
-          
-          echo ""
           echo "📦 Final packages:"
           ls -la release-packages/ || echo "No packages found"
 
