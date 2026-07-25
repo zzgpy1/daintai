@@ -3,7 +3,7 @@ FROM node:18-alpine AS builder
 
 WORKDIR /app
 
-# 复制依赖文件
+# 复制依赖文件 (使用 npm)
 COPY package*.json ./
 COPY package-lock*.json ./
 
@@ -16,7 +16,9 @@ COPY . .
 # 构建项目
 RUN npm run build
 
+# ============================================
 # 生产阶段
+# ============================================
 FROM nginx:alpine
 
 # 复制构建产物
