@@ -8,8 +8,12 @@ on:
 
 permissions:
   contents: write
+  packages: write
 
 jobs:
+  # ============================================
+  # 1. Web 构建
+  # ============================================
   build-web:
     runs-on: ubuntu-latest
     steps:
@@ -32,7 +36,11 @@ jobs:
         with:
           name: web-dist
           path: dist/
+          retention-days: 7
 
+  # ============================================
+  # 2. Electron 构建 (多平台)
+  # ============================================
   build-electron:
     needs: build-web
     runs-on: ${{ matrix.os }}
@@ -42,10 +50,16 @@ jobs:
         include:
           - os: ubuntu-latest
             target: AppImage
+            artifact-name: linux-appimage
+            file-suffix: .AppImage
           - os: windows-latest
             target: nsis
+            artifact-name: windows-installer
+            file-suffix: .exe
           - os: macos-latest
             target: dmg
+            artifact-name: macos-installer
+            file-suffix: .dmg
     
     steps:
       - uses: actions/checkout@v4
@@ -59,15 +73,28 @@ jobs:
       - name: Install dependencies
         run: npm ci
       
-      - name: Build Electron
-        run: npm run electron:build
+      - name: Build Electron (${{ matrix.os }})
+        run: |
+          npm run electron:build
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       
       - name: Upload Electron artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: electron-${{ matrix.os }}
-          path: dist-electron/
+          name: ${{ matrix.artifact-name }}
+          path: |
+            dist-electron/*.AppImage
+            dist-electron/*.exe
+            dist-electron/*.dmg
+            dist-electron/*.zip
+            dist-electron/*.blockmap
+            dist-electron/latest*.yml
+          retention-days: 7
 
+  # ============================================
+  # 3. Android 构建
+  # ============================================
   build-android:
     needs: build-web
     runs-on: ubuntu-latest
@@ -86,21 +113,29 @@ jobs:
           distribution: 'zulu'
           java-version: '17'
       
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+      
       - name: Install dependencies
         run: npm ci
       
       - name: Build Android
         run: npm run build:android
       
-      - name: Upload Android artifacts
+      - name: Upload Android APK
         uses: actions/upload-artifact@v4
         with:
           name: android-apk
-          path: android/app/build/outputs/apk/release/
+          path: android/app/build/outputs/apk/release/*.apk
+          retention-days: 7
 
+  # ============================================
+  # 4. Docker 发布
+  # ============================================
   publish-docker:
     needs: build-web
     runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/v')
     steps:
       - uses: actions/checkout@v4
       
@@ -117,7 +152,7 @@ jobs:
         id: meta
         uses: docker/metadata-action@v5
         with:
-          images: superneed/global-radio
+          images: ${{ secrets.DOCKER_USERNAME }}/global-radio
           tags: |
             type=semver,pattern={{version}}
             type=semver,pattern={{major}}.{{minor}}
@@ -134,25 +169,36 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
+  # ============================================
+  # 5. 创建 Release
+  # ============================================
   create-release:
     needs: [build-electron, build-android, publish-docker]
     runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/v')
     steps:
       - uses: actions/checkout@v4
       
-      - name: Download artifacts
+      - name: Download all artifacts
         uses: actions/download-artifact@v4
         with:
           path: artifacts/
+      
+      - name: List artifacts
+        run: |
+          ls -la artifacts/
+          find artifacts/ -type f
       
       - name: Create Release
         uses: softprops/action-gh-release@v1
         with:
           files: |
-            artifacts/electron-ubuntu-linux/*.AppImage
-            artifacts/electron-windows-latest/*.exe
-            artifacts/electron-macos-latest/*.dmg
+            artifacts/linux-appimage/*.AppImage
+            artifacts/windows-installer/*.exe
+            artifacts/macos-installer/*.dmg
             artifacts/android-apk/*.apk
           draft: false
           prerelease: false
           generate_release_notes: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
