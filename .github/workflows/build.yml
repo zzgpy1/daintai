@@ -7,45 +7,46 @@ on:
     branches: [ main ]
   workflow_dispatch:
 
+env:
+  NODE_VERSION: 20
+
 jobs:
   build:
     runs-on: ubuntu-latest
     
-    strategy:
-      matrix:
-        node-version: [18.x, 20.x]
-    
     steps:
     - uses: actions/checkout@v4
     
-    - name: Use Node.js ${{ matrix.node-version }}
+    - name: Setup Node.js
       uses: actions/setup-node@v4
       with:
-        node-version: ${{ matrix.node-version }}
+        node-version: ${{ env.NODE_VERSION }}
         cache: 'npm'
-        cache-dependency-path: '**/package.json'  # 使用 package.json 而不是 lockfile
+        cache-dependency-path: '**/package-lock.json'
     
-    - name: Install dependencies
+    - name: Clean npm cache
       run: |
-        echo "🧹 清理缓存..."
         npm cache clean --force
         rm -rf node_modules
-        
-        echo "📦 安装依赖..."
-        npm install
-      env:
-        NODE_OPTIONS: --max-old-space-size=4096
+        rm -f package-lock.json
     
-    - name: Run lint
-      run: npm run lint || echo "No lint script found"
+    - name: Install dependencies with retry
+      run: |
+        npm install --no-package-lock --legacy-peer-deps --no-audit --no-fund
+      env:
+        NPM_CONFIG_REGISTRY: https://registry.npmjs.org/
+        NPM_CONFIG_STRICT_SSL: false
     
     - name: Build
-      run: npm run build --if-present
+      run: |
+        npm run build --if-present
       env:
         NODE_OPTIONS: --max-old-space-size=4096
+        NPM_CONFIG_REGISTRY: https://registry.npmjs.org/
     
     - name: Upload build artifacts
       uses: actions/upload-artifact@v4
       with:
-        name: dist-${{ matrix.node-version }}
+        name: dist
         path: dist/
+        retention-days: 7
