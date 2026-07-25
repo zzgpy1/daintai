@@ -1,4 +1,4 @@
-name: Release
+name: 📦 Release
 
 on:
   push:
@@ -8,208 +8,275 @@ on:
 
 env:
   NODE_VERSION: 20
+  NODE_OPTIONS: --max-old-space-size=4096
+  ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION: true
 
 jobs:
+  # ============ Web 构建 ============
   release-web:
+    name: 🌐 Build Web
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v4
-    
-    - name: Setup Node.js
-      uses: actions/setup-node@v4
-      with:
-        node-version: ${{ env.NODE_VERSION }}
-        cache: 'npm'
-    
-    - name: Clean npm cache
-      run: |
-        npm cache clean --force
-        rm -rf node_modules
-        rm -f package-lock.json
-    
-    - name: Install dependencies
-      run: |
-        npm install --no-package-lock --legacy-peer-deps --no-audit --no-fund
-      env:
-        NPM_CONFIG_REGISTRY: https://registry.npmjs.org/
-    
-    - name: Build
-      run: |
-        npm run build
-      env:
-        NODE_OPTIONS: --max-old-space-size=4096
-        VITE_APP_VERSION: ${{ github.ref_name }}
-    
-    - name: Upload Web artifacts
-      uses: actions/upload-artifact@v4
-      with:
-        name: web-dist
-        path: dist/
-        retention-days: 7
-    
-    - name: Deploy to GitHub Pages
-      if: github.ref_type == 'tag'
-      uses: peaceiris/actions-gh-pages@v3
-      with:
-        github_token: ${{ secrets.GITHUB_TOKEN }}
-        publish_dir: ./dist
-        publish_branch: gh-pages
-        force_orphan: true
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: |
+          npm cache clean --force
+          rm -rf node_modules package-lock.json
+          npm install --no-package-lock --legacy-peer-deps --no-audit --no-fund --ignore-scripts
+
+      - name: Build Web
+        run: npx vite build
+        env:
+          VITE_APP_VERSION: ${{ github.ref_name }}
+
+      - name: Upload Web artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: web-dist
+          path: dist/
+          retention-days: 7
+
+  # ============ 桌面应用构建 ============
   release-desktop:
+    name: 💻 Build Desktop (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
     strategy:
       matrix:
         os: [windows-latest, macos-latest, ubuntu-latest]
-    runs-on: ${{ matrix.os }}
-    steps:
-    - uses: actions/checkout@v4
-    
-    - name: Setup Node.js
-      uses: actions/setup-node@v4
-      with:
-        node-version: ${{ env.NODE_VERSION }}
-        cache: 'npm'
-    
-    - name: Clean npm cache
-      run: |
-        npm cache clean --force
-        rm -rf node_modules
-        rm -f package-lock.json
-    
-    - name: Install dependencies
-      run: |
-        npm install --no-package-lock --legacy-peer-deps --no-audit --no-fund
-      env:
-        NPM_CONFIG_REGISTRY: https://registry.npmjs.org/
-    
-    - name: Build
-      run: |
-        npm run build
-      env:
-        NODE_OPTIONS: --max-old-space-size=4096
-    
-    - name: Build Electron
-      run: |
-        npm run electron:build -- --publish never
-      env:
-        NODE_OPTIONS: --max-old-space-size=4096
-        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-    
-    - name: Upload Desktop artifacts
-      uses: actions/upload-artifact@v4
-      with:
-        name: desktop-${{ matrix.os }}
-        path: release/
-        retention-days: 7
+      fail-fast: false
 
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      # ----- Windows 专用清理 -----
+      - name: Clean cache (Windows)
+        if: runner.os == 'Windows'
+        run: |
+          npm cache clean --force
+          Remove-Item -Recurse -Force node_modules -ErrorAction SilentlyContinue
+          Remove-Item -Force package-lock.json -ErrorAction SilentlyContinue
+        shell: pwsh
+
+      # ----- Unix 专用清理 -----
+      - name: Clean cache (Unix)
+        if: runner.os != 'Windows'
+        run: |
+          npm cache clean --force
+          rm -rf node_modules package-lock.json
+
+      # ----- 通用依赖安装 -----
+      - name: Install dependencies
+        run: |
+          npm install --no-package-lock --legacy-peer-deps --no-audit --no-fund --ignore-scripts
+        env:
+          ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION: true
+
+      # ----- 构建 Web（桌面端需要） -----
+      - name: Build Web
+        run: |
+          npx vite build
+        env:
+          ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION: true
+
+      # ----- Electron 构建（各平台） -----
+      - name: Build Electron (Windows)
+        if: runner.os == 'Windows'
+        run: |
+          npm run electron:build -- --win --publish never
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build Electron (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          npm run electron:build -- --mac --publish never
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          CSC_IDENTITY_AUTO_DISCOVERY: false
+
+      - name: Build Electron (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          npm run electron:build -- --linux --publish never
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      # ----- 上传产物 -----
+      - name: Upload Desktop artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: desktop-${{ runner.os }}
+          path: release/
+          retention-days: 7
+
+  # ============ Android 构建 ============
   release-android:
+    name: 📱 Build Android
     runs-on: ubuntu-latest
-    steps:
-    - uses: actions/checkout@v4
-    
-    - name: Setup Node.js
-      uses: actions/setup-node@v4
-      with:
-        node-version: ${{ env.NODE_VERSION }}
-        cache: 'npm'
-    
-    - name: Clean npm cache
-      run: |
-        npm cache clean --force
-        rm -rf node_modules
-        rm -f package-lock.json
-    
-    - name: Install dependencies
-      run: |
-        npm install --no-package-lock --legacy-peer-deps --no-audit --no-fund
-      env:
-        NPM_CONFIG_REGISTRY: https://registry.npmjs.org/
-    
-    - name: Setup Java
-      uses: actions/setup-java@v4
-      with:
-        distribution: 'temurin'
-        java-version: '17'
-    
-    - name: Setup Android SDK
-      uses: android-actions/setup-android@v3
-      with:
-        packages: 'platforms;android-34'
-    
-    - name: Build
-      run: |
-        npm run build
-      env:
-        NODE_OPTIONS: --max-old-space-size=4096
-    
-    - name: Sync Capacitor
-      run: npx cap sync android
-    
-    - name: Build Android APK
-      run: |
-        cd android
-        chmod +x gradlew
-        ./gradlew assembleRelease
-    
-    - name: Upload Android artifacts
-      uses: actions/upload-artifact@v4
-      with:
-        name: android-apk
-        path: android/app/build/outputs/apk/release/*.apk
-        retention-days: 7
+    needs: release-web
 
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+        with:
+          packages: 'platforms;android-34'
+
+      - name: Install dependencies
+        run: |
+          npm cache clean --force
+          rm -rf node_modules package-lock.json
+          npm install --no-package-lock --legacy-peer-deps --no-audit --no-fund --ignore-scripts
+        env:
+          ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION: true
+
+      - name: Download Web build
+        uses: actions/download-artifact@v4
+        with:
+          name: web-dist
+          path: dist/
+
+      - name: Sync Capacitor
+        run: |
+          npx cap sync android
+        env:
+          ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION: true
+
+      - name: Build Android APK
+        run: |
+          cd android
+          chmod +x gradlew
+          ./gradlew assembleRelease
+        env:
+          ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION: true
+
+      - name: Upload Android APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-apk
+          path: android/app/build/outputs/apk/release/*.apk
+          retention-days: 7
+
+  # ============ Docker 构建 ============
   release-docker:
+    name: 🐳 Build Docker
     runs-on: ubuntu-latest
-    needs: [release-web]
+    needs: release-web
     if: github.ref_type == 'tag'
-    steps:
-    - uses: actions/checkout@v4
-    
-    - name: Download web artifacts
-      uses: actions/download-artifact@v4
-      with:
-        name: web-dist
-        path: dist/
-    
-    - name: Set up Docker Buildx
-      uses: docker/setup-buildx-action@v3
-    
-    - name: Login to Docker Hub
-      uses: docker/login-action@v3
-      with:
-        username: ${{ secrets.DOCKER_USERNAME }}
-        password: ${{ secrets.DOCKER_PASSWORD }}
-    
-    - name: Build and push Docker image
-      uses: docker/build-push-action@v5
-      with:
-        context: .
-        push: true
-        tags: |
-          ${{ secrets.DOCKER_USERNAME }}/global-radio:latest
-          ${{ secrets.DOCKER_USERNAME }}/global-radio:${{ github.ref_name }}
-        cache-from: type=gha
-        cache-to: type=gha,mode=max
 
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Download Web build
+        uses: actions/download-artifact@v4
+        with:
+          name: web-dist
+          path: dist/
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+        continue-on-error: true
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: ${{ secrets.DOCKER_USERNAME != '' }}
+          tags: |
+            ${{ secrets.DOCKER_USERNAME }}/global-radio:latest
+            ${{ secrets.DOCKER_USERNAME }}/global-radio:${{ github.ref_name }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+        continue-on-error: true
+
+  # ============ 创建 Release ============
   create-release:
+    name: 📦 Create Release
     runs-on: ubuntu-latest
     needs: [release-web, release-desktop, release-android, release-docker]
-    if: github.ref_type == 'tag'
+    if: always() && github.ref_type == 'tag'
+
     steps:
-    - name: Download all artifacts
-      uses: actions/download-artifact@v4
-      with:
-        path: artifacts
-    
-    - name: List artifacts
-      run: ls -la artifacts/
-    
-    - name: Create Release
-      uses: softprops/action-gh-release@v1
-      with:
-        files: artifacts/**/*
-        generate_release_notes: true
-        draft: false
-        prerelease: false
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: List artifacts
+        run: |
+          echo "📦 Artifacts:"
+          find artifacts -type f -name "*.apk" -o -name "*.exe" -o -name "*.dmg" -o -name "*.AppImage" -o -name "*.deb" | sort
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: |
+            artifacts/**/*.apk
+            artifacts/**/*.exe
+            artifacts/**/*.dmg
+            artifacts/**/*.AppImage
+            artifacts/**/*.deb
+            artifacts/**/*.zip
+          generate_release_notes: true
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        continue-on-error: false
+
+      - name: Show deployment summary
+        run: |
+          echo "## 🎉 Release Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Platform | Status | Artifacts |" >> $GITHUB_STEP_SUMMARY
+          echo "|----------|--------|-----------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Web | ✅ | web-dist |" >> $GITHUB_STEP_SUMMARY
+          echo "| Windows | ${{ needs.release-desktop.result }} | desktop-Windows |" >> $GITHUB_STEP_SUMMARY
+          echo "| macOS | ${{ needs.release-desktop.result }} | desktop-macOS |" >> $GITHUB_STEP_SUMMARY
+          echo "| Linux | ${{ needs.release-desktop.result }} | desktop-Linux |" >> $GITHUB_STEP_SUMMARY
+          echo "| Android | ${{ needs.release-android.result }} | android-apk |" >> $GITHUB_STEP_SUMMARY
+          echo "| Docker | ${{ needs.release-docker.result }} | docker-image |" >> $GITHUB_STEP_SUMMARY
