@@ -3,41 +3,27 @@ import { createPinia } from 'pinia'
 import { createI18n } from 'vue-i18n'
 import router from './router'
 import App from './App.vue'
-
-// ============================================
-// 导入样式 - 确保路径正确
-// ============================================
 import './style.css'
 
 // ============================================
-// 导入语言包
+// 导入语言包 - 只导入已存在的文件
 // ============================================
 import zh from './locales/zh.json'
 import en from './locales/en.json'
-import es from './locales/es.json'
-import fr from './locales/fr.json'
-import de from './locales/de.json'
-import ja from './locales/ja.json'
-import ko from './locales/ko.json'
-import ru from './locales/ru.json'
-import ar from './locales/ar.json'
-import pt from './locales/pt.json'
 
 // ============================================
-// 创建 i18n 实例
+// 创建i18n实例
 // ============================================
 const i18n = createI18n({
   legacy: false,
   locale: localStorage.getItem('language') || 'zh',
   fallbackLocale: 'en',
   messages: {
-    zh, en, es, fr, de, ja, ko, ru, ar, pt
+    zh,
+    en
   }
 })
 
-// ============================================
-// 创建应用
-// ============================================
 const app = createApp(App)
 const pinia = createPinia()
 
@@ -50,11 +36,32 @@ app.use(i18n)
 // ============================================
 app.config.errorHandler = (err, instance, info) => {
   console.error('❌ 全局错误:', err)
+  console.error('组件:', instance)
+  console.error('信息:', info)
+  
   if (import.meta.env.DEV) {
-    console.error('组件:', instance)
-    console.error('信息:', info)
+    console.error('详细错误栈:', (err as Error).stack)
   }
 }
+
+// 未捕获的Promise错误处理
+window.addEventListener('unhandledrejection', (event) => {
+  console.error('❌ 未处理的Promise拒绝:', event.reason)
+  event.preventDefault()
+})
+
+// ============================================
+// 网络状态监测
+// ============================================
+window.addEventListener('online', () => {
+  console.log('✅ 网络已恢复')
+  window.dispatchEvent(new CustomEvent('network-online'))
+})
+
+window.addEventListener('offline', () => {
+  console.warn('⚠️ 网络已断开')
+  window.dispatchEvent(new CustomEvent('network-offline'))
+})
 
 // ============================================
 // 挂载应用
@@ -62,18 +69,16 @@ app.config.errorHandler = (err, instance, info) => {
 app.mount('#app')
 
 // ============================================
-// Service Worker 注册（生产环境）
+// Service Worker注册（生产环境）
 // ============================================
 if (import.meta.env.PROD && 'serviceWorker' in navigator) {
   window.addEventListener('load', () => {
-    setTimeout(() => {
-      navigator.serviceWorker.register('/sw.js')
-        .then(registration => {
-          console.log('✅ Service Worker 注册成功')
-        })
-        .catch(error => {
-          console.error('❌ Service Worker 注册失败:', error)
-        })
-    }, 2000)
+    navigator.serviceWorker.register('/sw.js')
+      .then(registration => {
+        console.log('✅ Service Worker注册成功:', registration)
+      })
+      .catch(error => {
+        console.error('❌ Service Worker注册失败:', error)
+      })
   })
 }
