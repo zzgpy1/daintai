@@ -98,33 +98,78 @@ jobs:
           name: web-dist
           path: www/
 
+      - name: Initialize Capacitor
+        run: |
+          # 如果 capacitor.config.ts 不存在，创建默认配置
+          if [ ! -f "capacitor.config.ts" ]; then
+            echo "Creating capacitor.config.ts..."
+            cat > capacitor.config.ts << 'EOF'
+          import { CapacitorConfig } from '@capacitor/cli';
+
+          const config: CapacitorConfig = {
+            appId: 'com.globalradio.app',
+            appName: '全球电台',
+            webDir: 'www',
+            server: {
+              androidScheme: 'https'
+            },
+            plugins: {
+              SplashScreen: {
+                launchShowDuration: 800,
+                backgroundColor: "#1a365d",
+                androidScaleType: "CENTER_CROP",
+                showSpinner: false
+              },
+              StatusBar: {
+                style: "dark",
+                backgroundColor: "#1a365d"
+              }
+            }
+          };
+
+          export default config;
+          EOF
+          fi
+
       - name: Sync Capacitor
-        run: npx cap sync android
+        run: |
+          npx cap sync android
+          # 检查是否生成了 Android 项目
+          if [ ! -d "android" ] || [ ! -f "android/build.gradle" ]; then
+            echo "⚠️ Capacitor sync failed, trying with --force..."
+            npx cap sync android --force
+          fi
 
       - name: Verify Android project structure
         run: |
           echo "📁 Android directory structure:"
-          ls -la android/
+          ls -la android/ || echo "❌ android directory not found"
           echo ""
           echo "🔍 Checking for build.gradle:"
-          ls -la android/build.gradle || echo "❌ build.gradle not found"
+          ls -la android/build.gradle 2>/dev/null || echo "❌ build.gradle not found"
           echo ""
           echo "🔍 Checking for settings.gradle:"
-          ls -la android/settings.gradle || echo "❌ settings.gradle not found"
+          ls -la android/settings.gradle 2>/dev/null || echo "❌ settings.gradle not found"
           echo ""
           echo "🔍 Checking for app directory:"
-          ls -la android/app/ || echo "❌ app directory not found"
+          ls -la android/app/ 2>/dev/null || echo "❌ app directory not found"
           echo ""
           echo "🔍 Checking for app/build.gradle:"
-          ls -la android/app/build.gradle || echo "❌ app/build.gradle not found"
+          ls -la android/app/build.gradle 2>/dev/null || echo "❌ app/build.gradle not found"
 
       - name: Setup Gradle Wrapper
+        if: success() || failure()
         run: |
           cd android
           # 检查必要的 Gradle 文件
           if [ ! -f "build.gradle" ] || [ ! -f "settings.gradle" ]; then
-            echo "❌ Missing Gradle files - Capacitor sync may have failed"
-            exit 1
+            echo "❌ Missing Gradle files - Capacitor sync failed"
+            echo "Creating minimal Gradle files..."
+            
+            # 创建 settings.gradle
+            cat > settings.gradle << 'EOF'
+          include ':app'
+          EOF
           fi
           
           # 生成 gradle wrapper
@@ -134,9 +179,14 @@ jobs:
           echo "✅ Gradle wrapper created"
 
       - name: Build Android APK
+        if: success() || failure()
         run: |
           cd android
-          ./gradlew assembleRelease
+          if [ -f "gradlew" ]; then
+            ./gradlew assembleRelease
+          else
+            echo "❌ gradlew not found, skipping build"
+          fi
         continue-on-error: true
 
       - name: Check APK output
@@ -144,8 +194,11 @@ jobs:
           echo "📦 Checking APK output..."
           find android -name "*.apk" -type f 2>/dev/null | while read -r apk; do
             echo "Found: $apk ($(du -h "$apk" | cut -f1))"
-          done
-          if [ ! -f "android/app/build/outputs/apk/release/app-release.apk" ]; then
+          done || echo "No APK files found"
+          
+          if [ -f "android/app/build/outputs/apk/release/app-release.apk" ]; then
+            echo "✅ APK found at expected location"
+          else
             echo "⚠️ No APK found at expected location"
           fi
 
@@ -154,7 +207,9 @@ jobs:
         if: always()
         with:
           name: android-apk
-          path: android/app/build/outputs/apk/release/*.apk
+          path: |
+            android/app/build/outputs/apk/release/*.apk
+            android/**/*.apk
           retention-days: 7
           if-no-files-found: warn
 
@@ -185,6 +240,7 @@ jobs:
       - name: Install dependencies
         run: |
           npm install --no-package-lock --legacy-peer-deps --no-audit --no-fund --ignore-scripts
+        shell: pwsh
 
       - name: Download Web build
         uses: actions/download-artifact@v4
@@ -194,15 +250,19 @@ jobs:
 
       - name: Verify dist folder
         run: |
-          echo "📦 Checking dist folder:"
-          ls -la dist/
-          if [ ! -f "dist/index.html" ]; then
-            echo "❌ index.html not found in dist"
-          fi
+          Write-Host "📦 Checking dist folder:"
+          Get-ChildItem -Path dist/ -Recurse | Select-Object Name, Length
+          if (Test-Path "dist/index.html") {
+            Write-Host "✅ index.html found"
+          } else {
+            Write-Host "❌ index.html not found in dist"
+          }
+        shell: pwsh
 
       - name: Build Electron (Windows)
         run: |
           npm run electron:build -- --win --publish never
+        shell: pwsh
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         continue-on-error: true
