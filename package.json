@@ -9,20 +9,15 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "build:electron": "npm run build && electron-builder",
-    "build:android": "npm run build && npx cap sync android && npx cap copy android && cd android && ./gradlew assembleRelease",
-    "build:docker": "docker build -f docker/Dockerfile -t global-radio:latest .",
     "preview": "vite preview",
     "electron:dev": "vite build --mode development && electron electron/main.ts",
     "electron:build": "vite build && electron-builder",
     "electron:build:win": "vite build && electron-builder --win",
     "electron:build:mac": "vite build && electron-builder --mac",
-    "capacitor:init": "npx cap init",
-    "capacitor:add-android": "npx cap add android",
-    "capacitor:sync": "npx cap sync",
-    "capacitor:open": "npx cap open",
-    "docker:build": "docker build -f docker/Dockerfile -t superneed/global-radio:latest .",
-    "docker:push": "docker push superneed/global-radio:latest",
+    "electron:build:linux": "vite build && electron-builder --linux",
+    "build:android": "npm run build && npx cap sync android && npx cap copy android && cd android && ./gradlew assembleRelease",
+    "docker:build": "docker build -f docker/Dockerfile -t global-radio:latest .",
+    "docker:push": "docker push global-radio:latest",
     "release": "node scripts/release.js",
     "update-version": "node scripts/update-version.js"
   },
@@ -44,13 +39,11 @@
     "vue": "^3.4.0",
     "vue-i18n": "^9.9.0",
     "vue-router": "^4.2.5",
-    "vue-virtual-scroller": "^2.0.0-beta.8",
     "workbox-window": "^7.3.0"
   },
   "devDependencies": {
     "@types/node": "^20.10.5",
     "@vitejs/plugin-vue": "^5.0.0",
-    "@vue/tsconfig": "^0.5.0",
     "autoprefixer": "^10.4.16",
     "electron": "^28.1.0",
     "electron-builder": "^24.9.1",
@@ -76,18 +69,27 @@
     ],
     "win": {
       "target": ["nsis", "zip"],
-      "icon": "electron/build/icon.ico"
+      "icon": "electron/build/icon.ico",
+      "artifactName": "${productName}-${version}-win.${ext}"
     },
     "mac": {
       "target": ["dmg", "zip"],
       "icon": "electron/build/icon.png",
-      "category": "public.app-category.music"
+      "category": "public.app-category.music",
+      "artifactName": "${productName}-${version}-mac.${ext}"
+    },
+    "linux": {
+      "target": ["AppImage", "deb"],
+      "icon": "electron/build/icon.png",
+      "category": "AudioVideo",
+      "artifactName": "${productName}-${version}-linux.${ext}"
     },
     "nsis": {
       "oneClick": false,
       "allowToChangeInstallationDirectory": true,
       "createDesktopShortcut": true,
-      "createStartMenuShortcut": true
+      "createStartMenuShortcut": true,
+      "artifactName": "${productName}-${version}-setup.${ext}"
     },
     "publish": {
       "provider": "github",
