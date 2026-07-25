@@ -2,25 +2,17 @@ import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import type { SupportedLanguage } from '@/types/store'
+import { SUPPORTED_LANGUAGES } from '@/utils/constants'
 
 export const useLanguageStore = defineStore('language', () => {
-  const { locale, t, messages } = useI18n()
+  const { locale, t } = useI18n()
   
-  const currentLanguage = ref<SupportedLanguage>((localStorage.getItem('language') as SupportedLanguage) || 'zh')
+  const currentLanguage = ref<SupportedLanguage>(
+    (localStorage.getItem('language') as SupportedLanguage) || 'zh'
+  )
   
-  // 支持的语言列表
-  const supportedLanguages = [
-    { code: 'zh', name: '中文', nativeName: '中文' },
-    { code: 'en', name: 'English', nativeName: 'English' },
-    { code: 'es', name: 'Español', nativeName: 'Español' },
-    { code: 'fr', name: 'Français', nativeName: 'Français' },
-    { code: 'de', name: 'Deutsch', nativeName: 'Deutsch' },
-    { code: 'ja', name: '日本語', nativeName: '日本語' },
-    { code: 'ko', name: '한국어', nativeName: '한국어' },
-    { code: 'ru', name: 'Русский', nativeName: 'Русский' },
-    { code: 'ar', name: 'العربية', nativeName: 'العربية' },
-    { code: 'pt', name: 'Português', nativeName: 'Português' }
-  ]
+  // 使用常量
+  const supportedLanguages = SUPPORTED_LANGUAGES
 
   const currentLanguageInfo = computed(() => {
     return supportedLanguages.find(lang => lang.code === currentLanguage.value) || supportedLanguages[0]
