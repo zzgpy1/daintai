@@ -28,7 +28,6 @@
       <div class="bg-white/95 dark:bg-gray-800/70 backdrop-blur-xl rounded-3xl shadow-xl dark:border dark:border-gray-700/30 overflow-hidden">
         <!-- 顶部区域 -->
         <div class="relative h-64 md:h-[400px] flex flex-col items-center justify-center overflow-hidden bg-gradient-to-br from-blue-500/30 via-purple-500/30 to-pink-500/30">
-          <!-- 背景装饰 -->
           <div class="absolute inset-0 bg-white/10 dark:bg-black/20"></div>
           
           <!-- 电台图标 -->
@@ -180,7 +179,9 @@ const openShareModal = () => {
   isShareModalVisible.value = true
 }
 
-// 可视化实现
+// ============================================
+// 可视化实现 - 修复语法错误
+// ============================================
 const startVisualizer = () => {
   if (!visualizerCanvas.value) return
   const canvas = visualizerCanvas.value
@@ -193,7 +194,9 @@ const startVisualizer = () => {
     const h = canvas.height
     const now = performance.now()
     
-    const barCount = 32    const barWidth = w / barCount * 0.7
+    // 修复：将两条语句分开写
+    const barCount = 32
+    const barWidth = w / barCount * 0.7
     const gap = w / barCount * 0.3
     
     for (let i = 0; i < barCount; i++) {
@@ -206,7 +209,12 @@ const startVisualizer = () => {
       ctx.shadowColor = `hsla(${hue}, 90%, 60%, 0.3)`
       ctx.shadowBlur = 10
       ctx.beginPath()
-      ctx.roundRect(x, y, barWidth, height, 4)
+      // 使用 roundRect 或 rect
+      if (ctx.roundRect) {
+        ctx.roundRect(x, y, barWidth, height, 4)
+      } else {
+        ctx.rect(x, y, barWidth, height)
+      }
       ctx.fill()
     }
     
@@ -223,6 +231,9 @@ const stopVisualizer = () => {
   }
 }
 
+// ============================================
+// 生命周期
+// ============================================
 onMounted(async () => {
   try {
     const result = await radioStore.getStationByUuid(stationUuid.value)
