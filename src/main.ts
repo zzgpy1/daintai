@@ -5,7 +5,9 @@ import router from './router'
 import App from './App.vue'
 import './style.css'
 
-// 导入语言包（仅使用 zh 和 en）
+// ============================================
+// 仅导入 zh 和 en 两种语言
+// ============================================
 import zh from './locales/zh.json'
 import en from './locales/en.json'
 
@@ -32,16 +34,8 @@ app.use(i18n)
 // ============================================
 app.config.errorHandler = (err, instance, info) => {
   console.error('❌ 全局错误:', err)
-  console.error('组件:', instance)
-  console.error('信息:', info)
-  
   if (import.meta.env.DEV) {
     console.error('详细错误栈:', (err as Error).stack)
-  }
-  
-  if (import.meta.env.PROD) {
-    // 可以集成错误上报服务
-    // reportError(err, instance, info)
   }
 }
 
@@ -63,26 +57,6 @@ window.addEventListener('offline', () => {
   console.warn('⚠️ 网络已断开')
   window.dispatchEvent(new CustomEvent('network-offline'))
 })
-
-// ============================================
-// 性能监测
-// ============================================
-if (import.meta.env.DEV) {
-  if ('PerformanceObserver' in window) {
-    try {
-      const observer = new PerformanceObserver((list) => {
-        for (const entry of list.getEntries()) {
-          if (entry.duration > 50) {
-            console.warn('⚠️ 长任务检测:', entry)
-          }
-        }
-      })
-      observer.observe({ entryTypes: ['longtask'] })
-    } catch (e) {
-      // 忽略不支持的情况
-    }
-  }
-}
 
 // ============================================
 // 挂载应用
