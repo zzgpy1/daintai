@@ -3,9 +3,15 @@ import { createPinia } from 'pinia'
 import { createI18n } from 'vue-i18n'
 import router from './router'
 import App from './App.vue'
+
+// ============================================
+// 导入样式 - 确保路径正确
+// ============================================
 import './style.css'
 
+// ============================================
 // 导入语言包
+// ============================================
 import zh from './locales/zh.json'
 import en from './locales/en.json'
 import es from './locales/es.json'
@@ -17,7 +23,9 @@ import ru from './locales/ru.json'
 import ar from './locales/ar.json'
 import pt from './locales/pt.json'
 
-// 创建i18n实例
+// ============================================
+// 创建 i18n 实例
+// ============================================
 const i18n = createI18n({
   legacy: false,
   locale: localStorage.getItem('language') || 'zh',
@@ -27,6 +35,9 @@ const i18n = createI18n({
   }
 })
 
+// ============================================
+// 创建应用
+// ============================================
 const app = createApp(App)
 const pinia = createPinia()
 
@@ -55,12 +66,10 @@ app.mount('#app')
 // ============================================
 if (import.meta.env.PROD && 'serviceWorker' in navigator) {
   window.addEventListener('load', () => {
-    // 延迟注册，避免影响首屏加载
     setTimeout(() => {
       navigator.serviceWorker.register('/sw.js')
         .then(registration => {
           console.log('✅ Service Worker 注册成功')
-          // 检查更新
           registration.addEventListener('updatefound', () => {
             const newWorker = registration.installing
             if (newWorker) {
