@@ -1,4 +1,4 @@
-name: Build and Test
+name: Build
 
 on:
   push:
@@ -19,31 +19,10 @@ jobs:
       with:
         node-version: 20
     
-    - name: Configure npm
+    - name: Run CI build script
       run: |
-        npm config set registry https://registry.npmjs.org/
-        npm config set strict-ssl false
-        npm config set legacy-peer-deps true
-        npm config set no-audit true
-        npm config set no-fund true
-        npm config set package-lock false
-    
-    - name: Clean npm cache
-      run: |
-        npm cache clean --force
-        rm -rf node_modules
-        rm -f package-lock.json
-    
-    - name: Install dependencies with npm (bypass integrity check)
-      run: |
-        npm install --no-package-lock --legacy-peer-deps --no-audit --no-fund --ignore-scripts
-      env:
-        NPM_CONFIG_STRICT_SSL: false
-        NPM_CONFIG_REGISTRY: https://registry.npmjs.org/
-    
-    - name: Build
-      run: |
-        npx vite build
+        chmod +x scripts/build-ci.sh
+        ./scripts/build-ci.sh
       env:
         NODE_OPTIONS: --max-old-space-size=4096
     
