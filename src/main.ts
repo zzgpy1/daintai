@@ -37,10 +37,9 @@ app.use(i18n)
 // ============================================
 app.config.errorHandler = (err, instance, info) => {
   console.error('❌ 全局错误:', err)
-  console.error('组件:', instance)
-  console.error('信息:', info)
-  
   if (import.meta.env.DEV) {
+    console.error('组件:', instance)
+    console.error('信息:', info)
     console.error('详细错误栈:', (err as Error).stack)
   }
 }
@@ -78,7 +77,7 @@ if (import.meta.env.PROD && 'serviceWorker' in navigator) {
   window.addEventListener('load', () => {
     navigator.serviceWorker.register('/sw.js')
       .then(registration => {
-        console.log('✅ Service Worker注册成功:', registration)
+        console.log('✅ Service Worker注册成功')
       })
       .catch(error => {
         console.error('❌ Service Worker注册失败:', error)
