@@ -1,5 +1,5 @@
-// 支持的语言类型
-export type SupportedLanguage = 'zh' | 'en' | 'es' | 'fr' | 'de' | 'ja' | 'ko' | 'ru' | 'ar' | 'pt'
+// 支持的语言类型（仅 zh 和 en）
+export type SupportedLanguage = 'zh' | 'en'
 
 // 主题模式
 export type ThemeMode = 'light' | 'dark' | 'system'
@@ -36,4 +36,23 @@ export interface AppSettings {
   enableAutoUpdate: boolean
   analyticsEnabled: boolean
   crashReporting: boolean
+}
+
+// 注意：RadioStation 类型在 radio.ts 中定义
+// 这里声明以避免循环依赖
+interface RadioStation {
+  stationuuid: string
+  name: string
+  url: string
+  url_resolved: string
+  homepage: string
+  favicon: string
+  tags: string
+  country: string
+  countrycode: string
+  state: string
+  language: string
+  languagecodes: string
+  votes: number
+  // ... 其他字段
 }
