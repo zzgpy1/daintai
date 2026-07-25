@@ -19,7 +19,13 @@ jobs:
         cache: 'npm'
     
     - name: Install dependencies
-      run: npm install  # 使用 npm install
+      run: |
+        if [ -f package-lock.json ]; then
+          npm ci
+        else
+          npm install
+          npm run build:lock
+        fi
     
     - name: Build
       run: npm run build
@@ -57,7 +63,13 @@ jobs:
         cache: 'npm'
     
     - name: Install dependencies
-      run: npm install
+      run: |
+        if [ -f package-lock.json ]; then
+          npm ci
+        else
+          npm install
+          npm run build:lock
+        fi
     
     - name: Build
       run: npm run build
@@ -99,7 +111,13 @@ jobs:
         packages: 'platforms;android-34'
     
     - name: Install dependencies
-      run: npm install
+      run: |
+        if [ -f package-lock.json ]; then
+          npm ci
+        else
+          npm install
+          npm run build:lock
+        fi
     
     - name: Build
       run: npm run build
