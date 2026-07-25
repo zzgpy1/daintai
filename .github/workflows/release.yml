@@ -75,21 +75,17 @@ jobs:
       - name: Install Capacitor
         run: |
           npm install -g @capacitor/cli @capacitor/core @capacitor/android
-
-      - name: Install dependencies
-        run: |
-          npm cache clean --force
-          rm -rf node_modules package-lock.json
           npm install --no-package-lock --legacy-peer-deps --no-audit --no-fund --ignore-scripts
 
       - name: Download Web build
         uses: actions/download-artifact@v4
         with:
           name: web-dist
-          path: www/  # 关键修复：Capacitor 默认查找 ./www 目录
+          path: dist/
 
       - name: Sync Capacitor
-        run: npx cap sync android
+        run: |
+          npx cap sync android
 
       - name: Build Android APK
         run: |
@@ -200,7 +196,7 @@ jobs:
     name: 🐳 Build Docker
     runs-on: ubuntu-latest
     needs: build-web
-    if: github.ref_type == 'tag' && secrets.DOCKER_USERNAME != ''
+    if: github.ref_type == 'tag'
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -239,6 +235,7 @@ jobs:
     runs-on: ubuntu-latest
     needs: [build-web, build-android, build-windows, build-macos, build-docker]
     if: always() && github.ref_type == 'tag'
+
     steps:
       - name: Download all artifacts
         uses: actions/download-artifact@v4
@@ -263,3 +260,15 @@ jobs:
           prerelease: false
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Deployment Summary
+        run: |
+          echo "## 🎉 Release Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Platform | Status | Artifact |" >> $GITHUB_STEP_SUMMARY
+          echo "|----------|--------|----------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Web | ✅ | web-dist |" >> $GITHUB_STEP_SUMMARY
+          echo "| Android | ${{ needs.build-android.result }} | android-apk |" >> $GITHUB_STEP_SUMMARY
+          echo "| Windows | ${{ needs.build-windows.result }} | windows-installer |" >> $GITHUB_STEP_SUMMARY
+          echo "| macOS | ${{ needs.build-macos.result }} | macos-installer |" >> $GITHUB_STEP_SUMMARY
+          echo "| Docker | ${{ needs.build-docker.result }} | docker-image |" >> $GITHUB_STEP_SUMMARY
