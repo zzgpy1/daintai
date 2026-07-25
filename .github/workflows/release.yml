@@ -5,11 +5,28 @@ on:
     tags:
       - 'v*'
   workflow_dispatch:
+    inputs:
+      tag_name:
+        description: 'Release Tag (e.g., v1.0.0)'
+        required: true
+        default: 'v1.0.0'
+        type: string
+      release_name:
+        description: 'Release Name'
+        required: true
+        default: 'Release v1.0.0'
+        type: string
 
 env:
   NODE_VERSION: 20
   NODE_OPTIONS: --max-old-space-size=4096
   ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION: true
+
+# 关键：设置写入权限
+permissions:
+  contents: write
+  actions: read
+  checks: read
 
 jobs:
   # ============ Web 构建 ============
@@ -36,7 +53,7 @@ jobs:
       - name: Build Web
         run: npx vite build
         env:
-          VITE_APP_VERSION: ${{ github.ref_name }}
+          VITE_APP_VERSION: ${{ github.ref_name || github.event.inputs.tag_name }}
 
       - name: Upload Web artifacts
         uses: actions/upload-artifact@v4
@@ -238,7 +255,7 @@ jobs:
           push: ${{ secrets.DOCKER_USERNAME != '' }}
           tags: |
             ${{ secrets.DOCKER_USERNAME }}/global-radio:latest
-            ${{ secrets.DOCKER_USERNAME }}/global-radio:${{ github.ref_name }}
+            ${{ secrets.DOCKER_USERNAME }}/global-radio:${{ github.ref_name || github.event.inputs.tag_name }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
         continue-on-error: true
@@ -248,48 +265,52 @@ jobs:
     name: 📦 Create Release
     runs-on: ubuntu-latest
     needs: [build-web]
-    # 关键修复：支持手动触发和 tag 触发
+    # 支持 tag 推送和手动触发
     if: |
       always() && (
         github.ref_type == 'tag' || 
         github.event_name == 'workflow_dispatch'
       )
+    permissions:
+      contents: write  # 关键：写入 Release 权限
     steps:
+      - name: Determine tag name
+        id: tag
+        run: |
+          if [ "${{ github.ref_type }}" == "tag" ]; then
+            echo "tag_name=${{ github.ref_name }}" >> $GITHUB_OUTPUT
+            echo "release_name=Release ${{ github.ref_name }}" >> $GITHUB_OUTPUT
+          else
+            echo "tag_name=${{ github.event.inputs.tag_name }}" >> $GITHUB_OUTPUT
+            echo "release_name=${{ github.event.inputs.release_name }}" >> $GITHUB_OUTPUT
+          fi
+
       - name: Download all artifacts
         uses: actions/download-artifact@v4
-        if: always()
         with:
           path: artifacts
           merge-multiple: true
 
       - name: List artifacts
-        if: always()
         run: |
           echo "📦 Artifacts found:"
-          find artifacts -type f \( -name "*.apk" -o -name "*.exe" -o -name "*.dmg" -o -name "*.zip" -o -name "*.AppImage" -o -name "*.deb" \) | sort || echo "No artifacts found"
+          ls -la artifacts/ || echo "No artifacts directory"
+          find artifacts -type f 2>/dev/null | sort || echo "No files found"
 
       - name: Create GitHub Release
-        uses: softprops/action-gh-release@v1
-        if: always()
+        uses: softprops/action-gh-release@v2
         with:
           files: |
-            artifacts/**/*.apk
-            artifacts/**/*.exe
-            artifacts/**/*.dmg
-            artifacts/**/*.zip
-            artifacts/**/*.AppImage
-            artifacts/**/*.deb
+            artifacts/**/*
           generate_release_notes: true
           draft: false
           prerelease: false
-          tag_name: ${{ github.ref_name || 'manual-release' }}
-          name: Release ${{ github.ref_name || 'Manual Release' }}
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        continue-on-error: true
+          tag_name: ${{ steps.tag.outputs.tag_name }}
+          name: ${{ steps.tag.outputs.release_name }}
+          token: ${{ secrets.GITHUB_TOKEN }}
+        continue-on-error: false
 
       - name: Deployment Summary
-        if: always()
         run: |
           echo "## 🎉 Release Summary" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
@@ -300,3 +321,5 @@ jobs:
           echo "| Windows | ${{ needs.build-windows.result }} | windows-installer |" >> $GITHUB_STEP_SUMMARY
           echo "| macOS | ${{ needs.build-macos.result }} | macos-installer |" >> $GITHUB_STEP_SUMMARY
           echo "| Docker | ${{ needs.build-docker.result }} | docker-image |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "🔗 Release: https://github.com/${{ github.repository }}/releases/tag/${{ steps.tag.outputs.tag_name }}" >> $GITHUB_STEP_SUMMARY
