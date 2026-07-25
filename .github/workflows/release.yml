@@ -26,11 +26,10 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
-          # 移除 cache 选项以避免 lock file 错误
-          # cache: 'npm'
+          # 移除 cache 避免 lock file 错误
       
       - name: Install dependencies
-        run: npm install
+        run: npm install --no-package-lock
       
       - name: Build Web
         run: npm run build
@@ -57,7 +56,7 @@ jobs:
           node-version: ${{ env.NODE_VERSION }}
       
       - name: Install dependencies
-        run: npm install
+        run: npm install --no-package-lock
       
       - name: Build Windows executable
         run: npm run electron:build:win
@@ -87,7 +86,7 @@ jobs:
           node-version: ${{ env.NODE_VERSION }}
       
       - name: Install dependencies
-        run: npm install
+        run: npm install --no-package-lock
       
       - name: Build macOS executable
         run: npm run electron:build:mac
@@ -117,7 +116,7 @@ jobs:
           node-version: ${{ env.NODE_VERSION }}
       
       - name: Install dependencies
-        run: npm install
+        run: npm install --no-package-lock
       
       - name: Build Linux executable
         run: npm run electron:build:linux
@@ -155,7 +154,7 @@ jobs:
         uses: android-actions/setup-android@v3
       
       - name: Install dependencies
-        run: npm install
+        run: npm install --no-package-lock
       
       - name: Build Android APK
         run: npm run build:android
