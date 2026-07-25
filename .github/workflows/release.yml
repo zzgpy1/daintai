@@ -10,6 +10,10 @@ permissions:
   contents: write
   packages: write
 
+# 设置环境变量以允许使用 Node 20（如果需要）
+env:
+  ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION: true
+
 jobs:
   build-web:
     runs-on: ubuntu-latest
@@ -19,42 +23,30 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 18
-          # 不强制要求 lock 文件
+          node-version: '20'  # 使用 Node 20 LTS
           cache: 'npm'
-          cache-dependency-path: '**/package-lock.json'
-      
-      - name: Check for lock file
-        id: check-lock
-        run: |
-          if [ -f package-lock.json ]; then
-            echo "has_lock=true" >> $GITHUB_OUTPUT
-            echo "✅ package-lock.json found"
-          else
-            echo "has_lock=false" >> $GITHUB_OUTPUT
-            echo "⚠️ package-lock.json not found, will generate it"
-          fi
+          cache-dependency-path: 'package-lock.json'  # 明确指定 lock 文件路径
       
       - name: Install dependencies
         run: |
-          if [ -f package-lock.json ]; then
-            echo "📦 Using npm ci with lock file"
-            npm ci
-          else
-            echo "📦 Using npm install (no lock file)"
-            npm install
-            # 生成 lock 文件供后续使用
+          # 如果 lock 文件不存在，生成一个
+          if [ ! -f package-lock.json ]; then
+            echo "⚠️ package-lock.json 不存在，正在生成..."
             npm install --package-lock-only
           fi
+          npm ci
       
       - name: Build Web
         run: npm run build
+        env:
+          NODE_ENV: production
       
       - name: Upload Web artifacts
         uses: actions/upload-artifact@v4
         with:
           name: web-dist
           path: dist/
+          retention-days: 7
 
   build-electron:
     needs: build-web
@@ -65,10 +57,13 @@ jobs:
         include:
           - os: ubuntu-latest
             target: AppImage
+            artifact-name: linux
           - os: windows-latest
             target: nsis
+            artifact-name: windows
           - os: macos-latest
             target: dmg
+            artifact-name: macos
     
     steps:
       - uses: actions/checkout@v4
@@ -76,29 +71,34 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 18
+          node-version: '20'
           cache: 'npm'
-          cache-dependency-path: '**/package-lock.json'
+          cache-dependency-path: 'package-lock.json'
       
       - name: Install dependencies
         run: |
-          if [ -f package-lock.json ]; then
-            npm ci
-          else
-            npm install
+          if [ ! -f package-lock.json ]; then
             npm install --package-lock-only
           fi
+          npm ci
       
       - name: Build Electron
         run: npm run electron:build
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          NODE_ENV: production
       
       - name: Upload Electron artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: electron-${{ matrix.os }}
-          path: dist-electron/
+          name: electron-${{ matrix.artifact-name }}
+          path: |
+            dist-electron/**/*.AppImage
+            dist-electron/**/*.exe
+            dist-electron/**/*.dmg
+            dist-electron/**/*.zip
+          retention-days: 7
+          if-no-files-found: warn
 
   build-android:
     needs: build-web
@@ -109,9 +109,9 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 18
+          node-version: '20'
           cache: 'npm'
-          cache-dependency-path: '**/package-lock.json'
+          cache-dependency-path: 'package-lock.json'
       
       - name: Setup Java
         uses: actions/setup-java@v4
@@ -124,21 +124,22 @@ jobs:
       
       - name: Install dependencies
         run: |
-          if [ -f package-lock.json ]; then
-            npm ci
-          else
-            npm install
+          if [ ! -f package-lock.json ]; then
             npm install --package-lock-only
           fi
+          npm ci
       
       - name: Build Android
         run: npm run build:android
+        env:
+          NODE_ENV: production
       
       - name: Upload Android artifacts
         uses: actions/upload-artifact@v4
         with:
           name: android-apk
           path: android/app/build/outputs/apk/release/*.apk
+          retention-days: 7
 
   publish-docker:
     needs: build-web
@@ -163,7 +164,7 @@ jobs:
           tags: |
             type=semver,pattern={{version}}
             type=semver,pattern={{major}}.{{minor}}
-            type=raw,value=latest,enable={{is_default_branch}}
+            type=raw,value=latest,enable=${{ github.ref == 'refs/heads/main' }}
       
       - name: Build and push Docker image
         uses: docker/build-push-action@v5
@@ -175,26 +176,44 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
+          platforms: linux/amd64,linux/arm64
 
   create-release:
     needs: [build-electron, build-android, publish-docker]
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     steps:
       - uses: actions/checkout@v4
       
-      - name: Download artifacts
+      - name: Download all artifacts
         uses: actions/download-artifact@v4
         with:
           path: artifacts/
       
+      - name: List artifacts
+        run: |
+          echo "📦 下载的构建产物:"
+          find artifacts/ -type f -name "*.AppImage" -o -name "*.exe" -o -name "*.dmg" -o -name "*.apk" | sort
+      
+      - name: Get version from tag
+        id: get_version
+        run: |
+          VERSION=${GITHUB_REF#refs/tags/v}
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+      
       - name: Create Release
         uses: softprops/action-gh-release@v1
         with:
+          name: v${{ steps.get_version.outputs.version }}
+          tag_name: ${{ github.ref_name }}
           files: |
-            artifacts/electron-ubuntu-latest/*.AppImage
-            artifacts/electron-windows-latest/*.exe
-            artifacts/electron-macos-latest/*.dmg
+            artifacts/electron-linux/*.AppImage
+            artifacts/electron-windows/*.exe
+            artifacts/electron-macos/*.dmg
             artifacts/android-apk/*.apk
           draft: false
           prerelease: false
           generate_release_notes: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
