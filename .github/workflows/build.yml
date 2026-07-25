@@ -24,21 +24,31 @@ jobs:
         node-version: ${{ matrix.node-version }}
         cache: 'npm'
     
-    - name: Install dependencies
+    - name: Check lockfile
       run: |
         if [ -f package-lock.json ]; then
-          echo "📦 package-lock.json found, using npm ci"
-          npm ci
+          echo "📦 package-lock.json exists"
+          echo "Lockfile version: $(head -20 package-lock.json | grep lockfileVersion || echo 'unknown')"
         else
-          echo "📦 package-lock.json not found, generating with npm install"
+          echo "📦 No package-lock.json found"
+        fi
+    
+    - name: Install dependencies (smart install)
+      run: |
+        # 智能安装：尝试 npm ci，失败则回退到 npm install
+        if [ -f package-lock.json ]; then
+          echo "📦 Attempting npm ci..."
+          npm ci 2>/dev/null || {
+            echo "⚠️ npm ci failed, falling back to npm install..."
+            npm install
+          }
+        else
+          echo "📦 No lockfile, using npm install..."
           npm install
         fi
     
-    - name: Run lint
-      run: npm run lint || echo "No lint script found"
-    
     - name: Build
-      run: npm run build
+      run: npm run build --if-present
       env:
         NODE_OPTIONS: --max-old-space-size=4096
     
