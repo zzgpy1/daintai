@@ -1,0 +1,26 @@
+FROM node:20-alpine
+
+WORKDIR /app
+
+# 配置 npm
+RUN npm config set registry https://registry.npmjs.org/ \
+    && npm config set strict-ssl false \
+    && npm config set legacy-peer-deps true \
+    && npm config set no-audit true \
+    && npm config set no-fund true \
+    && npm config set package-lock false
+
+# 复制依赖文件
+COPY package*.json ./
+
+# 安装依赖
+RUN npm install --no-package-lock --legacy-peer-deps --no-audit --no-fund --ignore-scripts
+
+# 复制源码
+COPY . .
+
+# 构建
+RUN npx vite build
+
+# 输出构建产物
+CMD ["echo", "Build complete!"]
