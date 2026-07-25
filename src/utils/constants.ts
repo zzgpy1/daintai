@@ -38,18 +38,10 @@ export const COUNTRY_CODE_MAP: Record<string, string> = {
   'MX': '墨西哥'
 }
 
-// 语言代码映射
+// 语言代码映射 - 仅保留中文和英文
 export const LANGUAGE_CODE_MAP: Record<string, string> = {
   'zh': '中文',
-  'en': 'English',
-  'es': 'Español',
-  'fr': 'Français',
-  'de': 'Deutsch',
-  'ja': '日本語',
-  'ko': '한국어',
-  'ru': 'Русский',
-  'ar': 'العربية',
-  'pt': 'Português'
+  'en': 'English'
 }
 
 // 标签分类
