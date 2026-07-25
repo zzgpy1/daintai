@@ -8,6 +8,7 @@ import './style.css'
 
 // ============================================
 // 导入语言包 - 只导入已存在的文件
+// 注意：如果后续需要添加其他语言，请先在 locales 目录下创建对应的 json 文件
 // ============================================
 import zh from './locales/zh.json'
 import en from './locales/en.json'
@@ -77,7 +78,7 @@ if (import.meta.env.PROD && 'serviceWorker' in navigator) {
   window.addEventListener('load', () => {
     navigator.serviceWorker.register('/sw.js')
       .then(registration => {
-        console.log('✅ Service Worker注册成功')
+        console.log('✅ Service Worker注册成功:', registration)
       })
       .catch(error => {
         console.error('❌ Service Worker注册失败:', error)
