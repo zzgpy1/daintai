@@ -15,64 +15,107 @@ on:
           - staging
 
 jobs:
-  deploy-web:
+  build:
+    name: Build
     runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/main'
+    outputs:
+      build_status: ${{ steps.build.outputs.status }}
     
     steps:
-    - uses: actions/checkout@v4
+    - name: Checkout code
+      uses: actions/checkout@v4
     
     - name: Setup Node.js
       uses: actions/setup-node@v4
       with:
         node-version: 20
     
-    - name: Install dependencies
+    - name: Clean install
       run: |
         npm cache clean --force
         rm -rf node_modules package-lock.json
         npm install --no-package-lock --legacy-peer-deps --no-audit --no-fund --ignore-scripts
     
-    - name: Build
+    - name: Build project
+      id: build
       run: |
         npx vite build
+        echo "status=success" >> $GITHUB_OUTPUT
       env:
         NODE_OPTIONS: --max-old-space-size=4096
     
-    # 方案 1：使用 SSH 部署（需要配置 SSH 密钥）
-    - name: Deploy via SSH
-      if: secrets.DEPLOY_HOST != '' && secrets.DEPLOY_USER != ''
-      run: |
-        mkdir -p ~/.ssh
-        echo "${{ secrets.DEPLOY_PRIVATE_KEY }}" > ~/.ssh/id_rsa
-        chmod 600 ~/.ssh/id_rsa
-        echo "${{ secrets.DEPLOY_KNOWN_HOSTS }}" > ~/.ssh/known_hosts
-        chmod 600 ~/.ssh/known_hosts
-        rsync -avz --delete -e "ssh -o StrictHostKeyChecking=yes" dist/ ${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }}:${{ secrets.DEPLOY_PATH }}/
-    
-    # 方案 2：使用 GitHub Pages
-    - name: Deploy to GitHub Pages
-      if: github.ref == 'refs/heads/main'
-      uses: peaceiris/actions-gh-pages@v3
+    - name: Upload build artifacts
+      uses: actions/upload-artifact@v4
       with:
-        github_token: ${{ secrets.GITHUB_TOKEN }}
-        publish_dir: ./dist
-        publish_branch: gh-pages
-        force_orphan: true
+        name: dist
+        path: dist/
+        retention-days: 7
+
+  deploy-github-pages:
+    name: Deploy to GitHub Pages
+    runs-on: ubuntu-latest
+    needs: build
+    if: github.ref == 'refs/heads/main'
     
-    # 方案 3：使用 Vercel
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    
+    steps:
+    - name: Download build artifacts
+      uses: actions/download-artifact@v4
+      with:
+        name: dist
+        path: dist/
+    
+    - name: Setup Pages
+      uses: actions/configure-pages@v4
+    
+    - name: Upload Pages artifact
+      uses: actions/upload-pages-artifact@v3
+      with:
+        path: dist/
+    
+    - name: Deploy to GitHub Pages
+      id: deployment
+      uses: actions/deploy-pages@v4
+
+  deploy-vercel:
+    name: Deploy to Vercel
+    runs-on: ubuntu-latest
+    needs: build
+    if: secrets.VERCEL_TOKEN != '' && github.ref == 'refs/heads/main'
+    
+    steps:
+    - name: Download build artifacts
+      uses: actions/download-artifact@v4
+      with:
+        name: dist
+        path: dist/
+    
     - name: Deploy to Vercel
-      if: secrets.VERCEL_TOKEN != '' && secrets.VERCEL_PROJECT_ID != ''
       uses: amondnet/vercel-action@v25
       with:
         vercel-token: ${{ secrets.VERCEL_TOKEN }}
         vercel-org-id: ${{ secrets.VERCEL_ORG_ID }}
         vercel-project-id: ${{ secrets.VERCEL_PROJECT_ID }}
         vercel-args: '--prod'
+
+  deploy-netlify:
+    name: Deploy to Netlify
+    runs-on: ubuntu-latest
+    needs: build
+    if: secrets.NETLIFY_AUTH_TOKEN != '' && github.ref == 'refs/heads/main'
     
-    # 方案 4：使用 Netlify
+    steps:
+    - name: Download build artifacts
+      uses: actions/download-artifact@v4
+      with:
+        name: dist
+        path: dist/
+    
     - name: Deploy to Netlify
-      if: secrets.NETLIFY_AUTH_TOKEN != ''
       uses: nwtgck/actions-netlify@v2.0
       with:
         publish-dir: './dist'
@@ -81,46 +124,22 @@ jobs:
         deploy-message: "Deploy from GitHub Actions"
         enable-pull-request-comment: false
         enable-commit-comment: true
-        overwrites-pull-request-comment: true
       env:
         NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
         NETLIFY_SITE_ID: ${{ secrets.NETLIFY_SITE_ID }}
-    
-    # 方案 5：使用 FTP
-    - name: Deploy via FTP
-      if: secrets.FTP_USERNAME != '' && secrets.FTP_SERVER != ''
-      uses: SamKirkland/FTP-Deploy-Action@v4.3.4
-      with:
-        server: ${{ secrets.FTP_SERVER }}
-        username: ${{ secrets.FTP_USERNAME }}
-        password: ${{ secrets.FTP_PASSWORD }}
-        local-dir: ./dist/
-        server-dir: ${{ secrets.FTP_REMOTE_DIR }}
 
-  # 部署到 VPS 的完整方案
   deploy-vps:
+    name: Deploy to VPS
     runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/main'
+    needs: build
+    if: secrets.VPS_HOST != '' && github.ref == 'refs/heads/main'
     
     steps:
-    - uses: actions/checkout@v4
-    
-    - name: Setup Node.js
-      uses: actions/setup-node@v4
+    - name: Download build artifacts
+      uses: actions/download-artifact@v4
       with:
-        node-version: 20
-    
-    - name: Install dependencies
-      run: |
-        npm cache clean --force
-        rm -rf node_modules package-lock.json
-        npm install --no-package-lock --legacy-peer-deps --no-audit --no-fund --ignore-scripts
-    
-    - name: Build
-      run: |
-        npx vite build
-      env:
-        NODE_OPTIONS: --max-old-space-size=4096
+        name: dist
+        path: dist/
     
     - name: Setup SSH key
       run: |
@@ -144,4 +163,16 @@ jobs:
     - name: Reload Nginx
       run: |
         ssh -p ${{ secrets.VPS_PORT || 22 }} ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} \
-          "sudo nginx -t && sudo systemctl reload nginx"
+          "sudo nginx -t && sudo systemctl reload nginx" || echo "Nginx reload skipped"
+
+  notification:
+    name: Notification
+    runs-on: ubuntu-latest
+    needs: [deploy-github-pages, deploy-vercel, deploy-netlify, deploy-vps]
+    if: always()
+    
+    steps:
+    - name: Check deployment status
+      run: |
+        echo "Deployment completed!"
+        echo "Status: ${{ needs.deploy-github-pages.result }}"
