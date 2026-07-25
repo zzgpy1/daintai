@@ -1,6 +1,8 @@
 import { contextBridge, ipcRenderer } from 'electron'
 
+// ============================================
 // 暴露安全的API给渲染进程
+// ============================================
 contextBridge.exposeInMainWorld('electronAPI', {
   // 获取版本
   getVersion: () => ipcRenderer.invoke('get-version'),
