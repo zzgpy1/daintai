@@ -76,26 +76,30 @@
           <h2 class="text-xl font-semibold text-ios-dark-gray dark:text-dark-text">{{ $t('home.popularStations') }}</h2>
           <button
             @click="refreshTopStations"
-            :disabled="radioStore.isLoadingTopStations"
+            :disabled="isLoadingTopStations"
             class="p-2 rounded-full bg-ios-blue/10 hover:bg-ios-blue/20 transition-colors disabled:opacity-50"
           >
-            <ArrowPathIcon :class="['w-5 h-5 text-ios-blue', { 'animate-spin': radioStore.isLoadingTopStations }]" />
+            <ArrowPathIcon :class="['w-5 h-5 text-ios-blue', { 'animate-spin': isLoadingTopStations }]" />
           </button>
         </div>
         
-        <div v-if="radioStore.isLoadingTopStations && radioStore.topStations.length === 0" class="space-y-3">
+        <div v-if="isLoadingTopStations && topStations.length === 0" class="space-y-3">
           <StationSkeleton v-for="i in 5" :key="i" />
         </div>
         
-        <div v-else class="space-y-3">
+        <div v-else-if="topStations.length > 0" class="space-y-3">
           <StationCard 
-            v-for="station in radioStore.topStations.slice(0, 10)" 
+            v-for="station in topStations.slice(0, 10)" 
             :key="station.stationuuid"
             :station="station"
             @play="playStation"
             @favorite="toggleFavorite"
             @share="openShareModal"
           />
+        </div>
+        
+        <div v-else class="text-center py-8 text-ios-gray dark:text-dark-secondary">
+          {{ $t('home.noStations') }}
         </div>
       </section>
 
@@ -105,19 +109,23 @@
           <h2 class="text-xl font-semibold text-ios-dark-gray dark:text-dark-text">{{ $t('home.latestStations') }}</h2>
         </div>
         
-        <div v-if="radioStore.isLoadingLatestStations && radioStore.latestStations.length === 0" class="space-y-3">
+        <div v-if="isLoadingLatestStations && latestStations.length === 0" class="space-y-3">
           <StationSkeleton v-for="i in 5" :key="i" />
         </div>
         
-        <div v-else class="space-y-3">
+        <div v-else-if="latestStations.length > 0" class="space-y-3">
           <StationCard 
-            v-for="station in radioStore.latestStations.slice(0, 10)" 
+            v-for="station in latestStations.slice(0, 10)" 
             :key="station.stationuuid"
             :station="station"
             @play="playStation"
             @favorite="toggleFavorite"
             @share="openShareModal"
           />
+        </div>
+        
+        <div v-else class="text-center py-8 text-ios-gray dark:text-dark-secondary">
+          {{ $t('home.noStations') }}
         </div>
       </section>
     </div>
@@ -132,11 +140,10 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, computed } from 'vue'
 import { useRadioStore } from '@/stores/radio'
 import { usePlayerStore } from '@/stores/player'
 import { useFavoritesStore } from '@/stores/favorites'
-import { useToastStore } from '@/stores/toast'
 import type { RadioStation } from '@/types/radio'
 
 import {
@@ -156,7 +163,12 @@ import ShareModal from '@/components/ShareModal.vue'
 const radioStore = useRadioStore()
 const playerStore = usePlayerStore()
 const favoritesStore = useFavoritesStore()
-const toastStore = useToastStore()
+
+// 使用 computed 获取响应式数据
+const topStations = computed(() => radioStore.topStations)
+const latestStations = computed(() => radioStore.latestStations)
+const isLoadingTopStations = computed(() => radioStore.isLoadingTopStations)
+const isLoadingLatestStations = computed(() => radioStore.isLoadingLatestStations)
 
 const isShareModalVisible = ref(false)
 const stationToShare = ref<RadioStation | null>(null)
