@@ -19,7 +19,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 18
+          node-version: 18  # 固定使用 Node 18，避免警告
           cache: npm
 
       - name: Install dependencies
@@ -31,22 +31,25 @@ jobs:
       - name: Upload Web Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: web-dist
+          name: web-dist  # 明确命名
           path: dist/
           retention-days: 7
 
+      # Docker 构建与推送（与 artifact 无关，但可保留）
       - name: Build Docker image
         run: |
           docker build -t ${{ env.DOCKER_IMAGE }}:${{ github.sha }} .
           docker tag ${{ env.DOCKER_IMAGE }}:${{ github.sha }} ${{ env.DOCKER_IMAGE }}:latest
 
       - name: Login to Docker Hub
+        if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
         uses: docker/login-action@v3
         with:
           username: ${{ secrets.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_PASSWORD }}
 
       - name: Push Docker image
+        if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
         run: |
           docker push ${{ env.DOCKER_IMAGE }}:${{ github.sha }}
           docker push ${{ env.DOCKER_IMAGE }}:latest
@@ -85,7 +88,7 @@ jobs:
       - name: Upload Desktop Artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: global-radio-${{ matrix.platform }}
+          name: desktop-${{ matrix.platform }}  # 为每个平台独立命名
           path: release/
           retention-days: 7
 
@@ -127,11 +130,11 @@ jobs:
       - name: Upload Android APK
         uses: actions/upload-artifact@v4
         with:
-          name: android-apk
+          name: android-apk  # 保持名称一致
           path: android/app/build/outputs/apk/release/*.apk
           retention-days: 7
 
-  # 4. 发布 Release
+  # 4. 发布 Release（整合所有产物）
   release:
     needs: [build-web, build-desktop, build-android]
     runs-on: ubuntu-latest
@@ -142,14 +145,15 @@ jobs:
       - name: Download all artifacts
         uses: actions/download-artifact@v4
         with:
-          path: artifacts
-          merge-multiple: true
+          path: artifacts  # 下载到统一目录
+          # 注意：这里没有指定 name，会下载所有关联的 artifact
 
-      - name: List artifacts
+      - name: List downloaded artifacts
         run: ls -la artifacts/
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v1
         with:
+          # 上传 artifacts 目录下的所有文件
           files: artifacts/**/*
           generate_release_notes: true
