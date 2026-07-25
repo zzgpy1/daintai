@@ -21,9 +21,19 @@ jobs:
         with:
           node-version: 18
           cache: 'npm'
+          # 如果找不到 lock 文件，不会报错
+          cache-dependency-path: '**/package-lock.json'
       
       - name: Install dependencies
-        run: npm ci
+        run: |
+          # 如果存在 package-lock.json 则使用 npm ci，否则使用 npm install
+          if [ -f package-lock.json ]; then
+            npm ci
+          else
+            npm install
+            # 生成 package-lock.json 以便后续缓存
+            npm install --package-lock-only
+          fi
       
       - name: Build Web
         run: npm run build
@@ -56,9 +66,16 @@ jobs:
         with:
           node-version: 18
           cache: 'npm'
+          cache-dependency-path: '**/package-lock.json'
       
       - name: Install dependencies
-        run: npm ci
+        run: |
+          if [ -f package-lock.json ]; then
+            npm ci
+          else
+            npm install
+            npm install --package-lock-only
+          fi
       
       - name: Build Electron
         run: npm run electron:build
@@ -82,6 +99,7 @@ jobs:
         with:
           node-version: 18
           cache: 'npm'
+          cache-dependency-path: '**/package-lock.json'
       
       - name: Setup Java
         uses: actions/setup-java@v4
@@ -93,7 +111,13 @@ jobs:
         uses: android-actions/setup-android@v3
       
       - name: Install dependencies
-        run: npm ci
+        run: |
+          if [ -f package-lock.json ]; then
+            npm ci
+          else
+            npm install
+            npm install --package-lock-only
+          fi
       
       - name: Build Android
         run: npm run build:android
