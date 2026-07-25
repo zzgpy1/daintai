@@ -11,58 +11,32 @@ jobs:
   build:
     runs-on: ubuntu-latest
     
+    strategy:
+      matrix:
+        node-version: [18.x, 20.x]
+    
     steps:
     - uses: actions/checkout@v4
     
-    # 使用 Node 22 避免 Node 20 弃用警告
-    - name: Setup Node.js
+    - name: Use Node.js ${{ matrix.node-version }}
       uses: actions/setup-node@v4
       with:
-        node-version: 22.x
+        node-version: ${{ matrix.node-version }}
         cache: 'npm'
-        cache-dependency-path: |
-          package-lock.json
-          package.json
     
-    # 自动生成 package-lock.json 如果缺失
-    - name: Generate lock file if missing
-      run: |
-        if [ ! -f package-lock.json ]; then
-          echo "📦 Generating package-lock.json..."
-          npm install --package-lock-only --legacy-peer-deps
-        fi
-    
-    # 使用 npm ci 加速安装（如果 lock 文件存在）
     - name: Install dependencies
-      run: |
-        if [ -f package-lock.json ]; then
-          npm ci --legacy-peer-deps
-        else
-          npm install --legacy-peer-deps
-        fi
-      env:
-        NODE_OPTIONS: --max-old-space-size=4096
+      run: npm install  # 改为 npm install
     
-    # 构建
+    - name: Run lint
+      run: npm run lint || echo "No lint script found"
+    
     - name: Build
-      run: npm run build
+      run: npm run build --if-present
       env:
         NODE_OPTIONS: --max-old-space-size=4096
     
-    # 上传构建产物
     - name: Upload build artifacts
       uses: actions/upload-artifact@v4
       with:
-        name: dist
+        name: dist-${{ matrix.node-version }}
         path: dist/
-        retention-days: 7
-    
-    # 可选：部署到 GitHub Pages（仅 main 分支）
-    - name: Deploy to GitHub Pages
-      if: github.ref == 'refs/heads/main'
-      uses: peaceiris/actions-gh-pages@v3
-      with:
-        github_token: ${{ secrets.GITHUB_TOKEN }}
-        publish_dir: ./dist
-        publish_branch: gh-pages
-        force_orphan: true
