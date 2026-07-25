@@ -101,9 +101,21 @@ jobs:
       - name: Sync Capacitor
         run: npx cap sync android
 
+      - name: List android directory
+        run: |
+          ls -la android/ || echo "android directory not found"
+          ls -la android/app/ || echo "app directory not found"
+          ls -la android/app/build.gradle || echo "build.gradle not found"
+
       - name: Build Android APK
         run: |
           cd android
+          # 检查是否存在 gradlew，如果不存在则创建
+          if [ ! -f "gradlew" ]; then
+            echo "gradlew not found, creating..."
+            # 使用 gradle wrapper 生成
+            gradle wrapper --gradle-version 8.0.2
+          fi
           chmod +x gradlew
           ./gradlew assembleRelease
         continue-on-error: true
@@ -236,7 +248,6 @@ jobs:
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
-        continue-on-error: true
 
       - name: Login to Docker Hub
         uses: docker/login-action@v3
@@ -249,7 +260,7 @@ jobs:
         uses: docker/build-push-action@v5
         with:
           context: .
-          push: ${{ secrets.DOCKER_USERNAME != '' }}
+          push: true
           tags: |
             ${{ secrets.DOCKER_USERNAME }}/global-radio:latest
             ${{ secrets.DOCKER_USERNAME }}/global-radio:${{ github.ref_name || github.event.inputs.tag_name }}
@@ -257,7 +268,12 @@ jobs:
           cache-to: type=gha,mode=max
         continue-on-error: true
 
-  # ============ 打包产物（压缩各平台安装包） ============
+      - name: Verify Docker push
+        run: |
+          echo "Docker image: ${{ secrets.DOCKER_USERNAME }}/global-radio:${{ github.ref_name || github.event.inputs.tag_name }}"
+          echo "Docker Hub: https://hub.docker.com/r/${{ secrets.DOCKER_USERNAME }}/global-radio"
+
+  # ============ 打包产物 ============
   package-artifacts:
     name: 📦 Package Artifacts
     runs-on: ubuntu-latest
@@ -291,23 +307,26 @@ jobs:
           mkdir -p release-packages
           
           # Android
-          if [ -d "artifacts/android" ] && [ "$(ls -A artifacts/android)" ]; then
+          if [ -d "artifacts/android" ] && [ "$(ls -A artifacts/android 2>/dev/null)" ]; then
             cp artifacts/android/*.apk release-packages/ 2>/dev/null || true
+            echo "Android APK copied"
           fi
           
           # Windows
-          if [ -d "artifacts/windows" ] && [ "$(ls -A artifacts/windows)" ]; then
+          if [ -d "artifacts/windows" ] && [ "$(ls -A artifacts/windows 2>/dev/null)" ]; then
             cp artifacts/windows/*.exe release-packages/ 2>/dev/null || true
+            echo "Windows installer copied"
           fi
           
           # macOS
-          if [ -d "artifacts/macos" ] && [ "$(ls -A artifacts/macos)" ]; then
+          if [ -d "artifacts/macos" ] && [ "$(ls -A artifacts/macos 2>/dev/null)" ]; then
             cp artifacts/macos/*.dmg release-packages/ 2>/dev/null || true
             cp artifacts/macos/*.zip release-packages/ 2>/dev/null || true
+            echo "macOS installer copied"
           fi
           
           echo "Files in release-packages:"
-          ls -la release-packages/
+          ls -la release-packages/ || echo "No files"
 
       - name: Upload release packages
         uses: actions/upload-artifact@v4
@@ -375,3 +394,4 @@ jobs:
           echo "| Docker | ${{ needs.build-docker.result }} |" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "🔗 Release: https://github.com/${{ github.repository }}/releases/tag/${{ steps.tag.outputs.tag_name }}" >> $GITHUB_STEP_SUMMARY
+          echo "🐳 Docker Hub: https://hub.docker.com/r/${{ secrets.DOCKER_USERNAME }}/global-radio" >> $GITHUB_STEP_SUMMARY
