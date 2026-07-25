@@ -1,14 +1,16 @@
-# 多阶段构建 - 构建阶段
+# ============================================
+# 构建阶段
+# ============================================
 FROM node:18-alpine AS builder
 
 WORKDIR /app
 
-# 复制依赖文件 (使用 npm)
+# 复制 package.json（优先复制锁文件）
 COPY package*.json ./
 COPY package-lock*.json ./
 
-# 安装依赖
-RUN npm ci --only=production=false
+# 如果没有 lock 文件，使用 npm install
+RUN if [ -f package-lock.json ]; then npm ci --only=production=false; else npm install; fi
 
 # 复制源码
 COPY . .
