@@ -2,7 +2,7 @@ version: '3.8'
 
 services:
   global-radio-web:
-    image: global-radio:latest
+    image: superneed/global-radio:latest
     container_name: global-radio-web
     restart: unless-stopped
     ports:
