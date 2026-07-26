@@ -24,26 +24,25 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-      
+
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: 18
           cache: 'npm'
-      
+
       - name: Install dependencies
-        run: |
-          npm install --legacy-peer-deps
-      
+        run: npm install --legacy-peer-deps
+
       - name: Build Web
         run: npm run build
-      
+
       - name: Verify build
         run: |
           ls -la dist/
           test -f dist/index.html || exit 1
           echo "✅ Web build successful!"
-      
+
       - name: Upload Web artifacts
         uses: actions/upload-artifact@v4
         with:
@@ -57,22 +56,27 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-      
+
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: 18
           cache: 'npm'
-      
+
+      - name: Download Web build artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: web-dist
+          path: dist/
+
       - name: Install dependencies
-        run: |
-          npm install --legacy-peer-deps
-      
+        run: npm install --legacy-peer-deps
+
       - name: Build Electron Windows
         run: npm run electron:build:win
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      
+
       - name: Upload Electron artifacts
         uses: actions/upload-artifact@v4
         with:
@@ -86,44 +90,49 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-      
+
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: 18
           cache: 'npm'
-      
+
       - name: Setup Java
         uses: actions/setup-java@v4
         with:
           distribution: 'zulu'
           java-version: '17'
-      
+
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
-      
+
+      - name: Download Web build artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: web-dist
+          path: www/
+
       - name: Install dependencies
-        run: |
-          npm install --legacy-peer-deps
-          npm install -g @capacitor/cli
-      
-      - name: Build Web
-        run: npm run build
-      
+        run: npm install --legacy-peer-deps
+
+      - name: Install Capacitor CLI
+        run: npm install -g @capacitor/cli
+
+      - name: Init Capacitor
+        run: npx cap init global-radio com.globalradio.app
+
       - name: Add Android platform
-        run: |
-          npx cap init global-radio com.globalradio.app
-          npx cap add android
-      
+        run: npx cap add android
+
       - name: Sync Capacitor
         run: npx cap sync android
-      
+
       - name: Build Android APK
         run: |
           cd android
           chmod +x gradlew
           ./gradlew assembleRelease --no-daemon
-      
+
       - name: Upload Android APK
         uses: actions/upload-artifact@v4
         with:
@@ -134,35 +143,38 @@ jobs:
     name: Publish Docker Image
     needs: build-web
     runs-on: ubuntu-latest
-    # 将 Secrets 映射为环境变量，以便在 if 条件中判断
     env:
       DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
       DOCKER_PASSWORD: ${{ secrets.DOCKER_PASSWORD }}
-    # 仅在两个 Secret 都存在时运行
-    if: env.DOCKER_USERNAME != '' && env.DOCKER_PASSWORD != ''
+    # 仅当有 Docker 凭据时才运行；同时确保是 tag 触发或手动输入了 tag
+    if: |
+      (env.DOCKER_USERNAME != '' && env.DOCKER_PASSWORD != '') &&
+      ( (github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')) ||
+        (github.event_name == 'workflow_dispatch' && github.event.inputs.tag != '') )
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-      
+
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
-      
+
       - name: Login to Docker Hub
         uses: docker/login-action@v3
         with:
           username: ${{ secrets.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_PASSWORD }}
-      
-      - name: Extract metadata
+
+      - name: Extract metadata (tags)
         id: meta
         uses: docker/metadata-action@v5
         with:
           images: ${{ secrets.DOCKER_USERNAME }}/global-radio
           tags: |
-            type=semver,pattern={{version}}
-            type=semver,pattern={{major}}.{{minor}}
+            # 从事件中获取版本号：push 时用 ref_name，手动时用输入 tag
+            type=raw,value=${{ github.event_name == 'push' && github.ref_name || github.event.inputs.tag }}
+            # 始终保留 latest 标签（仅当主分支时）
             type=raw,value=latest,enable=${{ github.ref == 'refs/heads/main' }}
-      
+
       - name: Build and push Docker image
         uses: docker/build-push-action@v5
         with:
@@ -178,24 +190,38 @@ jobs:
     name: Create GitHub Release
     needs: [build-electron, build-android]
     runs-on: ubuntu-latest
-    if: startsWith(github.ref, 'refs/tags/')
+    # 触发条件：push tag 或手动触发且输入了 tag
+    if: |
+      (github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')) ||
+      (github.event_name == 'workflow_dispatch' && github.event.inputs.tag != '')
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-      
+
       - name: Download artifacts
         uses: actions/download-artifact@v4
         with:
           path: artifacts/
-      
+
       - name: List artifacts
         run: |
           echo "=== Artifacts ==="
           find artifacts/ -type f | head -20
-      
+
+      - name: Determine release tag
+        id: get_tag
+        run: |
+          if [[ "${{ github.event_name }}" == "push" ]]; then
+            TAG="${{ github.ref_name }}"
+          else
+            TAG="${{ github.event.inputs.tag }}"
+          fi
+          echo "tag=$TAG" >> $GITHUB_OUTPUT
+
       - name: Create Release
         uses: softprops/action-gh-release@v1
         with:
+          tag_name: ${{ steps.get_tag.outputs.tag }}
           files: |
             artifacts/electron-win/*.exe
             artifacts/android-apk/*.apk
