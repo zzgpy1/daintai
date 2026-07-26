@@ -1,7 +1,8 @@
 FROM node:18-alpine AS builder
 WORKDIR /app
 COPY package*.json ./
-RUN npm ci --only=production=false   # ← 错误的参数 + 锁文件不同步
+# 删除锁文件（避免版本冲突），然后安装所有依赖（包括 devDependencies）
+RUN rm -f package-lock.json && npm install --legacy-peer-deps
 COPY . .
 RUN npm run build
 
