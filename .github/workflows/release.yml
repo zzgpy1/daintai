@@ -1,4 +1,4 @@
-name: release   # ← 修改为简短的名称，显示为 "release"
+name: Release
 
 on:
   push:
