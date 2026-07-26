@@ -1,5 +1,5 @@
 import axios from 'axios'
-import { API_CONFIG } from '@/config'
+import { API_CONFIG } from '@/config'   // 改为从 '@/config' 导入
 import type { RadioStation, RadioSearchParams, Country, Language, Tag } from '@/types/radio'
 
 class RadioAPI {
