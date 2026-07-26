@@ -9,27 +9,20 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
-    
     strategy:
       matrix:
         node-version: [18.x]
-    
     steps:
       - uses: actions/checkout@v4
-      
       - name: Use Node.js ${{ matrix.node-version }}
         uses: actions/setup-node@v4
         with:
           node-version: ${{ matrix.node-version }}
           cache: 'npm'
-      
-      # ✅ 使用 npm install 替代 npm ci
       - name: Install dependencies
-        run: npm install --legacy-peer-deps
-      
+        run: rm -f package-lock.json && npm install --legacy-peer-deps   # ← 修改
       - name: Build
         run: npm run build
-      
       - name: Test build
         run: |
           if [ ! -d "dist" ] || [ ! -f "dist/index.html" ]; then
