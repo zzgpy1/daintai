@@ -45,6 +45,12 @@
     "vite": "^5.0.8",
     "vue-tsc": "^1.8.27"
   },
+  "overrides": {
+    "rolldown": "0.14.0"
+  },
+  "resolutions": {
+    "rolldown": "0.14.0"
+  },
   "build": {
     "appId": "com.globalradio.app",
     "productName": "全球电台",
