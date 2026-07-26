@@ -112,6 +112,16 @@ export const useRadioStore = defineStore('radio', () => {
     }
   }
 
+  // ✅ 新增方法：根据 UUID 获取单个电台
+  const getStationByUUID = async (uuid: string): Promise<RadioStation | null> => {
+    try {
+      return await radioAPI.getStationByUUID(uuid)
+    } catch (err) {
+      console.error('获取电台详情失败:', err)
+      return null
+    }
+  }
+
   const resetSearch = () => {
     searchQuery.value = ''
     selectedCountry.value = ''
@@ -140,6 +150,7 @@ export const useRadioStore = defineStore('radio', () => {
     loadCountries,
     loadLanguages,
     loadTags,
+    getStationByUUID,   // 暴露新方法
     resetSearch
   }
 })
