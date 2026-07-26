@@ -143,7 +143,6 @@ jobs:
     name: Publish Docker Image
     needs: build-web
     runs-on: ubuntu-latest
-    # 仅当触发方式为 tag push 或手动指定 tag 时运行此 job
     if: |
       (github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')) ||
       (github.event_name == 'workflow_dispatch' && github.event.inputs.tag != '')
@@ -151,18 +150,31 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      - name: Check Docker credentials
+        id: check
+        run: |
+          if [ -n "$DOCKER_USERNAME" ] && [ -n "$DOCKER_PASSWORD" ]; then
+            echo "available=true" >> $GITHUB_OUTPUT
+          else
+            echo "available=false" >> $GITHUB_OUTPUT
+          fi
+        env:
+          DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
+          DOCKER_PASSWORD: ${{ secrets.DOCKER_PASSWORD }}
+
       - name: Set up Docker Buildx
+        if: steps.check.outputs.available == 'true'
         uses: docker/setup-buildx-action@v3
 
       - name: Login to Docker Hub
-        # 只有在 secrets 存在时才登录
-        if: ${{ secrets.DOCKER_USERNAME != '' && secrets.DOCKER_PASSWORD != '' }}
+        if: steps.check.outputs.available == 'true'
         uses: docker/login-action@v3
         with:
           username: ${{ secrets.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_PASSWORD }}
 
       - name: Extract metadata (tags)
+        if: steps.check.outputs.available == 'true'
         id: meta
         uses: docker/metadata-action@v5
         with:
@@ -172,8 +184,7 @@ jobs:
             type=raw,value=latest,enable=${{ github.ref == 'refs/heads/main' }}
 
       - name: Build and push Docker image
-        # 只有登录成功才执行构建和推送（即 secrets 存在）
-        if: ${{ secrets.DOCKER_USERNAME != '' && secrets.DOCKER_PASSWORD != '' }}
+        if: steps.check.outputs.available == 'true'
         uses: docker/build-push-action@v5
         with:
           context: .
