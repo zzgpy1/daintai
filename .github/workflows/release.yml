@@ -1,0 +1,194 @@
+name: Release Build
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Release tag (e.g., v2.0.0)'
+        required: true
+        default: 'v2.0.0'
+
+permissions:
+  contents: write
+
+env:
+  ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION: true
+
+jobs:
+  build-web:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 18
+          cache: 'npm'
+      
+      - name: Install dependencies
+        run: |
+          npm install --legacy-peer-deps
+      
+      - name: Build Web
+        run: npm run build
+      
+      - name: Verify build
+        run: |
+          ls -la dist/
+          test -f dist/index.html || exit 1
+          echo "✅ Web build successful!"
+      
+      - name: Upload Web artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: web-dist
+          path: dist/
+
+  build-electron:
+    needs: build-web
+    runs-on: windows-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 18
+          cache: 'npm'
+      
+      - name: Install dependencies
+        run: |
+          npm install --legacy-peer-deps
+      
+      - name: Build Electron Windows
+        run: npm run electron:build:win
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      
+      - name: Upload Electron artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: electron-win
+          path: dist-electron/*.exe
+
+  build-android:
+    needs: build-web
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 18
+          cache: 'npm'
+      
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'zulu'
+          java-version: '17'
+      
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+      
+      - name: Install dependencies
+        run: |
+          npm install --legacy-peer-deps
+          npm install -g @capacitor/cli
+      
+      - name: Build Web
+        run: npm run build
+      
+      - name: Add Android platform
+        run: |
+          npx cap init global-radio com.globalradio.app
+          npx cap add android
+      
+      - name: Sync Capacitor
+        run: npx cap sync android
+      
+      - name: Build Android APK
+        run: |
+          cd android
+          chmod +x gradlew
+          ./gradlew assembleRelease --no-daemon
+      
+      - name: Upload Android APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-apk
+          path: android/app/build/outputs/apk/release/*.apk
+
+  publish-docker:
+    needs: build-web
+    runs-on: ubuntu-latest
+    if: secrets.DOCKER_USERNAME != '' && secrets.DOCKER_PASSWORD != ''
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+      
+      - name: Login to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+      
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ secrets.DOCKER_USERNAME }}/global-radio
+          tags: |
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=raw,value=latest,enable=${{ github.ref == 'refs/heads/main' }}
+      
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: docker/Dockerfile
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  create-release:
+    needs: [build-electron, build-android]
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/')
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts/
+      
+      - name: List artifacts
+        run: |
+          echo "=== Artifacts ==="
+          find artifacts/ -type f | head -20
+      
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: |
+            artifacts/electron-win/*.exe
+            artifacts/android-apk/*.apk
+          generate_release_notes: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
