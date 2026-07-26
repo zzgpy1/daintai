@@ -1,6 +1,7 @@
 {
   "name": "global-radio",
   "version": "2.0.0",
+  "type": "module",
   "description": "全球电台 - 聆听世界",
   "main": "electron/main.ts",
   "scripts": {
