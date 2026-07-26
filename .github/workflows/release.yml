@@ -1,4 +1,4 @@
-name: Release Build
+name: Release Build   # ← 显示名称，与文件名无关
 
 on:
   push:
@@ -63,7 +63,7 @@ jobs:
           node-version: 18
           cache: 'npm'
 
-      # 🔹 复用 build-web 的产物，避免重复构建
+      # ✅ 复用 Web 构建产物，避免重复编译
       - name: Download Web build artifact
         uses: actions/download-artifact@v4
         with:
@@ -107,7 +107,7 @@ jobs:
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
 
-      # 🔹 复用 Web 产物并放置到 Capacitor 的 www 目录
+      # ✅ 下载 Web 构建产物到 www/ 目录（Capacitor 默认读取 www）
       - name: Download Web build artifact
         uses: actions/download-artifact@v4
         with:
@@ -145,11 +145,10 @@ jobs:
     name: Publish Docker Image
     needs: build-web
     runs-on: ubuntu-latest
-    # 🔹 关键修正：将 secrets 映射为环境变量，再在 if 中判断
+    # ✅ 通过 env 映射 secrets，并在 if 中判断
     env:
       DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
       DOCKER_PASSWORD: ${{ secrets.DOCKER_PASSWORD }}
-    # 只有 Docker 凭据存在时才执行；同时确保有 tag（push 或手动输入）
     if: |
       env.DOCKER_USERNAME != '' && env.DOCKER_PASSWORD != '' &&
       ( (github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')) ||
@@ -173,9 +172,8 @@ jobs:
         with:
           images: ${{ secrets.DOCKER_USERNAME }}/global-radio
           tags: |
-            # 动态获取版本号：push 时用 ref_name，手动时用输入 tag
+            # 根据触发方式动态生成版本标签
             type=raw,value=${{ github.event_name == 'push' && github.ref_name || github.event.inputs.tag }}
-            # 只有主分支才打 latest 标签
             type=raw,value=latest,enable=${{ github.ref == 'refs/heads/main' }}
 
       - name: Build and push Docker image
@@ -193,7 +191,7 @@ jobs:
     name: Create GitHub Release
     needs: [build-electron, build-android]
     runs-on: ubuntu-latest
-    # 支持 push tag 和手动触发
+    # ✅ 支持 push tag 和手动触发
     if: |
       (github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')) ||
       (github.event_name == 'workflow_dispatch' && github.event.inputs.tag != '')
