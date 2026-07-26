@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: 'Release tag'
+        description: 'Release tag (e.g., v2.0.0)'
         required: true
         default: 'v2.0.0'
 
@@ -69,6 +69,7 @@ jobs:
       - name: Build Electron Windows
         run: npm run electron:build:win
         env:
+          # 使用 GitHub 自动生成的 token
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       
       - name: Upload Electron artifacts
@@ -130,7 +131,7 @@ jobs:
   publish-docker:
     needs: build-web
     runs-on: ubuntu-latest
-    # 仅在 Docker Hub 凭证存在时运行
+    # 仅在设置了 Docker 凭证时运行
     if: secrets.DOCKER_USERNAME != '' && secrets.DOCKER_PASSWORD != ''
     steps:
       - name: Checkout code
@@ -169,6 +170,7 @@ jobs:
   create-release:
     needs: [build-electron, build-android]
     runs-on: ubuntu-latest
+    # 仅在推送 tag 时创建 Release
     if: startsWith(github.ref, 'refs/tags/')
     steps:
       - name: Checkout code
