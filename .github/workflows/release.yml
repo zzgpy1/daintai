@@ -5,9 +5,17 @@ on:
     tags:
       - 'v*'
   workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Release tag'
+        required: true
+        default: 'v2.0.0'
 
 permissions:
   contents: write
+
+env:
+  ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION: true
 
 jobs:
   build-web:
@@ -25,7 +33,6 @@ jobs:
       - name: Install dependencies
         run: |
           npm install --legacy-peer-deps
-          npm install terser --save-dev --legacy-peer-deps
       
       - name: Build Web
         run: npm run build
@@ -34,6 +41,7 @@ jobs:
         run: |
           ls -la dist/
           test -f dist/index.html || exit 1
+          echo "✅ Web build successful!"
       
       - name: Upload Web artifacts
         uses: actions/upload-artifact@v4
@@ -57,10 +65,11 @@ jobs:
       - name: Install dependencies
         run: |
           npm install --legacy-peer-deps
-          npm install terser --save-dev --legacy-peer-deps
       
       - name: Build Electron Windows
         run: npm run electron:build:win
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       
       - name: Upload Electron artifacts
         uses: actions/upload-artifact@v4
@@ -93,11 +102,15 @@ jobs:
       - name: Install dependencies
         run: |
           npm install --legacy-peer-deps
-          npm install terser --save-dev --legacy-peer-deps
           npm install -g @capacitor/cli
       
       - name: Build Web
         run: npm run build
+      
+      - name: Add Android platform
+        run: |
+          npx cap init global-radio com.globalradio.app
+          npx cap add android
       
       - name: Sync Capacitor
         run: npx cap sync android
@@ -117,6 +130,8 @@ jobs:
   publish-docker:
     needs: build-web
     runs-on: ubuntu-latest
+    # 仅在 Docker Hub 凭证存在时运行
+    if: secrets.DOCKER_USERNAME != '' && secrets.DOCKER_PASSWORD != ''
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -128,7 +143,7 @@ jobs:
         uses: docker/login-action@v3
         with:
           username: ${{ secrets.DOCKER_USERNAME }}
-          password: ${{ secrets.DOCKER_TOKEN }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
       
       - name: Extract metadata
         id: meta
@@ -152,9 +167,9 @@ jobs:
           cache-to: type=gha,mode=max
 
   create-release:
-    needs: [build-electron, build-android, publish-docker]
+    needs: [build-electron, build-android]
     runs-on: ubuntu-latest
-    if: always()
+    if: startsWith(github.ref, 'refs/tags/')
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
