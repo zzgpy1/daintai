@@ -23,15 +23,6 @@ const router = createRouter({
       }
     },
     {
-      path: '/favorites',
-      name: 'Favorites',
-      component: () => import('@/views/Favorites.vue'),
-      meta: {
-        title: '收藏',
-        keepAlive: true
-      }
-    },
-    {
       path: '/history',
       name: 'History',
       component: () => import('@/views/History.vue'),
