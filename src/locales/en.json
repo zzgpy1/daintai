@@ -1,0 +1,69 @@
+{
+  "nav": {
+    "home": "Home",
+    "search": "Search",
+    "favorites": "Favorites",
+    "history": "History",
+    "settings": "Settings"
+  },
+  "home": {
+    "title": "Global Radio",
+    "random": "Random Discovery",
+    "popular": "Popular Stations",
+    "latest": "Latest Stations",
+    "refresh": "Refresh"
+  },
+  "search": {
+    "title": "Search Stations",
+    "placeholder": "Search station name, country or tags",
+    "results": "Search Results",
+    "noResults": "No stations found",
+    "country": "Country",
+    "language": "Language",
+    "tags": "Tags",
+    "allCountries": "All Countries",
+    "allLanguages": "All Languages",
+    "allTags": "All Tags",
+    "search": "Search",
+    "reset": "Reset"
+  },
+  "favorites": {
+    "title": "My Favorites",
+    "empty": "No favorite stations",
+    "emptyHint": "Discover stations you like and favorite them",
+    "clearAll": "Clear All"
+  },
+  "history": {
+    "title": "History",
+    "empty": "No listening history",
+    "emptyHint": "Start listening, your history will be recorded here",
+    "clearAll": "Clear History"
+  },
+  "settings": {
+    "title": "Settings",
+    "theme": "Theme",
+    "light": "Light",
+    "dark": "Dark",
+    "language": "Language",
+    "volume": "Volume",
+    "sleepTimer": "Sleep Timer",
+    "timerActive": "Timer Active",
+    "remaining": "Remaining",
+    "minutes": "minutes",
+    "setTimer": "Set Timer",
+    "cancelTimer": "Cancel Timer",
+    "autoPlayNext": "Auto Play Next",
+    "notifications": "Notifications",
+    "autoUpdate": "Auto Update",
+    "about": "About",
+    "version": "Version"
+  },
+  "common": {
+    "loading": "Loading...",
+    "error": "Error occurred",
+    "retry": "Retry",
+    "cancel": "Cancel",
+    "confirm": "Confirm",
+    "save": "Save"
+  }
+}
