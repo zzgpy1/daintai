@@ -23,7 +23,7 @@ jobs:
           node-version: ${{ matrix.node-version }}
           cache: 'npm'
       
-      # 使用 npm install 替代 npm ci，确保依赖与 package.json 同步
+      # ✅ 使用 npm install 替代 npm ci
       - name: Install dependencies
         run: npm install --legacy-peer-deps
       
