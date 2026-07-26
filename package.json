@@ -9,12 +9,12 @@
     "preview": "vite preview",
     "electron:dev": "vite build && electron electron/main.ts",
     "electron:build": "vite build && electron-builder",
-    "electron:build:win": "vite build && electron-builder --win",
+    "electron:build:win": "vite build && electron-builder --win --x64",
     "capacitor:sync": "npx cap sync",
     "capacitor:open": "npx cap open",
-    "build:android": "npm run build && npx cap sync android && cd android && ./gradlew assembleRelease",
-    "docker:build": "docker build -f docker/Dockerfile -t superneed/global-radio:latest .",
-    "docker:push": "docker push superneed/global-radio:latest"
+    "build:android": "npm run build && npx cap sync android",
+    "docker:build": "docker build -f docker/Dockerfile -t global-radio:latest .",
+    "docker:push": "docker push global-radio:latest"
   },
   "dependencies": {
     "@capacitor/android": "^5.7.8",
@@ -26,6 +26,7 @@
     "@capacitor/updater": "^5.0.8",
     "@headlessui/vue": "^1.7.16",
     "@heroicons/vue": "^2.0.18",
+    "@intlify/unplugin-vue-i18n": "^0.12.0",
     "axios": "^1.6.2",
     "pinia": "^2.1.7",
     "vue": "^3.4.0",
@@ -62,7 +63,8 @@
     "nsis": {
       "oneClick": false,
       "allowToChangeInstallationDirectory": true,
-      "createDesktopShortcut": true
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true
     },
     "publish": {
       "provider": "github",
