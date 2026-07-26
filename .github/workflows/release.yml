@@ -24,10 +24,16 @@ jobs:
       
       - name: Install dependencies
         run: |
-          npm ci --legacy-peer-deps || npm install --legacy-peer-deps
+          npm install --legacy-peer-deps
+          npm install terser --save-dev --legacy-peer-deps
       
       - name: Build Web
         run: npm run build
+      
+      - name: Verify build
+        run: |
+          ls -la dist/
+          test -f dist/index.html || exit 1
       
       - name: Upload Web artifacts
         uses: actions/upload-artifact@v4
@@ -50,7 +56,8 @@ jobs:
       
       - name: Install dependencies
         run: |
-          npm ci --legacy-peer-deps || npm install --legacy-peer-deps
+          npm install --legacy-peer-deps
+          npm install terser --save-dev --legacy-peer-deps
       
       - name: Build Electron Windows
         run: npm run electron:build:win
@@ -80,15 +87,26 @@ jobs:
           distribution: 'zulu'
           java-version: '17'
       
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+      
       - name: Install dependencies
         run: |
-          npm ci --legacy-peer-deps || npm install --legacy-peer-deps
+          npm install --legacy-peer-deps
+          npm install terser --save-dev --legacy-peer-deps
+          npm install -g @capacitor/cli
       
-      - name: Build Android
+      - name: Build Web
+        run: npm run build
+      
+      - name: Sync Capacitor
+        run: npx cap sync android
+      
+      - name: Build Android APK
         run: |
-          npm run build
-          npx cap sync android
-          cd android && chmod +x gradlew && ./gradlew assembleRelease
+          cd android
+          chmod +x gradlew
+          ./gradlew assembleRelease --no-daemon
       
       - name: Upload Android APK
         uses: actions/upload-artifact@v4
@@ -120,7 +138,7 @@ jobs:
           tags: |
             type=semver,pattern={{version}}
             type=semver,pattern={{major}}.{{minor}}
-            type=raw,value=latest,enable={{is_default_branch}}
+            type=raw,value=latest,enable=${{ github.ref == 'refs/heads/main' }}
       
       - name: Build and push Docker image
         uses: docker/build-push-action@v5
@@ -136,6 +154,7 @@ jobs:
   create-release:
     needs: [build-electron, build-android, publish-docker]
     runs-on: ubuntu-latest
+    if: always()
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -147,8 +166,8 @@ jobs:
       
       - name: List artifacts
         run: |
-          ls -la artifacts/
-          find artifacts/ -name "*.exe" -o -name "*.apk" | head -20
+          echo "=== Artifacts ==="
+          find artifacts/ -type f | head -20
       
       - name: Create Release
         uses: softprops/action-gh-release@v1
