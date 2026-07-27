@@ -2,8 +2,10 @@ import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { radioAPI } from '@/services/radioApi'
 import type { RadioStation, Country, Language, Tag } from '@/types/radio'
+import { useToastStore } from './toast'
 
 export const useRadioStore = defineStore('radio', () => {
+  const toastStore = useToastStore()
   const stations = ref<RadioStation[]>([])
   const topStations = ref<RadioStation[]>([])
   const latestStations = ref<RadioStation[]>([])
@@ -18,8 +20,8 @@ export const useRadioStore = defineStore('radio', () => {
   const selectedTag = ref('')
 
   const filteredStations = computed(() => {
-    // ... 不变
     let filtered = stations.value
+    
     if (searchQuery.value) {
       const q = searchQuery.value.toLowerCase().trim()
       filtered = filtered.filter(s => 
@@ -29,15 +31,19 @@ export const useRadioStore = defineStore('radio', () => {
         (s.language && s.language.toLowerCase().includes(q))
       )
     }
+    
     if (selectedCountry.value) {
       filtered = filtered.filter(s => s.countrycode === selectedCountry.value)
     }
+    
     if (selectedLanguage.value) {
       filtered = filtered.filter(s => s.language?.toLowerCase().includes(selectedLanguage.value.toLowerCase()))
     }
+    
     if (selectedTag.value) {
       filtered = filtered.filter(s => s.tags.toLowerCase().includes(selectedTag.value.toLowerCase()))
     }
+    
     return filtered
   })
 
@@ -45,17 +51,22 @@ export const useRadioStore = defineStore('radio', () => {
     if (query) searchQuery.value = query
     isLoading.value = true
     error.value = null
+    
     try {
       const params: any = { limit: 100, hidebroken: true }
       if (searchQuery.value) params.name = searchQuery.value
       if (selectedCountry.value) params.countrycode = selectedCountry.value
       if (selectedLanguage.value) params.language = selectedLanguage.value
       if (selectedTag.value) params.tag = selectedTag.value
+      
       stations.value = await radioAPI.searchStations(params)
+      if (stations.value.length === 0) {
+        toastStore.showInfo('没有找到匹配的电台')
+      }
     } catch (err) {
-      error.value = '搜索失败，请检查网络后重试'
+      error.value = '搜索失败，请检查网络'
       console.error(err)
-      throw err // 让调用方知道失败
+      toastStore.showError('搜索失败，请稍后重试')
     } finally {
       isLoading.value = false
     }
@@ -63,13 +74,11 @@ export const useRadioStore = defineStore('radio', () => {
 
   const loadTopStations = async () => {
     isLoading.value = true
-    error.value = null
     try {
       topStations.value = await radioAPI.getTopStations(50)
     } catch (err) {
-      error.value = '加载热门电台失败，请重试'
-      console.error(err)
-      throw err
+      console.error('加载热门电台失败:', err)
+      toastStore.showError('加载热门电台失败')
     } finally {
       isLoading.value = false
     }
@@ -77,13 +86,11 @@ export const useRadioStore = defineStore('radio', () => {
 
   const loadLatestStations = async () => {
     isLoading.value = true
-    error.value = null
     try {
       latestStations.value = await radioAPI.getLatestStations(30)
     } catch (err) {
-      error.value = '加载最新电台失败，请重试'
-      console.error(err)
-      throw err
+      console.error('加载最新电台失败:', err)
+      toastStore.showError('加载最新电台失败')
     } finally {
       isLoading.value = false
     }
@@ -93,7 +100,7 @@ export const useRadioStore = defineStore('radio', () => {
     try {
       countries.value = await radioAPI.getCountries()
     } catch (err) {
-      console.error(err)
+      console.error('加载国家列表失败:', err)
     }
   }
 
@@ -101,7 +108,7 @@ export const useRadioStore = defineStore('radio', () => {
     try {
       languages.value = await radioAPI.getLanguages()
     } catch (err) {
-      console.error(err)
+      console.error('加载语言列表失败:', err)
     }
   }
 
@@ -109,7 +116,7 @@ export const useRadioStore = defineStore('radio', () => {
     try {
       tags.value = await radioAPI.getTags()
     } catch (err) {
-      console.error(err)
+      console.error('加载标签列表失败:', err)
     }
   }
 
