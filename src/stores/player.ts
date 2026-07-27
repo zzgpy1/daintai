@@ -25,7 +25,7 @@ export const usePlayerStore = defineStore('player', () => {
   const isBuffering = ref(false)
 
   // 防止快速切换导致 play/pause 冲突
-  private let playPromise: Promise<void> | null = null
+  let playPromise: Promise<void> | null = null
 
   const sleepTimer = ref<number | null>(null)
   const sleepTimerRemaining = ref(0)
@@ -124,17 +124,14 @@ export const usePlayerStore = defineStore('player', () => {
       isLoading.value = true
       isBuffering.value = false
 
-      // 如果正在播放相同电台且已播放，则暂停
       if (currentStation.value?.stationuuid === station.stationuuid && isPlaying.value) {
         pauseStation()
         isLoading.value = false
         return
       }
 
-      // 停止当前播放（如果有）
       if (audio.value && !audio.value.paused) {
         audio.value.pause()
-        // 确保之前的 play() 完成
         if (playPromise) {
           await playPromise.catch(() => {})
           playPromise = null
@@ -152,15 +149,12 @@ export const usePlayerStore = defineStore('player', () => {
       audio.value.muted = isMuted.value
       audio.value.crossOrigin = 'anonymous'
 
-      // 加载并播放
       audio.value.load()
       playPromise = audio.value.play()
       await playPromise
 
-      // 记录点击
       radioAPI.recordClick(station.stationuuid).catch(() => {})
 
-      // 更新媒体会话
       if ('mediaSession' in navigator) {
         navigator.mediaSession.metadata = new MediaMetadata({
           title: station.name,
@@ -170,7 +164,6 @@ export const usePlayerStore = defineStore('player', () => {
 
       toastStore.showSuccess(`正在播放: ${station.name}`)
     } catch (err) {
-      // 如果错误是 AbortError 或 NotAllowedError，忽略
       if (err instanceof Error) {
         if (err.name === 'AbortError' || err.name === 'NotAllowedError') {
           console.warn('播放被中断:', err.message)
@@ -253,7 +246,6 @@ export const usePlayerStore = defineStore('player', () => {
     }
   }
 
-  // 睡眠定时器
   const setSleepTimer = (minutes: number) => {
     clearSleepTimer()
     sleepTimer.value = minutes
