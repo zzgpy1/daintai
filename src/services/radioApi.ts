@@ -1,6 +1,28 @@
 import axios from 'axios'
-import { API_CONFIG } from '@/config'   // 改为从 '@/config' 导入
+import { API_CONFIG } from '@/config'
 import type { RadioStation, RadioSearchParams, Country, Language, Tag } from '@/types/radio'
+
+// 创建 axios 实例，增加超时和重试
+const apiClient = axios.create({
+  baseURL: API_CONFIG.baseURL,
+  timeout: 15000, // 15秒超时
+  headers: { 'User-Agent': 'GlobalRadio/2.0' }
+})
+
+// 简单重试机制（最多2次）
+apiClient.interceptors.response.use(undefined, async (error) => {
+  const config = error.config
+  if (!config || !config.retry) {
+    config.retry = 0
+  }
+  if (config.retry >= 2) {
+    return Promise.reject(error)
+  }
+  config.retry += 1
+  // 延迟 1 秒重试
+  await new Promise(resolve => setTimeout(resolve, 1000))
+  return apiClient(config)
+})
 
 class RadioAPI {
   private cache = new Map<string, { data: any; timestamp: number }>()
@@ -13,11 +35,7 @@ class RadioAPI {
     }
 
     try {
-      const response = await axios.get(`${API_CONFIG.baseURL}${endpoint}`, {
-        params,
-        timeout: API_CONFIG.timeout,
-        headers: { 'User-Agent': 'GlobalRadio/2.0' }
-      })
+      const response = await apiClient.get(endpoint, { params })
       const data = response.data
       this.cache.set(cacheKey, { data, timestamp: Date.now() })
       return data
@@ -27,6 +45,7 @@ class RadioAPI {
     }
   }
 
+  // ... 其他方法保持不变
   async searchStations(params: RadioSearchParams): Promise<RadioStation[]> {
     return this.request<RadioStation[]>(API_CONFIG.endpoints.search, params)
   }
@@ -71,7 +90,7 @@ class RadioAPI {
 
   async recordClick(stationUuid: string): Promise<void> {
     try {
-      await axios.get(`${API_CONFIG.baseURL}/json/url/${stationUuid}`)
+      await apiClient.get(`/json/url/${stationUuid}`)
     } catch {
       // 静默失败
     }
