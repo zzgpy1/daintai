@@ -98,7 +98,7 @@ const playerStore = usePlayerStore()
 const language = ref(settingsStore.language)
 const volume = ref(settingsStore.volume)
 const autoPlayNext = ref(settingsStore.autoPlayNext)
-const appVersion = '2.0.0'
+const appVersion = '2.0.3'
 
 const currentLanguageName = computed(() => {
   return language.value === 'zh' ? '中文' : 'English'
