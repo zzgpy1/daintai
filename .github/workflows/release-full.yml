@@ -83,9 +83,9 @@ jobs:
           Remove-Item -Force package-lock.json -ErrorAction SilentlyContinue
           npm install --legacy-peer-deps
 
-      - name: Verify vite installation
+      - name: Build Electron main process
         shell: pwsh
-        run: npm list vite
+        run: npm run build:electron:main
 
       - name: Build Electron Windows
         run: npm run electron:build:win
