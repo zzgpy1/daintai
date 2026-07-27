@@ -4,7 +4,7 @@ import { resolve } from 'path'
 
 export default defineConfig({
   plugins: [vue()],
-  base: './', // ✅ 关键：使用相对路径，支持 file:// 协议
+  base: './', // ✅ 关键：所有资源使用相对路径，支持 file:// 协议
   resolve: {
     alias: {
       '@': resolve(__dirname, 'src')
