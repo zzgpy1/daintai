@@ -33,7 +33,7 @@
           </button>
         </div>
 
-        <!-- 分类标签（精简） -->
+        <!-- 分类标签（全部=国内频道，其他按标签搜索） -->
         <div class="flex flex-wrap gap-2 overflow-x-auto pb-2">
           <button
             v-for="cat in categories"
@@ -59,7 +59,7 @@
           </div>
         </div>
 
-        <!-- 默认显示：国内频道 -->
+        <!-- 默认显示：国内频道（当无分类选中时） -->
         <div v-if="!currentCategory">
           <div class="flex items-center justify-between mb-4">
             <h2 class="text-lg font-semibold text-ios-dark-gray dark:text-dark-text">{{ $t('home.china') }}</h2>
@@ -72,28 +72,6 @@
             <StationCard v-for="station in chinaStations" :key="station.stationuuid" :station="station" />
           </div>
         </div>
-
-        <!-- 热门电台（保留） -->
-        <section v-if="!currentCategory">
-          <div class="flex items-center justify-between mb-4">
-            <h2 class="text-lg font-semibold text-ios-dark-gray dark:text-dark-text">{{ $t('home.popular') }}</h2>
-            <button @click="refreshTop" class="text-sm text-ios-blue hover:underline" :disabled="topLoading">
-              {{ topLoading ? '刷新中...' : $t('home.refresh') }}
-            </button>
-          </div>
-          <div v-if="topStations.length === 0" class="text-center py-4 text-ios-gray dark:text-dark-secondary">{{ $t('common.noData') }}</div>
-          <div class="space-y-3">
-            <StationCard v-for="station in topStations.slice(0, 10)" :key="station.stationuuid" :station="station" />
-          </div>
-        </section>
-
-        <section v-if="!currentCategory">
-          <h2 class="text-lg font-semibold text-ios-dark-gray dark:text-dark-text mb-4">{{ $t('home.latest') }}</h2>
-          <div v-if="latestStations.length === 0" class="text-center py-4 text-ios-gray dark:text-dark-secondary">{{ $t('common.noData') }}</div>
-          <div class="space-y-3">
-            <StationCard v-for="station in latestStations.slice(0, 10)" :key="station.stationuuid" :station="station" />
-          </div>
-        </section>
       </template>
     </div>
   </div>
@@ -105,10 +83,8 @@ import { useRouter } from 'vue-router'
 import { useRadioStore } from '@/stores/radio'
 import { usePlayerStore } from '@/stores/player'
 import { useToastStore } from '@/stores/toast'
-import { Cog6ToothIcon, ArrowsRightLeftIcon, MagnifyingGlassIcon } from '@heroicons/vue/24/outline'
-import ThemeToggle from '@/components/common/ThemeToggle.vue'
+import { ArrowsRightLeftIcon, MagnifyingGlassIcon } from '@heroicons/vue/24/outline'
 import StationCard from '@/components/common/StationCard.vue'
-import PlayerBar from '@/components/common/PlayerBar.vue'
 
 const router = useRouter()
 const radioStore = useRadioStore()
@@ -118,14 +94,13 @@ const toastStore = useToastStore()
 const loading = ref(true)
 const error = ref<string | null>(null)
 const randomLoading = ref(false)
-const currentCategory = ref('')
+const currentCategory = ref('')  // '' 表示显示国内频道
 const chinaLoading = ref(false)
-const topLoading = ref(false)
 const categoryLoading = ref(false)
 
-// 精简分类（去掉古典、爵士、摇滚、流行）
+// 分类定义（空值代表全部/国内频道）
 const categories = [
-  { value: 'all', label: '全部' },
+  { value: '', label: '全部' },
   { value: 'music', label: '音乐' },
   { value: 'news', label: '新闻' },
   { value: 'talk', label: '谈话' },
@@ -134,8 +109,6 @@ const categories = [
 
 const chinaStations = computed(() => radioStore.chinaStations)
 const categoryStations = computed(() => radioStore.categoryStations)
-const topStations = computed(() => radioStore.topStations)
-const latestStations = computed(() => radioStore.latestStations)
 
 const getCategoryLabel = (value: string) => {
   const found = categories.find(c => c.value === value)
@@ -155,19 +128,6 @@ const refreshChina = async () => {
   }
 }
 
-// 刷新热门
-const refreshTop = async () => {
-  topLoading.value = true
-  try {
-    await radioStore.loadTopStations()
-    toastStore.showInfo('已刷新热门电台')
-  } catch {
-    toastStore.showError('刷新失败')
-  } finally {
-    topLoading.value = false
-  }
-}
-
 // 刷新分类
 const refreshCategory = async () => {
   if (!currentCategory.value) return
@@ -184,19 +144,18 @@ const refreshCategory = async () => {
 
 // 选择分类
 const selectCategory = async (tag: string) => {
-  if (tag === 'all') {
-    // 全部 => 显示国内频道
-    currentCategory.value = ''
-    radioStore.categoryStations = []
-    return
-  }
   if (currentCategory.value === tag) {
-    // 取消选中
+    // 取消选中，回到国内频道
     currentCategory.value = ''
     radioStore.categoryStations = []
     return
   }
   currentCategory.value = tag
+  if (tag === '') {
+    // 全部 => 显示国内频道
+    radioStore.categoryStations = []
+    return
+  }
   await radioStore.loadCategoryStations(tag)
 }
 
@@ -221,9 +180,9 @@ const handleRandom = async () => {
       return
     }
     
-    // 再降级：从热门中选
-    if (topStations.value.length > 0) {
-      const random = topStations.value[Math.floor(Math.random() * topStations.value.length)]
+    // 再降级：从热门中选（如果有）
+    if (radioStore.topStations.length > 0) {
+      const random = radioStore.topStations[Math.floor(Math.random() * radioStore.topStations.length)]
       await playerStore.playStation(random)
       toastStore.showInfo('从热门电台随机选择')
       return
@@ -240,8 +199,8 @@ const handleRandom = async () => {
         toastStore.showInfo('从国内频道随机选择')
         return
       }
-      if (topStations.value.length > 0) {
-        const random = topStations.value[Math.floor(Math.random() * topStations.value.length)]
+      if (radioStore.topStations.length > 0) {
+        const random = radioStore.topStations[Math.floor(Math.random() * radioStore.topStations.length)]
         await playerStore.playStation(random)
         toastStore.showInfo('从热门电台随机选择')
         return
