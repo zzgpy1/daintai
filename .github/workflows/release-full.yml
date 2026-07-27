@@ -102,7 +102,7 @@ jobs:
           name: electron-win
           path: dist-electron/*.exe
 
-  build-android:
+    build-android:
     name: Build Android APK
     needs: build-web
     runs-on: ubuntu-latest
@@ -137,17 +137,16 @@ jobs:
           rm -rf node_modules package-lock.json
           npm install --legacy-peer-deps
 
-      - name: Verify vite installation
-        run: npm list vite
-
       - name: Install Capacitor CLI
         run: npm install -g @capacitor/cli
 
       - name: Init Capacitor
         run: npx cap init global-radio com.globalradio.app
 
-      - name: Add Android platform
-        run: npx cap add android
+      - name: Remove existing android and add platform
+        run: |
+          rm -rf android
+          npx cap add android
 
       - name: Sync Capacitor
         run: npx cap sync android
