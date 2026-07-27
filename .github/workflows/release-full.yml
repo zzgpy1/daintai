@@ -31,16 +31,15 @@ jobs:
           node-version: 18
           cache: 'npm'
 
-      - name: Clear cache and install dependencies
+      - name: Install dependencies (including dev)
         run: |
-          rm -rf node_modules package-lock.json   # 清除缓存
-          npm install --legacy-peer-deps --include=dev   # 强制安装所有依赖
-
-      - name: Debug - list installed vite
-        run: npm list vite || echo "vite not found"
+          # 清除可能存在的 NODE_ENV，确保 devDependencies 被安装
+          unset NODE_ENV
+          rm -f package-lock.json   # 删除旧锁文件，避免版本冲突
+          npm install --legacy-peer-deps --include=dev
 
       - name: Build Web
-        run: npx vite build   # 使用 npx 确保可执行
+        run: npm run build   # ✅ 使用 npm run，自动使用本地 Vite
 
       - name: Verify build
         run: |
@@ -74,10 +73,10 @@ jobs:
           name: web-dist
           path: dist/
 
-      - name: Clear cache and install dependencies
+      - name: Install dependencies (including dev)
         shell: pwsh
         run: |
-          Remove-Item -Recurse -Force node_modules -ErrorAction SilentlyContinue
+          $env:NODE_ENV = $null
           Remove-Item -Force package-lock.json -ErrorAction SilentlyContinue
           npm install --legacy-peer-deps --include=dev
 
@@ -121,9 +120,10 @@ jobs:
           name: web-dist
           path: www/
 
-      - name: Clear cache and install dependencies
+      - name: Install dependencies (including dev)
         run: |
-          rm -rf node_modules package-lock.json
+          unset NODE_ENV
+          rm -f package-lock.json
           npm install --legacy-peer-deps --include=dev
 
       - name: Install Capacitor CLI
