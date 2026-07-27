@@ -7,7 +7,7 @@ RUN npm run build
 
 FROM nginx:alpine
 COPY --from=builder /app/dist /usr/share/nginx/html
-# 直接写入 nginx 配置，避免依赖外部文件
+# 直接写入 nginx 配置，避免外部文件依赖
 RUN echo 'server { \
     listen 80; \
     server_name _; \
