@@ -32,7 +32,10 @@ jobs:
           cache: 'npm'
 
       - name: Install dependencies
-        run: npm install --legacy-peer-deps   # ✅ 无需删除锁文件
+        run: |
+          rm -rf node_modules
+          npm install --legacy-peer-deps
+          npx vite --version   # 验证 vite 已安装
 
       - name: Build Web
         run: npm run build
@@ -70,7 +73,8 @@ jobs:
           path: dist/
 
       - name: Install dependencies
-        run: npm install --legacy-peer-deps   # ✅ Windows 兼容
+        # Windows 上不删除 node_modules，直接安装
+        run: npm install --legacy-peer-deps
 
       - name: Build Electron Windows
         run: npm run electron:build:win
@@ -113,7 +117,10 @@ jobs:
           path: www/
 
       - name: Install dependencies
-        run: npm install --legacy-peer-deps   # ✅
+        run: |
+          rm -rf node_modules
+          npm install --legacy-peer-deps
+          npx vite --version   # 验证
 
       - name: Install Capacitor CLI
         run: npm install -g @capacitor/cli
