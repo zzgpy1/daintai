@@ -32,7 +32,7 @@ jobs:
           cache: 'npm'
 
       - name: Install dependencies
-        run: rm -f package-lock.json && npm install --legacy-peer-deps
+        run: npm install --legacy-peer-deps   # ✅ 移除 rm -f
 
       - name: Build Web
         run: npm run build
@@ -70,7 +70,7 @@ jobs:
           path: dist/
 
       - name: Install dependencies
-        run: rm -f package-lock.json && npm install --legacy-peer-deps
+        run: npm install --legacy-peer-deps   # ✅ Windows 兼容
 
       - name: Build Electron Windows
         run: npm run electron:build:win
@@ -113,7 +113,7 @@ jobs:
           path: www/
 
       - name: Install dependencies
-        run: rm -f package-lock.json && npm install --legacy-peer-deps
+        run: npm install --legacy-peer-deps   # ✅
 
       - name: Install Capacitor CLI
         run: npm install -g @capacitor/cli
