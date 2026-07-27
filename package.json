@@ -1,6 +1,6 @@
 {
   "name": "global-radio",
-  "version": "2.0.0",
+  "version": "2.0.3",
   "description": "全球电台 - 聆听世界",
   "main": "electron-build/main.js",
   "scripts": {
@@ -53,6 +53,10 @@
     "directories": {
       "output": "dist-electron"
     },
+    "files": [
+      "dist/**/*",
+      "electron-build/**/*"
+    ],
     "win": {
       "target": "nsis",
       "icon": "electron/build/icon.ico"
