@@ -8,7 +8,11 @@
     </div>
 
     <div v-else-if="station" class="max-w-4xl mx-auto px-4 py-6">
-      <!-- 电台信息 -->
+      <!-- 返回按钮 + 标题 -->
+      <div class="flex items-center gap-4 mb-4">
+        <BackButton />
+      </div>
+
       <div class="ios-card p-6 text-center">
         <div class="w-24 h-24 mx-auto rounded-full overflow-hidden shadow-lg mb-4">
           <img
@@ -47,7 +51,6 @@
         </div>
       </div>
 
-      <!-- 技术信息 -->
       <div class="ios-card p-4 mt-4">
         <h3 class="font-medium text-ios-dark-gray dark:text-dark-text mb-2">技术信息</h3>
         <div class="grid grid-cols-2 gap-2 text-sm">
@@ -75,6 +78,7 @@ import { usePlayerStore } from '@/stores/player'
 import { useFavoritesStore } from '@/stores/favorites'
 import { useToastStore } from '@/stores/toast'
 import type { RadioStation } from '@/types/radio'
+import BackButton from '@/components/common/BackButton.vue'
 import PlayerBar from '@/components/common/PlayerBar.vue'
 import { PlayIcon, PauseIcon, HeartIcon } from '@heroicons/vue/24/outline'
 
