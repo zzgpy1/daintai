@@ -2,7 +2,7 @@
   "name": "global-radio",
   "version": "2.0.0",
   "description": "全球电台 - 聆听世界",
-  "main": "dist-electron/main.js",   // ✅ 改为编译后的文件
+  "main": "dist-electron/main.js",  
   "scripts": {
     "dev": "vite",
     "build": "vite build",
@@ -17,10 +17,8 @@
     "docker:push": "docker push global-radio:latest"
   },
   "dependencies": {
-    // ...（保持不变）
   },
   "devDependencies": {
-    // ...（保持不变）
   },
   "build": {
     "appId": "com.globalradio.app",
@@ -30,7 +28,7 @@
     },
     "files": [
       "dist/**/*",
-      "dist-electron/**/*"   // ✅ 包含编译后的主进程
+      "dist-electron/**/*"   
     ],
     "win": {
       "target": "nsis",
