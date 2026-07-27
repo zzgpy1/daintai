@@ -109,7 +109,8 @@ export const useRadioStore = defineStore('radio', () => {
     }
   }
 
-  const loadCategoryStations = async (tag: string) => {
+  // 修改：支持国家过滤，默认中国
+  const loadCategoryStations = async (tag: string, countryCode: string = 'CN') => {
     if (!tag) {
       categoryStations.value = []
       return
@@ -117,9 +118,11 @@ export const useRadioStore = defineStore('radio', () => {
     isLoading.value = true
     currentCategory.value = tag
     try {
-      categoryStations.value = await radioAPI.getStationsByTag(tag, 50)
+      // 使用搜索接口同时过滤 tag 和 countrycode
+      const result = await radioAPI.searchStations({ tag, countrycode: countryCode, limit: 50, hidebroken: true })
+      categoryStations.value = result
       if (categoryStations.value.length === 0) {
-        toastStore.showInfo(`未找到“${tag}”分类的电台`)
+        toastStore.showInfo(`未找到国内“${tag}”分类的电台`)
       }
     } catch (err) {
       console.error(`加载分类 ${tag} 失败:`, err)
