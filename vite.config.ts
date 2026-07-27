@@ -4,6 +4,7 @@ import { resolve } from 'path'
 
 export default defineConfig({
   plugins: [vue()],
+  base: './', // ✅ 关键：使用相对路径，支持 file:// 协议
   resolve: {
     alias: {
       '@': resolve(__dirname, 'src')
@@ -17,7 +18,6 @@ export default defineConfig({
   build: {
     outDir: 'dist',
     sourcemap: false,
-    // 使用 esbuild 替代 terser（推荐）
     minify: 'esbuild',
     rollupOptions: {
       output: {
