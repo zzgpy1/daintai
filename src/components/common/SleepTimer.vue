@@ -1,11 +1,17 @@
 <template>
   <div>
-    <button @click="showDialog = true" class="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-dark-gray relative">
-      <MoonIcon class="w-5 h-5" :class="hasActiveTimer ? 'text-ios-blue' : 'text-ios-gray dark:text-dark-secondary'" />
-      <span v-if="hasActiveTimer" class="absolute -top-1 -right-1 w-4 h-4 bg-ios-blue text-white text-[10px] rounded-full flex items-center justify-center">
-        {{ Math.ceil(playerStore.sleepTimerRemaining) }}
-      </span>
-    </button>
+    <div class="flex items-center justify-between">
+      <div>
+        <h3 class="font-medium text-ios-dark-gray dark:text-dark-text">{{ $t('settings.sleepTimer') }}</h3>
+        <p v-if="hasActiveTimer" class="text-sm text-blue-600 dark:text-blue-400">
+          剩余 {{ remainingText }}
+        </p>
+        <p v-else class="text-sm text-ios-gray dark:text-dark-secondary">未设置</p>
+      </div>
+      <button @click="showDialog = true" class="px-4 py-2 bg-ios-blue text-white rounded-ios hover:bg-blue-600">
+        {{ hasActiveTimer ? '修改' : '设置' }}
+      </button>
+    </div>
 
     <!-- 弹窗 -->
     <Teleport to="body">
@@ -54,7 +60,7 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue'
 import { usePlayerStore } from '@/stores/player'
-import { MoonIcon, XMarkIcon } from '@heroicons/vue/24/outline'
+import { XMarkIcon } from '@heroicons/vue/24/outline'
 
 const playerStore = usePlayerStore()
 const showDialog = ref(false)
