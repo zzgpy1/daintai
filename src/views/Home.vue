@@ -13,11 +13,13 @@
     </header>
 
     <div class="max-w-6xl mx-auto px-4 py-6 space-y-8">
+      <!-- 加载状态 -->
       <div v-if="loading" class="text-center py-8">
         <div class="inline-block w-8 h-8 border-4 border-ios-blue border-t-transparent rounded-full animate-spin"></div>
         <p class="text-ios-gray dark:text-dark-secondary mt-2">加载中...</p>
       </div>
 
+      <!-- 错误状态 -->
       <div v-else-if="error" class="text-center py-8">
         <p class="text-ios-red">{{ error }}</p>
         <button @click="retryLoad" class="mt-4 px-6 py-2 bg-ios-blue text-white rounded-ios hover:bg-blue-600">
@@ -25,6 +27,7 @@
         </button>
       </div>
 
+      <!-- 内容 -->
       <template v-else>
         <div class="grid grid-cols-2 gap-4">
           <button @click="loadRandom" class="ios-card p-6 text-center hover:shadow-lg transition-all active:scale-95">
@@ -83,13 +86,21 @@ const loading = ref(true)
 const error = ref<string | null>(null)
 
 const loadTopStations = async () => {
-  await radioStore.loadTopStations()
-  topStations.value = radioStore.topStations
+  try {
+    await radioStore.loadTopStations()
+    topStations.value = radioStore.topStations
+  } catch (e) {
+    console.error(e)
+  }
 }
 
 const loadLatestStations = async () => {
-  await radioStore.loadLatestStations()
-  latestStations.value = radioStore.latestStations
+  try {
+    await radioStore.loadLatestStations()
+    latestStations.value = radioStore.latestStations
+  } catch (e) {
+    console.error(e)
+  }
 }
 
 const loadRandom = async () => {
@@ -114,8 +125,11 @@ const retryLoad = () => {
 
 const initData = async () => {
   try {
-    await Promise.all([loadTopStations(), loadLatestStations()])
-    await radioStore.loadCountries()
+    await Promise.all([
+      loadTopStations(),
+      loadLatestStations(),
+      radioStore.loadCountries()
+    ])
     error.value = null
   } catch (e) {
     error.value = '加载数据失败，请检查网络连接后重试'
