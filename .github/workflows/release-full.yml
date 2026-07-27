@@ -33,13 +33,17 @@ jobs:
 
       - name: Install dependencies (including dev)
         run: |
-          # 清除可能存在的 NODE_ENV，确保 devDependencies 被安装
-          unset NODE_ENV
-          rm -f package-lock.json   # 删除旧锁文件，避免版本冲突
-          npm install --legacy-peer-deps --include=dev
+          export NODE_ENV=development   # 强制 dev 依赖安装
+          rm -rf node_modules package-lock.json
+          npm install --legacy-peer-deps
+
+      - name: Verify vite installation
+        run: |
+          npm list vite || echo "vite not found"
+          ls -la node_modules/.bin/vite || echo "vite binary missing"
 
       - name: Build Web
-        run: npm run build   # ✅ 使用 npm run，自动使用本地 Vite
+        run: npm run build   # 使用 npm run，自动使用本地 vite
 
       - name: Verify build
         run: |
@@ -76,9 +80,16 @@ jobs:
       - name: Install dependencies (including dev)
         shell: pwsh
         run: |
-          $env:NODE_ENV = $null
+          $env:NODE_ENV = 'development'
+          Remove-Item -Recurse -Force node_modules -ErrorAction SilentlyContinue
           Remove-Item -Force package-lock.json -ErrorAction SilentlyContinue
-          npm install --legacy-peer-deps --include=dev
+          npm install --legacy-peer-deps
+
+      - name: Verify vite installation
+        shell: pwsh
+        run: |
+          npm list vite
+          Test-Path node_modules/.bin/vite.cmd
 
       - name: Build Electron Windows
         run: npm run electron:build:win
@@ -122,9 +133,12 @@ jobs:
 
       - name: Install dependencies (including dev)
         run: |
-          unset NODE_ENV
-          rm -f package-lock.json
-          npm install --legacy-peer-deps --include=dev
+          export NODE_ENV=development
+          rm -rf node_modules package-lock.json
+          npm install --legacy-peer-deps
+
+      - name: Verify vite installation
+        run: npm list vite
 
       - name: Install Capacitor CLI
         run: npm install -g @capacitor/cli
