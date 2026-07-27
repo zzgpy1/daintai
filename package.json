@@ -2,14 +2,15 @@
   "name": "global-radio",
   "version": "2.0.0",
   "description": "全球电台 - 聆听世界",
-  "main": "electron/main.ts",
+  "main": "electron-build/main.js",
   "scripts": {
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "electron:dev": "vite build && electron electron/main.ts",
-    "electron:build": "vite build && electron-builder",
-    "electron:build:win": "vite build && electron-builder --win --x64",
+    "build:electron:main": "tsc -p tsconfig.electron.json",
+    "electron:dev": "npm run build:electron:main && vite build && electron electron-build/main.js",
+    "electron:build": "npm run build:electron:main && vite build && electron-builder",
+    "electron:build:win": "npm run build:electron:main && vite build && electron-builder --win --x64",
     "capacitor:sync": "npx cap sync",
     "capacitor:open": "npx cap open",
     "build:android": "npm run build && npx cap sync android && cd android && ./gradlew assembleRelease",
@@ -54,7 +55,7 @@
     },
     "files": [
       "dist/**/*",
-      "electron/**/*"
+      "electron-build/**/*"
     ],
     "win": {
       "target": "nsis",
