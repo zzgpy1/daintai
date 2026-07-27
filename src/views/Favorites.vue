@@ -2,7 +2,10 @@
   <div class="min-h-screen bg-ios-light-gray dark:bg-dark-bg pb-24">
     <header class="sticky top-0 z-10 bg-white/80 dark:bg-dark-surface/80 backdrop-blur-lg border-b border-gray-200 dark:border-dark-gray px-4 py-4">
       <div class="max-w-6xl mx-auto flex items-center justify-between">
-        <h1 class="text-xl font-bold text-ios-dark-gray dark:text-dark-text">{{ $t('favorites.title') }}</h1>
+        <div class="flex items-center gap-4">
+          <BackButton />
+          <h1 class="text-xl font-bold text-ios-dark-gray dark:text-dark-text">{{ $t('favorites.title') }}</h1>
+        </div>
         <button v-if="favorites.length > 0" @click="clearAll" class="text-ios-red text-sm hover:underline">
           {{ $t('favorites.clearAll') }}
         </button>
@@ -37,6 +40,7 @@ import { computed } from 'vue'
 import { useFavoritesStore } from '@/stores/favorites'
 import { useToastStore } from '@/stores/toast'
 import type { RadioStation, FavoriteStation } from '@/types/radio'
+import BackButton from '@/components/common/BackButton.vue'
 import StationCard from '@/components/common/StationCard.vue'
 import PlayerBar from '@/components/common/PlayerBar.vue'
 import { HeartIcon } from '@heroicons/vue/24/outline'
