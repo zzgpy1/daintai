@@ -33,17 +33,15 @@ jobs:
 
       - name: Install dependencies (including dev)
         run: |
-          export NODE_ENV=development   # 强制 dev 依赖安装
+          export NODE_ENV=development
           rm -rf node_modules package-lock.json
           npm install --legacy-peer-deps
 
       - name: Verify vite installation
-        run: |
-          npm list vite || echo "vite not found"
-          ls -la node_modules/.bin/vite || echo "vite binary missing"
+        run: npm list vite
 
       - name: Build Web
-        run: npm run build   # 使用 npm run，自动使用本地 vite
+        run: npm run build
 
       - name: Verify build
         run: |
@@ -87,9 +85,7 @@ jobs:
 
       - name: Verify vite installation
         shell: pwsh
-        run: |
-          npm list vite
-          Test-Path node_modules/.bin/vite.cmd
+        run: npm list vite
 
       - name: Build Electron Windows
         run: npm run electron:build:win
@@ -102,7 +98,7 @@ jobs:
           name: electron-win
           path: dist-electron/*.exe
 
-    build-android:
+  build-android:
     name: Build Android APK
     needs: build-web
     runs-on: ubuntu-latest
