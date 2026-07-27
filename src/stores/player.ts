@@ -22,6 +22,10 @@ export const usePlayerStore = defineStore('player', () => {
   const duration = ref(0)
   const volume = ref(settingsStore.volume)
   const isMuted = ref(false)
+  const isBuffering = ref(false)
+
+  // 防止快速切换导致 play/pause 冲突
+  private let playPromise: Promise<void> | null = null
 
   const sleepTimer = ref<number | null>(null)
   const sleepTimerRemaining = ref(0)
@@ -49,10 +53,12 @@ export const usePlayerStore = defineStore('player', () => {
       audio.value = new Audio()
       audio.value.preload = 'metadata'
       audio.value.volume = volume.value
+      audio.value.crossOrigin = 'anonymous'
 
       audio.value.addEventListener('play', () => {
         isPlaying.value = true
         isLoading.value = false
+        isBuffering.value = false
         if (currentStation.value) {
           historyStore.addToHistory(currentStation.value)
         }
@@ -62,11 +68,16 @@ export const usePlayerStore = defineStore('player', () => {
         isPlaying.value = false
       })
 
+      audio.value.addEventListener('waiting', () => {
+        isBuffering.value = true
+      })
+
+      audio.value.addEventListener('canplay', () => {
+        isBuffering.value = false
+      })
+
       audio.value.addEventListener('ended', () => {
         isPlaying.value = false
-        if (settingsStore.autoPlayNext) {
-          // 自动播放下一个（可选）
-        }
       })
 
       audio.value.addEventListener('timeupdate', () => {
@@ -84,7 +95,7 @@ export const usePlayerStore = defineStore('player', () => {
         if (mediaError) {
           switch (mediaError.code) {
             case MediaError.MEDIA_ERR_NETWORK:
-              msg = '网络错误，请检查网络连接'
+              msg = '网络错误，请检查连接'
               break
             case MediaError.MEDIA_ERR_DECODE:
               msg = '音频解码失败，可能是不支持的格式'
@@ -99,6 +110,7 @@ export const usePlayerStore = defineStore('player', () => {
         error.value = msg
         isPlaying.value = false
         isLoading.value = false
+        isBuffering.value = false
         toastStore.showError(msg)
       })
     }
@@ -110,39 +122,41 @@ export const usePlayerStore = defineStore('player', () => {
     try {
       error.value = null
       isLoading.value = true
+      isBuffering.value = false
 
-      // 如果正在播放相同电台，先暂停再重新加载
+      // 如果正在播放相同电台且已播放，则暂停
       if (currentStation.value?.stationuuid === station.stationuuid && isPlaying.value) {
-        // 如果已经播放，则暂停
         pauseStation()
         isLoading.value = false
         return
       }
 
-      // 停止当前播放
+      // 停止当前播放（如果有）
       if (audio.value && !audio.value.paused) {
         audio.value.pause()
+        // 确保之前的 play() 完成
+        if (playPromise) {
+          await playPromise.catch(() => {})
+          playPromise = null
+        }
       }
 
       currentStation.value = station
-      
-      // 尝试使用 url_resolved，否则使用 url
       const streamUrl = station.url_resolved || station.url
       if (!streamUrl) {
         throw new Error('电台流地址无效')
       }
 
-      audio.value!.src = streamUrl
-      audio.value!.volume = volume.value
-      audio.value!.muted = isMuted.value
+      audio.value.src = streamUrl
+      audio.value.volume = volume.value
+      audio.value.muted = isMuted.value
+      audio.value.crossOrigin = 'anonymous'
 
-      // 添加跨域属性
-      audio.value!.crossOrigin = 'anonymous'
+      // 加载并播放
+      audio.value.load()
+      playPromise = audio.value.play()
+      await playPromise
 
-      // 先加载元数据再播放
-      await audio.value!.load()
-      await audio.value!.play()
-      
       // 记录点击
       radioAPI.recordClick(station.stationuuid).catch(() => {})
 
@@ -153,32 +167,46 @@ export const usePlayerStore = defineStore('player', () => {
           artist: station.country || '全球电台'
         })
       }
-      
+
       toastStore.showSuccess(`正在播放: ${station.name}`)
     } catch (err) {
-      const msg = err instanceof Error ? err.message : '播放失败，请重试'
-      error.value = msg
-      isLoading.value = false
-      toastStore.showError(msg)
-      console.error('播放错误:', err)
+      // 如果错误是 AbortError 或 NotAllowedError，忽略
+      if (err instanceof Error) {
+        if (err.name === 'AbortError' || err.name === 'NotAllowedError') {
+          console.warn('播放被中断:', err.message)
+          return
+        }
+        const msg = err.message || '播放失败，请重试'
+        error.value = msg
+        toastStore.showError(msg)
+        console.error('播放错误:', err)
+      }
     } finally {
       isLoading.value = false
+      playPromise = null
     }
   }
 
   const pauseStation = () => {
     if (audio.value) {
       audio.value.pause()
+      if (playPromise) {
+        playPromise.catch(() => {})
+        playPromise = null
+      }
     }
   }
 
   const resumeStation = async () => {
     if (audio.value && currentStation.value) {
       try {
-        await audio.value.play()
+        playPromise = audio.value.play()
+        await playPromise
       } catch (err) {
         console.error('恢复播放失败:', err)
         toastStore.showError('恢复播放失败')
+      } finally {
+        playPromise = null
       }
     }
   }
@@ -196,10 +224,15 @@ export const usePlayerStore = defineStore('player', () => {
       audio.value.pause()
       audio.value.currentTime = 0
       audio.value.src = ''
+      if (playPromise) {
+        playPromise.catch(() => {})
+        playPromise = null
+      }
     }
     isPlaying.value = false
     currentStation.value = null
     error.value = null
+    isBuffering.value = false
   }
 
   const setVolume = (value: number) => {
@@ -220,11 +253,11 @@ export const usePlayerStore = defineStore('player', () => {
     }
   }
 
+  // 睡眠定时器
   const setSleepTimer = (minutes: number) => {
     clearSleepTimer()
     sleepTimer.value = minutes
     sleepTimerRemaining.value = minutes
-
     sleepTimerInterval.value = setInterval(() => {
       sleepTimerRemaining.value--
       if (sleepTimerRemaining.value <= 0) {
@@ -233,7 +266,6 @@ export const usePlayerStore = defineStore('player', () => {
         toastStore.showInfo('⏰ 定时已到，播放已停止')
       }
     }, 60000)
-
     toastStore.showSuccess(`⏰ ${minutes}分钟后停止播放`)
   }
 
@@ -256,6 +288,7 @@ export const usePlayerStore = defineStore('player', () => {
     duration,
     volume,
     isMuted,
+    isBuffering,
     sleepTimer,
     sleepTimerRemaining,
     isFavorite,
