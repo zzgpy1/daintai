@@ -18,7 +18,7 @@ env:
   ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION: true
 
 jobs:
-    build-web:
+  build-web:
     name: Build Web
     runs-on: ubuntu-latest
     steps:
@@ -33,13 +33,8 @@ jobs:
 
       - name: Install dependencies
         run: |
-          rm -f package-lock.json
+          rm -rf node_modules package-lock.json
           npm install --legacy-peer-deps
-
-      - name: Debug - verify vite exists
-        run: |
-          ls -la node_modules/vite/bin/vite.js || echo "vite.js not found"
-          ls -la node_modules/.bin/vite || echo "vite symlink not found"
 
       - name: Build Web
         run: node node_modules/vite/bin/vite.js build
@@ -80,7 +75,6 @@ jobs:
         run: npm install --legacy-peer-deps
 
       - name: Compile Electron main process
-        # Windows 上使用 node 调用 tsc 入口
         run: node node_modules/typescript/bin/tsc -p electron/tsconfig.json
 
       - name: Build Electron Windows
@@ -125,10 +119,10 @@ jobs:
 
       - name: Install dependencies
         run: |
-          rm -f package-lock.json
+          rm -rf node_modules package-lock.json
           npm install --legacy-peer-deps
 
-      - name: Install Capacitor CLI globally (for cap commands)
+      - name: Install Capacitor CLI globally
         run: npm install -g @capacitor/cli
 
       - name: Init Capacitor
