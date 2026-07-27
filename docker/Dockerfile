@@ -1,33 +1,13 @@
 FROM node:18-alpine AS builder
 WORKDIR /app
 COPY package*.json ./
-RUN rm -f package-lock.json && npm install --legacy-peer-deps
+# 删除旧锁文件并强制安装所有依赖（包括 dev）
+RUN rm -f package-lock.json && npm install --legacy-peer-deps --include=dev
 COPY . .
-RUN npm run build
+# 使用 npx 确保 vite 命令可执行
+RUN npx vite build
 
 FROM nginx:alpine
 COPY --from=builder /app/dist /usr/share/nginx/html
-# 直接在容器中生成 nginx 配置（避免外部文件被忽略）
-RUN echo 'server { \
-    listen 80; \
-    server_name _; \
-    root /usr/share/nginx/html; \
-    index index.html; \
-    gzip on; \
-    gzip_vary on; \
-    gzip_min_length 1024; \
-    gzip_types text/plain text/css text/xml text/javascript application/javascript application/xml+rss application/json; \
-    location ~* \.(js|css|png|jpg|jpeg|gif|ico|svg|woff|woff2)$ { \
-        expires 1y; \
-        add_header Cache-Control "public, immutable"; \
-        access_log off; \
-    } \
-    location / { \
-        try_files $uri $uri/ /index.html; \
-    } \
-    add_header X-Frame-Options "SAMEORIGIN" always; \
-    add_header X-Content-Type-Options "nosniff" always; \
-    add_header X-XSS-Protection "1; mode=block" always; \
-}' > /etc/nginx/conf.d/default.conf
-
+COPY nginx.conf /etc/nginx/conf.d/default.conf
 EXPOSE 80
