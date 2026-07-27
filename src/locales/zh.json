@@ -11,8 +11,8 @@
     "random": "随机发现",
     "popular": "热门电台",
     "latest": "最新电台",
-    "china": "国内频道",
-    "refresh": "刷新"
+    "refresh": "刷新",
+    "china": "国内频道"
   },
   "search": {
     "title": "搜索电台",
@@ -66,6 +66,7 @@
     "cancel": "取消",
     "confirm": "确认",
     "save": "保存",
+    "back": "返回",
     "noData": "暂无数据"
   },
   "player": {
