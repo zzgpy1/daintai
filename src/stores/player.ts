@@ -7,11 +7,6 @@ import { useToastStore } from './toast'
 import { useSettingsStore } from './settings'
 import { radioAPI } from '@/services/radioApi'
 
-// 检测是否为 HLS 流
-const isHLS = (url: string): boolean => {
-  return url.includes('.m3u8') || url.includes('m3u8')
-}
-
 export const usePlayerStore = defineStore('player', () => {
   const favoritesStore = useFavoritesStore()
   const historyStore = useHistoryStore()
@@ -28,13 +23,33 @@ export const usePlayerStore = defineStore('player', () => {
   const volume = ref(settingsStore.volume)
   const isMuted = ref(false)
 
+  const sleepTimer = ref<number | null>(null)
+  const sleepTimerRemaining = ref(0)
+  const sleepTimerInterval = ref<NodeJS.Timeout | null>(null)
+
+  const isFavorite = computed(() => {
+    if (!currentStation.value) return false
+    return favoritesStore.isFavorite(currentStation.value.stationuuid)
+  })
+
+  const progress = computed(() => {
+    if (duration.value === 0) return 0
+    return (currentTime.value / duration.value) * 100
+  })
+
+  const formatTime = (seconds: number): string => {
+    if (!seconds || isNaN(seconds)) return '00:00'
+    const mins = Math.floor(seconds / 60)
+    const secs = Math.floor(seconds % 60)
+    return `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`
+  }
+
   const initAudio = () => {
     if (!audio.value) {
       audio.value = new Audio()
       audio.value.preload = 'metadata'
       audio.value.volume = volume.value
 
-      // 事件绑定
       audio.value.addEventListener('play', () => {
         isPlaying.value = true
         isLoading.value = false
@@ -49,6 +64,9 @@ export const usePlayerStore = defineStore('player', () => {
 
       audio.value.addEventListener('ended', () => {
         isPlaying.value = false
+        if (settingsStore.autoPlayNext) {
+          // 自动播放下一个（可选）
+        }
       })
 
       audio.value.addEventListener('timeupdate', () => {
@@ -69,11 +87,13 @@ export const usePlayerStore = defineStore('player', () => {
               msg = '网络错误，请检查网络连接'
               break
             case MediaError.MEDIA_ERR_DECODE:
-              msg = '音频解码失败（可能不支持的格式）'
+              msg = '音频解码失败，可能是不支持的格式'
               break
             case MediaError.MEDIA_ERR_SRC_NOT_SUPPORTED:
-              msg = '不支持的音频格式（尝试使用其他电台）'
+              msg = '不支持的音频格式'
               break
+            default:
+              msg = `播放错误 (${mediaError.code})`
           }
         }
         error.value = msg
@@ -91,26 +111,40 @@ export const usePlayerStore = defineStore('player', () => {
       error.value = null
       isLoading.value = true
 
-      if (currentStation.value?.stationuuid !== station.stationuuid) {
-        audio.value!.pause()
+      // 如果正在播放相同电台，先暂停再重新加载
+      if (currentStation.value?.stationuuid === station.stationuuid && isPlaying.value) {
+        // 如果已经播放，则暂停
+        pauseStation()
+        isLoading.value = false
+        return
+      }
+
+      // 停止当前播放
+      if (audio.value && !audio.value.paused) {
+        audio.value.pause()
       }
 
       currentStation.value = station
+      
+      // 尝试使用 url_resolved，否则使用 url
       const streamUrl = station.url_resolved || station.url
-
-      // 检测 HLS 流
-      if (isHLS(streamUrl)) {
-        // 尝试使用 HLS.js 或提示用户
-        toastStore.showWarning('此电台使用 HLS 流，可能无法在浏览器中播放，请尝试其他电台')
-        // 仍然尝试播放，但可能失败
+      if (!streamUrl) {
+        throw new Error('电台流地址无效')
       }
 
       audio.value!.src = streamUrl
       audio.value!.volume = volume.value
       audio.value!.muted = isMuted.value
 
+      // 添加跨域属性
+      audio.value!.crossOrigin = 'anonymous'
+
+      // 先加载元数据再播放
+      await audio.value!.load()
       await audio.value!.play()
-      radioAPI.recordClick(station.stationuuid)
+      
+      // 记录点击
+      radioAPI.recordClick(station.stationuuid).catch(() => {})
 
       // 更新媒体会话
       if ('mediaSession' in navigator) {
@@ -119,16 +153,124 @@ export const usePlayerStore = defineStore('player', () => {
           artist: station.country || '全球电台'
         })
       }
+      
+      toastStore.showSuccess(`正在播放: ${station.name}`)
     } catch (err) {
-      const msg = err instanceof Error ? err.message : '播放失败'
+      const msg = err instanceof Error ? err.message : '播放失败，请重试'
       error.value = msg
+      isLoading.value = false
       toastStore.showError(msg)
-      throw err
+      console.error('播放错误:', err)
     } finally {
       isLoading.value = false
     }
   }
 
-  // ... 其他方法（pause, resume, toggle, stop, volume, mute, seek, sleep timer 等）保持不变
-  // 确保导出所有方法
+  const pauseStation = () => {
+    if (audio.value) {
+      audio.value.pause()
+    }
+  }
+
+  const resumeStation = async () => {
+    if (audio.value && currentStation.value) {
+      try {
+        await audio.value.play()
+      } catch (err) {
+        console.error('恢复播放失败:', err)
+        toastStore.showError('恢复播放失败')
+      }
+    }
+  }
+
+  const togglePlayback = async () => {
+    if (isPlaying.value) {
+      pauseStation()
+    } else {
+      await resumeStation()
+    }
+  }
+
+  const stopStation = () => {
+    if (audio.value) {
+      audio.value.pause()
+      audio.value.currentTime = 0
+      audio.value.src = ''
+    }
+    isPlaying.value = false
+    currentStation.value = null
+    error.value = null
+  }
+
+  const setVolume = (value: number) => {
+    volume.value = Math.max(0, Math.min(1, value))
+    if (audio.value) audio.value.volume = volume.value
+    settingsStore.setVolume(volume.value)
+  }
+
+  const toggleMute = () => {
+    isMuted.value = !isMuted.value
+    if (audio.value) audio.value.muted = isMuted.value
+    settingsStore.setMuted(isMuted.value)
+  }
+
+  const seek = (time: number) => {
+    if (audio.value && duration.value > 0) {
+      audio.value.currentTime = Math.max(0, Math.min(duration.value, time))
+    }
+  }
+
+  const setSleepTimer = (minutes: number) => {
+    clearSleepTimer()
+    sleepTimer.value = minutes
+    sleepTimerRemaining.value = minutes
+
+    sleepTimerInterval.value = setInterval(() => {
+      sleepTimerRemaining.value--
+      if (sleepTimerRemaining.value <= 0) {
+        clearSleepTimer()
+        stopStation()
+        toastStore.showInfo('⏰ 定时已到，播放已停止')
+      }
+    }, 60000)
+
+    toastStore.showSuccess(`⏰ ${minutes}分钟后停止播放`)
+  }
+
+  const clearSleepTimer = () => {
+    if (sleepTimerInterval.value) {
+      clearInterval(sleepTimerInterval.value)
+      sleepTimerInterval.value = null
+    }
+    sleepTimer.value = null
+    sleepTimerRemaining.value = 0
+  }
+
+  return {
+    audio,
+    currentStation,
+    isPlaying,
+    isLoading,
+    error,
+    currentTime,
+    duration,
+    volume,
+    isMuted,
+    sleepTimer,
+    sleepTimerRemaining,
+    isFavorite,
+    progress,
+    initAudio,
+    playStation,
+    pauseStation,
+    resumeStation,
+    togglePlayback,
+    stopStation,
+    setVolume,
+    toggleMute,
+    seek,
+    setSleepTimer,
+    clearSleepTimer,
+    formatTime
+  }
 })
