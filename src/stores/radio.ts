@@ -9,8 +9,8 @@ export const useRadioStore = defineStore('radio', () => {
   const stations = ref<RadioStation[]>([])
   const topStations = ref<RadioStation[]>([])
   const latestStations = ref<RadioStation[]>([])
-  const chinaStations = ref<RadioStation[]>([])   // 国内频道
-  const categoryStations = ref<RadioStation[]>([]) // 分类结果
+  const chinaStations = ref<RadioStation[]>([])
+  const categoryStations = ref<RadioStation[]>([])
   const countries = ref<Country[]>([])
   const languages = ref<Language[]>([])
   const tags = ref<Tag[]>([])
@@ -20,11 +20,10 @@ export const useRadioStore = defineStore('radio', () => {
   const selectedCountry = ref('')
   const selectedLanguage = ref('')
   const selectedTag = ref('')
-  const currentCategory = ref<string>('') // 当前选中的分类
+  const currentCategory = ref<string>('')
 
   const filteredStations = computed(() => {
     let filtered = stations.value
-    
     if (searchQuery.value) {
       const q = searchQuery.value.toLowerCase().trim()
       filtered = filtered.filter(s => 
@@ -34,19 +33,15 @@ export const useRadioStore = defineStore('radio', () => {
         (s.language && s.language.toLowerCase().includes(q))
       )
     }
-    
     if (selectedCountry.value) {
       filtered = filtered.filter(s => s.countrycode === selectedCountry.value)
     }
-    
     if (selectedLanguage.value) {
       filtered = filtered.filter(s => s.language?.toLowerCase().includes(selectedLanguage.value.toLowerCase()))
     }
-    
     if (selectedTag.value) {
       filtered = filtered.filter(s => s.tags.toLowerCase().includes(selectedTag.value.toLowerCase()))
     }
-    
     return filtered
   })
 
@@ -54,14 +49,12 @@ export const useRadioStore = defineStore('radio', () => {
     if (query) searchQuery.value = query
     isLoading.value = true
     error.value = null
-    
     try {
       const params: any = { limit: 100, hidebroken: true }
       if (searchQuery.value) params.name = searchQuery.value
       if (selectedCountry.value) params.countrycode = selectedCountry.value
       if (selectedLanguage.value) params.language = selectedLanguage.value
       if (selectedTag.value) params.tag = selectedTag.value
-      
       stations.value = await radioAPI.searchStations(params)
       if (stations.value.length === 0) {
         toastStore.showInfo('没有找到匹配的电台')
@@ -73,6 +66,7 @@ export const useRadioStore = defineStore('radio', () => {
     } finally {
       isLoading.value = false
     }
+    return stations.value
   }
 
   const loadTopStations = async () => {
@@ -99,13 +93,11 @@ export const useRadioStore = defineStore('radio', () => {
     }
   }
 
-  // 加载中国电台（默认）
   const loadChinaStations = async () => {
     isLoading.value = true
     try {
       chinaStations.value = await radioAPI.getStationsByCountry('CN', 50)
       if (chinaStations.value.length === 0) {
-        // 如果中国电台为空，尝试搜索包含 "China" 的
         const results = await radioAPI.searchStations({ country: 'China', limit: 50 })
         chinaStations.value = results
       }
@@ -117,7 +109,6 @@ export const useRadioStore = defineStore('radio', () => {
     }
   }
 
-  // 按分类加载（音乐、体育、财经、新闻等）
   const loadCategoryStations = async (tag: string) => {
     if (!tag) {
       categoryStations.value = []
