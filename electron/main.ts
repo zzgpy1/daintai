@@ -15,7 +15,7 @@ function createWindow() {
       nodeIntegration: false,
       contextIsolation: true,
       preload: path.join(__dirname, 'preload.js'),
-      webSecurity: false, // 临时解决跨域，生产环境建议配置白名单
+      webSecurity: false,
       allowRunningInsecureContent: false
     },
     icon: path.join(__dirname, 'build/icon.ico')
@@ -28,24 +28,18 @@ function createWindow() {
     slashes: true
   })
 
-  console.log('Loading URL:', startUrl) // 调试日志
-
   mainWindow.loadURL(startUrl).catch(err => {
-    console.error('加载页面失败:', err)
+    console.error('加载失败:', err)
+    setTimeout(() => mainWindow?.reload(), 2000)
   })
 
-  // 监听加载失败事件
-  mainWindow.webContents.on('did-fail-load', (event, errorCode, errorDescription) => {
-    console.error('页面加载失败:', errorCode, errorDescription)
-    // 可尝试重新加载
+  mainWindow.webContents.on('did-fail-load', () => {
+    setTimeout(() => mainWindow?.reload(), 3000)
   })
 
-  // 开启 DevTools（发布时可注释掉）
   mainWindow.webContents.openDevTools()
-
   mainWindow.on('closed', () => { mainWindow = null })
 
-  // 自动更新
   autoUpdater.checkForUpdatesAndNotify()
   autoUpdater.on('update-available', () => {
     mainWindow?.webContents.send('update-available')
