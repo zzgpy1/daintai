@@ -1,18 +1,15 @@
 <template>
-  <div class="min-h-screen bg-ios-light-gray dark:bg-dark-bg pb-24">
-    <header class="sticky top-0 z-10 bg-white/80 dark:bg-dark-surface/80 backdrop-blur-lg border-b border-gray-200 dark:border-dark-gray px-4 py-4">
-      <div class="flex items-center justify-between max-w-6xl mx-auto">
-        <h1 class="text-xl font-bold text-ios-dark-gray dark:text-dark-text">{{ $t('home.title') }}</h1>
-        <div class="flex items-center gap-2">
-          <ThemeToggle />
-          <button @click="$router.push('/settings')" class="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-dark-gray">
-            <Cog6ToothIcon class="w-5 h-5 text-ios-gray dark:text-dark-secondary" />
-          </button>
-        </div>
+  <div class="min-h-screen bg-ios-light-gray dark:bg-dark-bg">
+    <!-- 顶部 -->
+    <header class="bg-white/80 dark:bg-dark-surface/80 backdrop-blur-lg border-b border-gray-200 dark:border-dark-gray px-4 py-4">
+      <div class="max-w-6xl mx-auto">
+        <h1 class="text-2xl font-bold text-ios-dark-gray dark:text-dark-text">{{ $t('home.title') }}</h1>
+        <p class="text-sm text-ios-gray dark:text-dark-secondary mt-1">{{ $t('home.slogan') }}</p>
       </div>
     </header>
 
     <div class="max-w-6xl mx-auto px-4 py-6 space-y-6">
+      <!-- 加载/错误状态 -->
       <div v-if="loading" class="text-center py-8">
         <div class="inline-block w-8 h-8 border-4 border-ios-blue border-t-transparent rounded-full animate-spin"></div>
         <p class="text-ios-gray dark:text-dark-secondary mt-2">{{ $t('common.loading') }}</p>
@@ -36,7 +33,7 @@
           </button>
         </div>
 
-        <!-- 分类选项卡 -->
+        <!-- 分类标签（精简） -->
         <div class="flex flex-wrap gap-2 overflow-x-auto pb-2">
           <button
             v-for="cat in categories"
@@ -49,7 +46,7 @@
           </button>
         </div>
 
-        <!-- 分类显示 -->
+        <!-- 分类内容 -->
         <div v-if="currentCategory && categoryStations.length > 0">
           <div class="flex items-center justify-between mb-4">
             <h2 class="text-lg font-semibold text-ios-dark-gray dark:text-dark-text">{{ getCategoryLabel(currentCategory) }}</h2>
@@ -62,7 +59,7 @@
           </div>
         </div>
 
-        <!-- 国内频道（默认） -->
+        <!-- 默认显示：国内频道 -->
         <div v-if="!currentCategory">
           <div class="flex items-center justify-between mb-4">
             <h2 class="text-lg font-semibold text-ios-dark-gray dark:text-dark-text">{{ $t('home.china') }}</h2>
@@ -99,7 +96,6 @@
         </section>
       </template>
     </div>
-    <PlayerBar />
   </div>
 </template>
 
@@ -127,15 +123,13 @@ const chinaLoading = ref(false)
 const topLoading = ref(false)
 const categoryLoading = ref(false)
 
+// 精简分类（去掉古典、爵士、摇滚、流行）
 const categories = [
+  { value: 'all', label: '全部' },
   { value: 'music', label: '音乐' },
-  { value: 'sports', label: '体育' },
   { value: 'news', label: '新闻' },
   { value: 'talk', label: '谈话' },
-  { value: 'classical', label: '古典' },
-  { value: 'jazz', label: '爵士' },
-  { value: 'rock', label: '摇滚' },
-  { value: 'pop', label: '流行' }
+  { value: 'sports', label: '体育' }
 ]
 
 const chinaStations = computed(() => radioStore.chinaStations)
@@ -190,8 +184,14 @@ const refreshCategory = async () => {
 
 // 选择分类
 const selectCategory = async (tag: string) => {
+  if (tag === 'all') {
+    // 全部 => 显示国内频道
+    currentCategory.value = ''
+    radioStore.categoryStations = []
+    return
+  }
   if (currentCategory.value === tag) {
-    // 取消选中，回到国内频道
+    // 取消选中
     currentCategory.value = ''
     radioStore.categoryStations = []
     return
@@ -200,7 +200,7 @@ const selectCategory = async (tag: string) => {
   await radioStore.loadCategoryStations(tag)
 }
 
-// 随机发现
+// 随机发现（增强降级）
 const handleRandom = async () => {
   if (randomLoading.value) return
   randomLoading.value = true
@@ -213,7 +213,7 @@ const handleRandom = async () => {
       return
     }
     
-    // 如果随机为空，从国内频道中随机选一个
+    // 降级：从国内频道随机选
     if (chinaStations.value.length > 0) {
       const random = chinaStations.value[Math.floor(Math.random() * chinaStations.value.length)]
       await playerStore.playStation(random)
@@ -221,7 +221,7 @@ const handleRandom = async () => {
       return
     }
     
-    // 如果国内为空，从热门中选
+    // 再降级：从热门中选
     if (topStations.value.length > 0) {
       const random = topStations.value[Math.floor(Math.random() * topStations.value.length)]
       await playerStore.playStation(random)
@@ -232,7 +232,7 @@ const handleRandom = async () => {
     toastStore.showError('暂无可用电台，请稍后重试')
   } catch (err) {
     console.error('随机失败', err)
-    // 降级：从国内或热门中随机选
+    // 最终降级
     try {
       if (chinaStations.value.length > 0) {
         const random = chinaStations.value[Math.floor(Math.random() * chinaStations.value.length)]
