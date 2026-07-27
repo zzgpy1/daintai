@@ -37,7 +37,11 @@ function createWindow() {
     setTimeout(() => mainWindow?.reload(), 3000)
   })
 
-  mainWindow.webContents.openDevTools()
+  // ✅ 生产环境关闭DevTools（仅在开发环境启用）
+  if (process.env.NODE_ENV === 'development') {
+    mainWindow.webContents.openDevTools()
+  }
+
   mainWindow.on('closed', () => { mainWindow = null })
 
   autoUpdater.checkForUpdatesAndNotify()
