@@ -32,10 +32,13 @@ jobs:
           cache: 'npm'
 
       - name: Install dependencies
-        run: npm install --legacy-peer-deps
+        run: |
+          rm -f package-lock.json
+          npm install --legacy-peer-deps
 
       - name: Build Web
-        run: npx vite build   # ✅ 直接调用 npx
+        # 直接调用 vite 的入口文件，避免依赖 .bin 链接
+        run: node node_modules/vite/bin/vite.js build
 
       - name: Verify build
         run: |
@@ -72,8 +75,12 @@ jobs:
       - name: Install dependencies
         run: npm install --legacy-peer-deps
 
+      - name: Compile Electron main process
+        # Windows 上使用 node 调用 tsc 入口
+        run: node node_modules/typescript/bin/tsc -p electron/tsconfig.json
+
       - name: Build Electron Windows
-        run: npx electron-builder --win --x64   # ✅ 直接使用 npx
+        run: node node_modules/electron-builder/out/cli/cli.js --win --x64
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
@@ -113,7 +120,9 @@ jobs:
           path: www/
 
       - name: Install dependencies
-        run: npm install --legacy-peer-deps
+        run: |
+          rm -f package-lock.json
+          npm install --legacy-peer-deps
 
       - name: Install Capacitor CLI globally (for cap commands)
         run: npm install -g @capacitor/cli
