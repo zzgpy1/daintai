@@ -53,10 +53,6 @@
     "directories": {
       "output": "dist-electron"
     },
-    "files": [
-      "dist/**/*",
-      "electron-build/**/*"
-    ],
     "win": {
       "target": "nsis",
       "icon": "electron/build/icon.ico"
