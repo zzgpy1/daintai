@@ -1,4 +1,13 @@
 {
+  "home": {
+    "title": "全球电台",
+    "slogan": "聆听世界，音乐无界",
+    "random": "随机发现",
+    "popular": "热门电台",
+    "latest": "最新电台",
+    "refresh": "刷新",
+    "china": "国内频道"
+  },
   "nav": {
     "home": "首页",
     "search": "搜索",
@@ -6,27 +15,14 @@
     "history": "足迹",
     "settings": "设置"
   },
-  "home": {
-    "title": "全球电台",
-    "random": "随机发现",
-    "popular": "热门电台",
-    "latest": "最新电台",
-    "refresh": "刷新",
-    "china": "国内频道"
-  },
   "search": {
     "title": "搜索电台",
-    "placeholder": "搜索电台名称、国家或标签",
+    "placeholder": "搜索电台名称、国家或标签...",
     "results": "搜索结果",
     "noResults": "未找到相关电台",
-    "country": "国家",
-    "language": "语言",
-    "tags": "标签",
     "allCountries": "所有国家",
     "allLanguages": "所有语言",
-    "allTags": "所有标签",
-    "search": "搜索",
-    "reset": "重置"
+    "allTags": "所有标签"
   },
   "favorites": {
     "title": "我的收藏",
@@ -54,8 +50,6 @@
     "setTimer": "设置定时",
     "cancelTimer": "取消定时",
     "autoPlayNext": "自动播放下一个",
-    "notifications": "通知",
-    "autoUpdate": "自动更新",
     "about": "关于",
     "version": "版本"
   },
@@ -63,16 +57,12 @@
     "loading": "加载中...",
     "error": "出错了",
     "retry": "重试",
-    "cancel": "取消",
-    "confirm": "确认",
-    "save": "保存",
     "back": "返回",
     "noData": "暂无数据"
   },
   "player": {
     "play": "播放",
     "pause": "暂停",
-    "stop": "停止",
     "favorite": "收藏",
     "favorited": "已收藏"
   }
