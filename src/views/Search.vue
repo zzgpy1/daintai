@@ -52,8 +52,6 @@
         <StationCard v-for="station in radioStore.filteredStations" :key="station.stationuuid" :station="station" />
       </div>
     </div>
-
-    <PlayerBar />
   </div>
 </template>
 
@@ -62,7 +60,6 @@ import { ref, onMounted, watch } from 'vue'
 import { useRadioStore } from '@/stores/radio'
 import BackButton from '@/components/common/BackButton.vue'
 import StationCard from '@/components/common/StationCard.vue'
-import PlayerBar from '@/components/common/PlayerBar.vue'
 import { MagnifyingGlassIcon } from '@heroicons/vue/24/outline'
 
 const radioStore = useRadioStore()
