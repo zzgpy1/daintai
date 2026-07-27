@@ -17,7 +17,6 @@ import { ArrowLeftIcon } from '@heroicons/vue/24/outline'
 const route = useRoute()
 const router = useRouter()
 
-// 不在首页时显示返回按钮
 const show = computed(() => route.path !== '/')
 
 const goBack = () => {
