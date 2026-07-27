@@ -1,7 +1,6 @@
 <template>
   <div class="ios-card p-4 hover:shadow-lg transition-all cursor-pointer" @click="goToDetail">
     <div class="flex items-center gap-4">
-      <!-- 图标 -->
       <img
         v-if="station.favicon"
         :src="station.favicon"
@@ -13,7 +12,6 @@
         {{ station.name.charAt(0).toUpperCase() }}
       </div>
 
-      <!-- 信息 -->
       <div class="flex-1 min-w-0">
         <h3 class="font-medium text-ios-dark-gray dark:text-dark-text truncate">{{ station.name }}</h3>
         <p class="text-sm text-ios-gray dark:text-dark-secondary truncate">{{ station.country }}</p>
@@ -24,7 +22,6 @@
         </div>
       </div>
 
-      <!-- 操作 -->
       <div class="flex items-center gap-2">
         <button @click.stop="toggleFavorite" class="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-dark-gray">
           <HeartIcon class="w-5 h-5" :class="isFavorited ? 'text-ios-red fill-current' : 'text-ios-gray dark:text-dark-secondary'" />
@@ -43,6 +40,7 @@ import { computed, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { usePlayerStore } from '@/stores/player'
 import { useFavoritesStore } from '@/stores/favorites'
+import { useToastStore } from '@/stores/toast'
 import type { RadioStation } from '@/types/radio'
 import { PlayIcon, PauseIcon, HeartIcon } from '@heroicons/vue/24/outline'
 
@@ -51,6 +49,7 @@ const props = defineProps<{ station: RadioStation }>()
 const router = useRouter()
 const playerStore = usePlayerStore()
 const favoritesStore = useFavoritesStore()
+const toastStore = useToastStore()
 const showFallback = ref(false)
 
 const tags = computed(() => {
@@ -69,13 +68,18 @@ const goToDetail = () => {
 
 const toggleFavorite = () => {
   favoritesStore.toggleFavorite(props.station)
+  toastStore.showInfo(isFavorited.value ? '已取消收藏' : '已添加收藏')
 }
 
 const handlePlay = async () => {
   if (isCurrentPlaying.value) {
     playerStore.pauseStation()
   } else {
-    await playerStore.playStation(props.station)
+    try {
+      await playerStore.playStation(props.station)
+    } catch (e) {
+      toastStore.showError('播放失败，请检查网络或电台源')
+    }
   }
 }
 </script>
