@@ -65,5 +65,12 @@
     "cancel": "取消",
     "confirm": "确认",
     "save": "保存"
+  },
+  "player": {
+    "play": "播放",
+    "pause": "暂停",
+    "stop": "停止",
+    "favorite": "收藏",
+    "favorited": "已收藏"
   }
 }
