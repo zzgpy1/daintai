@@ -18,17 +18,12 @@ function createWindow() {
     icon: path.join(__dirname, 'build/icon.ico')
   })
 
-  // 生产环境加载 dist/index.html，开发环境加载 Vite 开发服务器
-  const isDev = process.env.NODE_ENV === 'development'
-  const startUrl = isDev
-    ? 'http://localhost:4173'  // Vite 预览服务器（或 dev 服务器，可调整）
-    : `file://${path.join(__dirname, '../dist/index.html')}`
-
+  const startUrl = process.env.ELECTRON_START_URL || 
+    `file://${path.join(__dirname, '../dist/index.html')}`
   mainWindow.loadURL(startUrl)
 
   mainWindow.on('closed', () => { mainWindow = null })
 
-  // 自动更新
   autoUpdater.checkForUpdatesAndNotify()
   autoUpdater.on('update-available', () => {
     mainWindow?.webContents.send('update-available')
