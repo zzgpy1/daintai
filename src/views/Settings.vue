@@ -1,7 +1,8 @@
 <template>
   <div class="min-h-screen bg-ios-light-gray dark:bg-dark-bg pb-24">
     <header class="sticky top-0 z-10 bg-white/80 dark:bg-dark-surface/80 backdrop-blur-lg border-b border-gray-200 dark:border-dark-gray px-4 py-4">
-      <div class="max-w-6xl mx-auto">
+      <div class="max-w-6xl mx-auto flex items-center gap-4">
+        <BackButton />
         <h1 class="text-xl font-bold text-ios-dark-gray dark:text-dark-text">{{ $t('settings.title') }}</h1>
       </div>
     </header>
@@ -87,6 +88,7 @@ import { ref, computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useSettingsStore } from '@/stores/settings'
 import { usePlayerStore } from '@/stores/player'
+import BackButton from '@/components/common/BackButton.vue'
 import ThemeToggle from '@/components/common/ThemeToggle.vue'
 import SleepTimer from '@/components/common/SleepTimer.vue'
 import PlayerBar from '@/components/common/PlayerBar.vue'
