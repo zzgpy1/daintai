@@ -13,7 +13,7 @@
     "electron:build:win": "npm run build:electron:main && vite build && electron-builder --win --x64",
     "capacitor:sync": "npx cap sync",
     "capacitor:open": "npx cap open",
-    "build:android": "npm run build && npx cap sync android && cd android && ./gradlew assembleRelease",
+    "build:android": "npm run build && npx cap sync android && cd android && ./gradlew assembleDebug",
     "docker:build": "docker build -f docker/Dockerfile -t global-radio:latest .",
     "docker:push": "docker push global-radio:latest"
   },
