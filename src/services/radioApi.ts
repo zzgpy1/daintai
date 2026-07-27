@@ -24,6 +24,10 @@ class RadioAPI {
       try {
         const response = await this.axiosInstance.get(`${baseURL}${endpoint}`, { params })
         const data = response.data
+        // 如果数据为空且是随机请求，尝试重新获取
+        if (endpoint === API_CONFIG.endpoints.random && (!data || data.length === 0)) {
+          throw new Error('Empty random response')
+        }
         this.cache.set(cacheKey, { data, timestamp: Date.now() })
         if (baseURL === API_CONFIG.fallbackBaseURL) {
           this.currentBaseURL = API_CONFIG.baseURL
@@ -52,17 +56,24 @@ class RadioAPI {
   }
 
   async getRandomStations(limit: number = 30): Promise<RadioStation[]> {
-    // 随机请求有时会返回空数组，增加重试并尝试不同参数
     try {
       const result = await this.requestWithRetry<RadioStation[]>(`${API_CONFIG.endpoints.random}/${limit}`)
       if (!result || result.length === 0) {
-        // 如果为空，尝试获取热门作为备选
+        // 如果随机为空，返回热门作为备选
         return this.getTopStations(limit)
       }
       return result
     } catch {
       return this.getTopStations(limit) // 降级
     }
+  }
+
+  async getStationsByCountry(countryCode: string, limit: number = 50): Promise<RadioStation[]> {
+    return this.requestWithRetry<RadioStation[]>(`${API_CONFIG.endpoints.byCountry}/${countryCode}`, { limit })
+  }
+
+  async getStationsByTag(tag: string, limit: number = 50): Promise<RadioStation[]> {
+    return this.requestWithRetry<RadioStation[]>(`${API_CONFIG.endpoints.byTag}/${tag}`, { limit })
   }
 
   async getCountries(): Promise<Country[]> {
