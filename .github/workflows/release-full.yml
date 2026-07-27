@@ -19,8 +19,7 @@ env:
 
 jobs:
   build-web:
-    - name: Build Web
-    run: node node_modules/vite/bin/vite.js build
+    name: Build Web
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
@@ -33,12 +32,10 @@ jobs:
           cache: 'npm'
 
       - name: Install dependencies
-        run: |
-          rm -rf node_modules package-lock.json
-          npm install --legacy-peer-deps
+        run: npm install --legacy-peer-deps   # ✅ 无需删除锁文件
 
       - name: Build Web
-        run: node node_modules/vite/bin/vite.js build
+        run: npm run build
 
       - name: Verify build
         run: |
@@ -73,13 +70,10 @@ jobs:
           path: dist/
 
       - name: Install dependencies
-        run: npm install --legacy-peer-deps
-
-      - name: Compile Electron main process
-        run: node node_modules/typescript/bin/tsc -p electron/tsconfig.json
+        run: npm install --legacy-peer-deps   # ✅ Windows 兼容
 
       - name: Build Electron Windows
-        run: node node_modules/electron-builder/out/cli/cli.js --win --x64
+        run: npm run electron:build:win
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
@@ -119,11 +113,9 @@ jobs:
           path: www/
 
       - name: Install dependencies
-        run: |
-          rm -rf node_modules package-lock.json
-          npm install --legacy-peer-deps
+        run: npm install --legacy-peer-deps   # ✅
 
-      - name: Install Capacitor CLI globally
+      - name: Install Capacitor CLI
         run: npm install -g @capacitor/cli
 
       - name: Init Capacitor
