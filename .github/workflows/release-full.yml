@@ -31,12 +31,11 @@ jobs:
           node-version: 18
           cache: 'npm'
 
-      # 更新 package.json 版本（从 tag 或输入）
       - name: Update version
         run: |
           VERSION="${{ github.event_name == 'push' && github.ref_name || github.event.inputs.tag }}"
-          VERSION=${VERSION#v}  # 去掉 v 前缀
-          npm version $VERSION --no-git-tag-version --allow-same-version
+          VERSION=${VERSION#v}
+          jq --arg v "$VERSION" '.version = $v' package.json > tmp.json && mv tmp.json package.json
           echo "Version set to $VERSION"
 
       - name: Install dependencies (including dev)
@@ -47,6 +46,18 @@ jobs:
 
       - name: Build Web
         run: npm run build
+
+      - name: Verify build
+        run: |
+          ls -la dist/
+          test -f dist/index.html || exit 1
+          echo "✅ Web build successful!"
+
+      - name: Upload Web artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: web-dist
+          path: dist/
 
   build-electron:
     name: Build Electron Windows
@@ -61,6 +72,16 @@ jobs:
         with:
           node-version: 18
           cache: 'npm'
+
+      - name: Update version
+        shell: pwsh
+        run: |
+          $VERSION = if ($env:GITHUB_EVENT_NAME -eq 'push') { "$env:GITHUB_REF_NAME" } else { "${{ github.event.inputs.tag }}" }
+          $VERSION = $VERSION -replace '^v', ''
+          $json = Get-Content package.json | ConvertFrom-Json
+          $json.version = $VERSION
+          $json | ConvertTo-Json -Depth 10 | Set-Content package.json
+          Write-Host "Version set to $VERSION"
 
       - name: Download Web build artifact
         uses: actions/download-artifact@v4
@@ -104,6 +125,13 @@ jobs:
         with:
           node-version: 18
           cache: 'npm'
+
+      - name: Update version
+        run: |
+          VERSION="${{ github.event_name == 'push' && github.ref_name || github.event.inputs.tag }}"
+          VERSION=${VERSION#v}
+          jq --arg v "$VERSION" '.version = $v' package.json > tmp.json && mv tmp.json package.json
+          echo "Version set to $VERSION"
 
       - name: Setup Java
         uses: actions/setup-java@v4
@@ -162,6 +190,19 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 18
+          cache: 'npm'
+
+      - name: Update version
+        run: |
+          VERSION="${{ github.event_name == 'push' && github.ref_name || github.event.inputs.tag }}"
+          VERSION=${VERSION#v}
+          jq --arg v "$VERSION" '.version = $v' package.json > tmp.json && mv tmp.json package.json
+          echo "Version set to $VERSION"
 
       - name: Check Docker credentials
         id: check
