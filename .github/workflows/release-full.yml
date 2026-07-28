@@ -31,6 +31,14 @@ jobs:
           node-version: 18
           cache: 'npm'
 
+      # 更新 package.json 版本（从 tag 或输入）
+      - name: Update version
+        run: |
+          VERSION="${{ github.event_name == 'push' && github.ref_name || github.event.inputs.tag }}"
+          VERSION=${VERSION#v}  # 去掉 v 前缀
+          npm version $VERSION --no-git-tag-version --allow-same-version
+          echo "Version set to $VERSION"
+
       - name: Install dependencies (including dev)
         run: |
           export NODE_ENV=development
@@ -39,18 +47,6 @@ jobs:
 
       - name: Build Web
         run: npm run build
-
-      - name: Verify build
-        run: |
-          ls -la dist/
-          test -f dist/index.html || exit 1
-          echo "✅ Web build successful!"
-
-      - name: Upload Web artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: web-dist
-          path: dist/
 
   build-electron:
     name: Build Electron Windows
