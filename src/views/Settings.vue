@@ -92,6 +92,8 @@ import BackButton from '@/components/common/BackButton.vue'
 import ThemeToggle from '@/components/common/ThemeToggle.vue'
 import SleepTimer from '@/components/common/SleepTimer.vue'
 import PlayerBar from '@/components/common/PlayerBar.vue'
+// 导入 package.json 获取版本号
+import pkg from '@/../package.json'
 
 const { locale } = useI18n()
 const settingsStore = useSettingsStore()
@@ -100,7 +102,8 @@ const playerStore = usePlayerStore()
 const language = ref(settingsStore.language)
 const volume = ref(settingsStore.volume)
 const autoPlayNext = ref(settingsStore.autoPlayNext)
-const appVersion = '2.0.3'
+// 动态读取 package.json 中的版本号
+const appVersion = pkg.version
 
 const currentLanguageName = computed(() => {
   return language.value === 'zh' ? '中文' : 'English'
