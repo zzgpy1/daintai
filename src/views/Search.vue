@@ -8,17 +8,15 @@
     </header>
 
     <div class="max-w-6xl mx-auto px-4 py-6">
-      <!-- 搜索框 -->
-      <div class="relative mb-4 z-20">
-        <MagnifyingGlassIcon class="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-ios-gray" />
+      <!-- 搜索框 - 确保可输入 -->
+      <div class="relative mb-4">
+        <MagnifyingGlassIcon class="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-ios-gray pointer-events-none" />
         <input
-          ref="searchInput"
           v-model="searchQuery"
           @input="onSearch"
           :placeholder="$t('search.placeholder')"
           class="w-full pl-10 pr-4 py-3 rounded-ios border border-gray-200 dark:border-dark-gray bg-white dark:bg-dark-card text-ios-dark-gray dark:text-dark-text focus:outline-none focus:ring-2 focus:ring-ios-blue"
           autofocus
-          @click.stop
         />
       </div>
 
@@ -59,7 +57,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, watch, nextTick } from 'vue'
+import { ref, onMounted, watch } from 'vue'
 import { useRadioStore } from '@/stores/radio'
 import BackButton from '@/components/common/BackButton.vue'
 import StationCard from '@/components/common/StationCard.vue'
@@ -69,7 +67,6 @@ const radioStore = useRadioStore()
 const searchQuery = ref('')
 const selectedCountry = ref('')
 const selectedLanguage = ref('')
-const searchInput = ref<HTMLInputElement | null>(null)
 
 const countries = ref<any[]>([])
 const languages = ref<any[]>([])
@@ -94,9 +91,5 @@ onMounted(async () => {
   ])
   countries.value = radioStore.countries
   languages.value = radioStore.languages
-  await nextTick()
-  if (searchInput.value) {
-    searchInput.value.focus()
-  }
 })
 </script>
