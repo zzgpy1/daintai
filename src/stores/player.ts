@@ -94,8 +94,18 @@ export const usePlayerStore = defineStore('player', () => {
           return
         }
         const mediaError = (e.target as HTMLAudioElement).error
-        let msg = '播放失败'
         if (mediaError) {
+          // 🔹 对于不支持的格式，静默处理，不弹出错误提示
+          if (mediaError.code === MediaError.MEDIA_ERR_SRC_NOT_SUPPORTED) {
+            console.warn('不支持的音频格式:', currentStation.value?.name)
+            isPlaying.value = false
+            isLoading.value = false
+            isBuffering.value = false
+            // 不清除 currentStation，保留信息以便用户知道当前尝试的电台
+            return
+          }
+          // 其他错误（网络、解码等）才显示提示
+          let msg = '播放失败'
           switch (mediaError.code) {
             case MediaError.MEDIA_ERR_NETWORK:
               msg = '网络错误，请检查连接'
@@ -103,18 +113,15 @@ export const usePlayerStore = defineStore('player', () => {
             case MediaError.MEDIA_ERR_DECODE:
               msg = '音频解码失败，可能是不支持的格式'
               break
-            case MediaError.MEDIA_ERR_SRC_NOT_SUPPORTED:
-              msg = '不支持的音频格式'
-              break
             default:
               msg = `播放错误 (${mediaError.code})`
           }
+          error.value = msg
+          isPlaying.value = false
+          isLoading.value = false
+          isBuffering.value = false
+          toastStore.showError(msg)
         }
-        error.value = msg
-        isPlaying.value = false
-        isLoading.value = false
-        isBuffering.value = false
-        toastStore.showError(msg)
       })
     }
   }
@@ -219,7 +226,6 @@ export const usePlayerStore = defineStore('player', () => {
     if (audio.value) {
       audio.value.pause()
       audio.value.currentTime = 0
-      // 清空 src 并移除错误监听临时处理
       audio.value.src = ''
       if (playPromise) {
         playPromise.catch(() => {})
