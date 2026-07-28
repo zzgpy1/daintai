@@ -35,14 +35,14 @@ jobs:
         run: |
           VERSION="${{ github.event_name == 'push' && github.ref_name || github.event.inputs.tag }}"
           VERSION=${VERSION#v}
-          jq --arg v "$VERSION" '.version = $v' package.json > tmp.json && mv tmp.json package.json
+          npm version $VERSION --no-git-tag-version --allow-same-version
           echo "Version set to $VERSION"
 
       - name: Install dependencies (including dev)
         run: |
           export NODE_ENV=development
           rm -rf node_modules package-lock.json
-          npm install --legacy-peer-deps
+          npm install --legacy-peer-deps --registry https://registry.npmmirror.com --fetch-retries=3
 
       - name: Build Web
         run: npm run build
@@ -76,12 +76,10 @@ jobs:
       - name: Update version
         shell: pwsh
         run: |
-          $VERSION = if ($env:GITHUB_EVENT_NAME -eq 'push') { "$env:GITHUB_REF_NAME" } else { "${{ github.event.inputs.tag }}" }
+          $VERSION = if ("${{ github.event_name }}" -eq "push") { "${{ github.ref_name }}" } else { "${{ github.event.inputs.tag }}" }
           $VERSION = $VERSION -replace '^v', ''
-          $json = Get-Content package.json | ConvertFrom-Json
-          $json.version = $VERSION
-          $json | ConvertTo-Json -Depth 10 | Set-Content package.json
-          Write-Host "Version set to $VERSION"
+          npm version $VERSION --no-git-tag-version --allow-same-version
+          echo "Version set to $VERSION"
 
       - name: Download Web build artifact
         uses: actions/download-artifact@v4
@@ -95,7 +93,7 @@ jobs:
           $env:NODE_ENV = 'development'
           Remove-Item -Recurse -Force node_modules -ErrorAction SilentlyContinue
           Remove-Item -Force package-lock.json -ErrorAction SilentlyContinue
-          npm install --legacy-peer-deps
+          npm install --legacy-peer-deps --registry https://registry.npmmirror.com --fetch-retries=3
 
       - name: Build Electron main process
         shell: pwsh
@@ -130,7 +128,7 @@ jobs:
         run: |
           VERSION="${{ github.event_name == 'push' && github.ref_name || github.event.inputs.tag }}"
           VERSION=${VERSION#v}
-          jq --arg v "$VERSION" '.version = $v' package.json > tmp.json && mv tmp.json package.json
+          npm version $VERSION --no-git-tag-version --allow-same-version
           echo "Version set to $VERSION"
 
       - name: Setup Java
@@ -152,7 +150,7 @@ jobs:
         run: |
           export NODE_ENV=development
           rm -rf node_modules package-lock.json
-          npm install --legacy-peer-deps
+          npm install --legacy-peer-deps --registry https://registry.npmmirror.com --fetch-retries=3
 
       - name: Install Capacitor CLI
         run: npm install -g @capacitor/cli
@@ -190,19 +188,6 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: 18
-          cache: 'npm'
-
-      - name: Update version
-        run: |
-          VERSION="${{ github.event_name == 'push' && github.ref_name || github.event.inputs.tag }}"
-          VERSION=${VERSION#v}
-          jq --arg v "$VERSION" '.version = $v' package.json > tmp.json && mv tmp.json package.json
-          echo "Version set to $VERSION"
 
       - name: Check Docker credentials
         id: check
