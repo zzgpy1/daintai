@@ -24,7 +24,6 @@ export const usePlayerStore = defineStore('player', () => {
   const isMuted = ref(false)
   const isBuffering = ref(false)
 
-  // 防止快速切换导致 play/pause 冲突
   let playPromise: Promise<void> | null = null
 
   const sleepTimer = ref<number | null>(null)
@@ -90,6 +89,10 @@ export const usePlayerStore = defineStore('player', () => {
       })
 
       audio.value.addEventListener('error', (e) => {
+        // 如果 src 为空或停止状态，忽略错误
+        if (!audio.value?.src || audio.value?.src === '') {
+          return
+        }
         const mediaError = (e.target as HTMLAudioElement).error
         let msg = '播放失败'
         if (mediaError) {
@@ -216,6 +219,7 @@ export const usePlayerStore = defineStore('player', () => {
     if (audio.value) {
       audio.value.pause()
       audio.value.currentTime = 0
+      // 清空 src 并移除错误监听临时处理
       audio.value.src = ''
       if (playPromise) {
         playPromise.catch(() => {})
