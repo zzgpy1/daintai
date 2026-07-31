@@ -110,7 +110,7 @@ jobs:
           name: electron-win
           path: dist-electron/*.exe
 
-  build-android:
+    build-android:
     name: Build Android APK
     needs: build-web
     runs-on: ubuntu-latest
@@ -146,7 +146,7 @@ jobs:
           name: web-dist
           path: www/
 
-      - name: Install dependencies (including dev)
+      - name: Install dependencies
         run: |
           export NODE_ENV=development
           rm -rf node_modules package-lock.json
@@ -166,47 +166,32 @@ jobs:
       - name: Sync Capacitor
         run: npx cap sync android
 
-      # 🔑 生成固定的调试签名密钥（覆盖安装的关键）
-      - name: Generate fixed debug keystore
+      # 🔑 关键：从 Secret 还原固定签名密钥
+      - name: Decode keystore
         run: |
-          keytool -genkey -v -keystore android/app/debug.keystore \
-            -alias androiddebugkey -keyalg RSA -keysize 2048 -validity 10000 \
-            -storepass android -keypass android \
-            -dname "CN=Android Debug, O=Android, C=US"
-
-      # 🔧 修改 build.gradle 使用这个 keystore
-      - name: Configure signing in build.gradle
-        run: |
-          cat >> android/app/build.gradle << 'EOF'
-          android {
-              signingConfigs {
-                  release {
-                      storeFile file("debug.keystore")
-                      storePassword "android"
-                      keyAlias "androiddebugkey"
-                      keyPassword "android"
-                  }
-              }
-              buildTypes {
-                  release {
-                      signingConfig signingConfigs.release
-                  }
-              }
-          }
-          EOF
+          mkdir -p android/app
+          echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 -d > android/app/release.keystore
 
       - name: Build Android APK (Release signed)
         run: |
           cd android
           chmod +x gradlew
+          # 设置签名环境变量，供 build.gradle 使用
+          export KEYSTORE_FILE=app/release.keystore
+          export KEYSTORE_PASSWORD="${{ secrets.KEYSTORE_PASSWORD }}"
+          export KEY_ALIAS="${{ secrets.KEY_ALIAS }}"
+          export KEY_PASSWORD="${{ secrets.KEY_PASSWORD }}"
           ./gradlew assembleRelease --no-daemon
+        env:
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
 
       - name: Upload Android APK
         uses: actions/upload-artifact@v4
         with:
           name: android-apk
           path: android/app/build/outputs/apk/release/*.apk
-
   publish-docker:
     name: Publish Docker Image
     needs: build-web
