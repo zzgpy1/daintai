@@ -18,7 +18,7 @@ export const API_CONFIG = {
 }
 
 export const APP_CONFIG = {
-  name: '全球电台',
+  name: '国内电台',
   version: '2.0.3',
   maxHistoryItems: 500,
   sleepTimerOptions: [15, 30, 45, 60, 90, 120],
