@@ -75,7 +75,7 @@
         <h3 class="font-medium text-ios-dark-gray dark:text-dark-text">{{ $t('settings.about') }}</h3>
         <p class="text-sm text-ios-gray dark:text-dark-secondary mt-1">{{ $t('settings.version') }}: {{ appVersion }}</p>
         <p class="text-sm text-ios-gray dark:text-dark-secondary">数据来源: Radio Browser</p>
-        <p class="text-sm text-ios-gray dark:text-dark-secondary">© {{ currentYear }} GlobalRadio</p>
+        <p class="text-sm text-ios-gray dark:text-dark-secondary">© {{ currentYear }} 国内电台</p>
       </div>
     </div>
 
