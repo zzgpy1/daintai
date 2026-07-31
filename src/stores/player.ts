@@ -89,22 +89,18 @@ export const usePlayerStore = defineStore('player', () => {
       })
 
       audio.value.addEventListener('error', (e) => {
-        // 如果 src 为空或停止状态，忽略错误
-        if (!audio.value?.src || audio.value?.src === '') {
-          return
-        }
+        if (!audio.value?.src || audio.value?.src === '') return
         const mediaError = (e.target as HTMLAudioElement).error
         if (mediaError) {
-          // 🔹 对于不支持的格式，静默处理，不弹出错误提示
+          // 对于不支持的格式，静默处理，不显示错误
           if (mediaError.code === MediaError.MEDIA_ERR_SRC_NOT_SUPPORTED) {
             console.warn('不支持的音频格式:', currentStation.value?.name)
             isPlaying.value = false
             isLoading.value = false
             isBuffering.value = false
-            // 不清除 currentStation，保留信息以便用户知道当前尝试的电台
             return
           }
-          // 其他错误（网络、解码等）才显示提示
+          // 其他错误仅记录日志，开发环境显示提示
           let msg = '播放失败'
           switch (mediaError.code) {
             case MediaError.MEDIA_ERR_NETWORK:
@@ -120,7 +116,10 @@ export const usePlayerStore = defineStore('player', () => {
           isPlaying.value = false
           isLoading.value = false
           isBuffering.value = false
-          toastStore.showError(msg)
+          if (import.meta.env.DEV) {
+            toastStore.showError(msg)
+          }
+          console.warn('播放错误:', msg)
         }
       })
     }
@@ -181,7 +180,9 @@ export const usePlayerStore = defineStore('player', () => {
         }
         const msg = err.message || '播放失败，请重试'
         error.value = msg
-        toastStore.showError(msg)
+        if (import.meta.env.DEV) {
+          toastStore.showError(msg)
+        }
         console.error('播放错误:', err)
       }
     } finally {
