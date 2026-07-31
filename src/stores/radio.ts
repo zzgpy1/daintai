@@ -4,6 +4,29 @@ import { radioAPI } from '@/services/radioApi'
 import type { RadioStation, Country, Language, Tag } from '@/types/radio'
 import { useToastStore } from './toast'
 
+const CACHE_KEY_CHINA = 'radio-china-cache'
+const CACHE_KEY_TOP = 'radio-top-cache'
+const CACHE_KEY_LATEST = 'radio-latest-cache'
+const CACHE_TTL = 600000 // 10分钟
+
+function loadCachedData(key: string): any[] | null {
+  try {
+    const raw = localStorage.getItem(key)
+    if (!raw) return null
+    const cached = JSON.parse(raw)
+    if (Date.now() - cached.timestamp < CACHE_TTL) {
+      return cached.data
+    }
+    return null
+  } catch { return null }
+}
+
+function saveCachedData(key: string, data: any[]) {
+  try {
+    localStorage.setItem(key, JSON.stringify({ data, timestamp: Date.now() }))
+  } catch {}
+}
+
 export const useRadioStore = defineStore('radio', () => {
   const toastStore = useToastStore()
   const stations = ref<RadioStation[]>([])
@@ -21,6 +44,11 @@ export const useRadioStore = defineStore('radio', () => {
   const selectedLanguage = ref('')
   const selectedTag = ref('')
   const currentCategory = ref<string>('')
+
+  // 防止并发请求
+  let chinaLoadingPromise: Promise<void> | null = null
+  let topLoadingPromise: Promise<void> | null = null
+  let latestLoadingPromise: Promise<void> | null = null
 
   const filteredStations = computed(() => {
     let filtered = stations.value
@@ -74,69 +102,119 @@ export const useRadioStore = defineStore('radio', () => {
   }
 
   const loadTopStations = async () => {
-    isLoading.value = true
-    try {
-      topStations.value = await radioAPI.getTopStations(50)
-    } catch (err) {
-      console.error('加载热门电台失败:', err)
-      // 降级：尝试用搜索获取热门（按投票数排序）
-      try {
-        const result = await radioAPI.searchStations({ order: 'clickcount', limit: 50, reverse: true })
-        topStations.value = result
-        toastStore.showInfo('使用备用方式加载热门电台')
-      } catch (e) {
-        toastStore.showError('加载热门电台失败')
-        topStations.value = []
-      }
-    } finally {
-      isLoading.value = false
+    // 先读缓存
+    const cached = loadCachedData(CACHE_KEY_TOP)
+    if (cached) {
+      topStations.value = cached
     }
+    if (topLoadingPromise) return topLoadingPromise
+
+    topLoadingPromise = (async () => {
+      isLoading.value = true
+      try {
+        let data = await radioAPI.getTopStations(50)
+        if (data.length > 0) {
+          topStations.value = data
+          saveCachedData(CACHE_KEY_TOP, data)
+        } else {
+          // 降级
+          const fallback = await radioAPI.searchStations({ order: 'clickcount', limit: 50, reverse: true })
+          if (fallback.length > 0) {
+            topStations.value = fallback
+            saveCachedData(CACHE_KEY_TOP, fallback)
+          } else {
+            throw new Error('No top stations')
+          }
+        }
+      } catch (err) {
+        console.error('加载热门电台失败:', err)
+        if (!cached) {
+          toastStore.showError('加载热门电台失败')
+        } else {
+          console.warn('刷新热门电台失败，使用缓存数据')
+        }
+      } finally {
+        isLoading.value = false
+        topLoadingPromise = null
+      }
+    })()
+    await topLoadingPromise
   }
 
   const loadLatestStations = async () => {
-    isLoading.value = true
-    try {
-      latestStations.value = await radioAPI.getLatestStations(30)
-    } catch (err) {
-      console.error('加载最新电台失败:', err)
-      // 降级：尝试用搜索获取最新（按更新时间排序）
-      try {
-        const result = await radioAPI.searchStations({ order: 'name', limit: 30 })
-        latestStations.value = result
-        toastStore.showInfo('使用备用方式加载最新电台')
-      } catch (e) {
-        toastStore.showError('加载最新电台失败')
-        latestStations.value = []
-      }
-    } finally {
-      isLoading.value = false
+    const cached = loadCachedData(CACHE_KEY_LATEST)
+    if (cached) {
+      latestStations.value = cached
     }
+    if (latestLoadingPromise) return latestLoadingPromise
+
+    latestLoadingPromise = (async () => {
+      isLoading.value = true
+      try {
+        let data = await radioAPI.getLatestStations(30)
+        if (data.length > 0) {
+          latestStations.value = data
+          saveCachedData(CACHE_KEY_LATEST, data)
+        } else {
+          const fallback = await radioAPI.searchStations({ order: 'name', limit: 30 })
+          if (fallback.length > 0) {
+            latestStations.value = fallback
+            saveCachedData(CACHE_KEY_LATEST, fallback)
+          } else {
+            throw new Error('No latest stations')
+          }
+        }
+      } catch (err) {
+        console.error('加载最新电台失败:', err)
+        if (!cached) {
+          toastStore.showError('加载最新电台失败')
+        } else {
+          console.warn('刷新最新电台失败，使用缓存数据')
+        }
+      } finally {
+        isLoading.value = false
+        latestLoadingPromise = null
+      }
+    })()
+    await latestLoadingPromise
   }
 
   const loadChinaStations = async () => {
-    isLoading.value = true
-    try {
-      // 优先使用 getStationsByCountry（带有降级逻辑）
-      chinaStations.value = await radioAPI.getStationsByCountry('CN', 50)
-      if (chinaStations.value.length === 0) {
-        // 如果返回空，尝试用搜索
-        const results = await radioAPI.searchStations({ country: 'China', limit: 50 })
-        chinaStations.value = results
-      }
-    } catch (err) {
-      console.error('加载国内电台失败:', err)
-      // 最后降级：搜索 China
-      try {
-        const results = await radioAPI.searchStations({ country: 'China', limit: 50 })
-        chinaStations.value = results
-        toastStore.showInfo('使用备用方式加载国内频道')
-      } catch (e) {
-        toastStore.showError('加载国内电台失败')
-        chinaStations.value = []
-      }
-    } finally {
-      isLoading.value = false
+    const cached = loadCachedData(CACHE_KEY_CHINA)
+    if (cached) {
+      chinaStations.value = cached
     }
+    if (chinaLoadingPromise) return chinaLoadingPromise
+
+    chinaLoadingPromise = (async () => {
+      isLoading.value = true
+      try {
+        let data = await radioAPI.getStationsByCountry('CN', 50)
+        if (data.length > 0) {
+          chinaStations.value = data
+          saveCachedData(CACHE_KEY_CHINA, data)
+        } else {
+          const fallback = await radioAPI.searchStations({ country: 'China', limit: 50 })
+          if (fallback.length > 0) {
+            chinaStations.value = fallback
+            saveCachedData(CACHE_KEY_CHINA, fallback)
+          } else {
+            throw new Error('No China stations')
+          }
+        }
+      } catch (err) {
+        console.error('加载国内电台失败:', err)
+        if (!cached) {
+          toastStore.showError('加载国内电台失败')
+        } else {
+          console.warn('刷新国内电台失败，使用缓存数据')
+        }
+      } finally {
+        isLoading.value = false
+        chinaLoadingPromise = null
+      }
+    })()
+    await chinaLoadingPromise
   }
 
   const loadCategoryStations = async (tag: string, countryCode: string = 'CN') => {
