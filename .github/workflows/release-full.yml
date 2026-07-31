@@ -166,7 +166,7 @@ jobs:
       - name: Sync Capacitor
         run: npx cap sync android
 
-      # 🔑 解码签名密钥（使用 printf 避免换行问题）
+      # 🔑 解码签名密钥
       - name: Decode keystore
         run: |
           mkdir -p android/app
@@ -178,7 +178,7 @@ jobs:
           fi
           echo "✅ Keystore decoded"
 
-      # 🛠 生成缺失的 Android 资源（解决 Theme.SplashScreen 错误）
+      # 🛠 生成缺失的 Android 资源（包含 AppTheme.NoActionBarLaunch）
       - name: Create missing Android resources
         run: |
           # 创建 colors.xml
@@ -193,7 +193,7 @@ jobs:
           </resources>
           EOF
 
-          # 创建 styles.xml，包含必需的 Theme.SplashScreen
+          # 创建 styles.xml，包含 Theme.SplashScreen 和 AppTheme.NoActionBarLaunch
           cat > android/app/src/main/res/values/styles.xml << 'EOF'
           <?xml version="1.0" encoding="utf-8"?>
           <resources>
@@ -205,12 +205,15 @@ jobs:
               <style name="Theme.SplashScreen" parent="AppTheme">
                   <item name="android:windowBackground">@color/splashBackground</item>
               </style>
+              <style name="AppTheme.NoActionBarLaunch" parent="Theme.SplashScreen">
+                  <!-- 保持与 SplashScreen 相同，满足引用需求 -->
+              </style>
           </resources>
           EOF
 
           echo "✅ Android resources created"
 
-      # 📝 覆盖 build.gradle 以使用固定签名（直接嵌入 Secrets，避免环境变量读取问题）
+      # 📝 覆盖 build.gradle 以使用固定签名
       - name: Generate build.gradle with embedded signing config
         run: |
           cat > android/app/build.gradle << 'EOF'
@@ -277,7 +280,6 @@ jobs:
           fi
           echo "APK file size: $(stat -c%s $APK_PATH) bytes"
           file $APK_PATH
-          # 使用 jarsigner 验证签名
           jarsigner -verify -verbose -certs $APK_PATH || true
 
       - name: Upload Android APK
