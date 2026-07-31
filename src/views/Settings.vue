@@ -75,7 +75,7 @@
         <h3 class="font-medium text-ios-dark-gray dark:text-dark-text">{{ $t('settings.about') }}</h3>
         <p class="text-sm text-ios-gray dark:text-dark-secondary mt-1">{{ $t('settings.version') }}: {{ appVersion }}</p>
         <p class="text-sm text-ios-gray dark:text-dark-secondary">数据来源: Radio Browser</p>
-        <p class="text-sm text-ios-gray dark:text-dark-secondary">© 2024 GlobalRadio</p>
+        <p class="text-sm text-ios-gray dark:text-dark-secondary">© {{ currentYear }} GlobalRadio</p>
       </div>
     </div>
 
@@ -92,7 +92,6 @@ import BackButton from '@/components/common/BackButton.vue'
 import ThemeToggle from '@/components/common/ThemeToggle.vue'
 import SleepTimer from '@/components/common/SleepTimer.vue'
 import PlayerBar from '@/components/common/PlayerBar.vue'
-// 导入 package.json 获取版本号
 import pkg from '@/../package.json'
 
 const { locale } = useI18n()
@@ -102,8 +101,8 @@ const playerStore = usePlayerStore()
 const language = ref(settingsStore.language)
 const volume = ref(settingsStore.volume)
 const autoPlayNext = ref(settingsStore.autoPlayNext)
-// 动态读取 package.json 中的版本号
 const appVersion = pkg.version
+const currentYear = new Date().getFullYear()
 
 const currentLanguageName = computed(() => {
   return language.value === 'zh' ? '中文' : 'English'
