@@ -14,8 +14,8 @@ class RadioAPI {
   private currentMirrorIndex = 0
   private CACHE_TTL = 600000 // 10 分钟
   private axiosInstance = axios.create({
-    timeout: 15000, // 15 秒超时
-    headers: { 'User-Agent': 'GlobalRadio/2.0' }
+    timeout: 15000,
+    headers: { 'User-Agent': '国内电台/2.0' }
   })
   private abortControllers: AbortController[] = []
 
@@ -25,7 +25,7 @@ class RadioAPI {
 
   private switchToNextMirror() {
     this.currentMirrorIndex = (this.currentMirrorIndex + 1) % this.apiMirrors.length
-    console.log(`Switching API mirror to: ${this.getCurrentBaseURL()}`)
+    console.log(`切换 API 镜像: ${this.getCurrentBaseURL()}`)
   }
 
   private async requestWithRetry<T>(
@@ -81,12 +81,15 @@ class RadioAPI {
     }
   }
 
+  // 不再使用原 top/latest 接口，改用 search 带排序，此方法保留但内部改用 search
   async getTopStations(limit: number = 50): Promise<RadioStation[]> {
-    return this.requestWithRetry<RadioStation[]>(`${API_CONFIG.endpoints.top}/${limit}`, undefined, 2)
+    // 直接调用 search 带 order=clickcount
+    return this.searchStations({ order: 'clickcount', limit, reverse: true, hidebroken: true })
   }
 
   async getLatestStations(limit: number = 50): Promise<RadioStation[]> {
-    return this.requestWithRetry<RadioStation[]>(`${API_CONFIG.endpoints.latest}/${limit}`, undefined, 2)
+    // 使用 search 并尝试按 name 排序（因为没有 lastchange 排序）
+    return this.searchStations({ order: 'name', limit, hidebroken: true })
   }
 
   async getRandomStations(limit: number = 30): Promise<RadioStation[]> {
@@ -101,16 +104,15 @@ class RadioAPI {
     }
   }
 
-  // 使用快速降级策略
   async getStationsByCountry(countryCode: string, limit: number = 50): Promise<RadioStation[]> {
     try {
       return await this.requestWithRetry<RadioStation[]>(
         `${API_CONFIG.endpoints.byCountry}/${countryCode}`,
         { limit },
-        2 // 仅重试 2 次，快速失败
+        2
       )
     } catch {
-      console.warn(`getStationsByCountry failed for ${countryCode}, falling back to search`)
+      console.warn(`getStationsByCountry 失败，降级到 search`)
       return this.searchStations({ countrycode: countryCode, limit, hidebroken: true })
     }
   }
