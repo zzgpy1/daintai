@@ -1,7 +1,7 @@
 {
-  "name": "global-radio",
+  "name": "china-radio",
   "version": "2.0.3",
-  "description": "全球电台 - 聆听世界",
+  "description": "国内电台 - 聆听中国",
   "main": "electron-build/main.js",
   "scripts": {
     "dev": "vite",
@@ -14,8 +14,8 @@
     "capacitor:sync": "npx cap sync",
     "capacitor:open": "npx cap open",
     "build:android": "npm run build && npx cap sync android && cd android && ./gradlew assembleDebug",
-    "docker:build": "docker build -f docker/Dockerfile -t global-radio:latest .",
-    "docker:push": "docker push global-radio:latest"
+    "docker:build": "docker build -f docker/Dockerfile -t china-radio:latest .",
+    "docker:push": "docker push china-radio:latest"
   },
   "dependencies": {
     "@capacitor/android": "^5.7.8",
@@ -48,8 +48,8 @@
     "vue-tsc": "^1.8.27"
   },
   "build": {
-    "appId": "com.globalradio.app",
-    "productName": "全球电台",
+    "appId": "com.chinaradio.app",
+    "productName": "国内电台",
     "directories": {
       "output": "dist-electron"
     },
