@@ -1,30 +1,26 @@
 apply plugin: 'com.android.application'
 
 android {
-    namespace "com.globalradio.app"
+    namespace "com.chinaradio.app" // 改为与 package.json 的 appId 一致
     compileSdk rootProject.ext.compileSdkVersion
 
     defaultConfig {
-        applicationId "com.globalradio.app"
+        applicationId "com.chinaradio.app"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
         versionCode 1
-        versionName "2.0.3"
+        versionName "2.0.3"  // 手动改为与 package.json 相同，或通过 gradle 读取
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
     }
 
     signingConfigs {
-        // 读取环境变量，如果未设置则使用 debug 签名（仅开发时）
         release {
-            storeFile file(System.getenv("KEYSTORE_FILE") ?: "debug.keystore")
-            storePassword System.getenv("KEYSTORE_PASSWORD") ?: "android"
-            keyAlias System.getenv("KEY_ALIAS") ?: "androiddebugkey"
-            keyPassword System.getenv("KEY_PASSWORD") ?: "android"
+            storeFile file(System.getenv("KEYSTORE_FILE") ?: "release.keystore")
+            storePassword System.getenv("KEYSTORE_PASSWORD") ?: "your-store-password"
+            keyAlias System.getenv("KEY_ALIAS") ?: "globalradio"
+            keyPassword System.getenv("KEY_PASSWORD") ?: "your-key-password"
             v1SigningEnabled true
             v2SigningEnabled true
-        }
-        debug {
-            // 默认 debug 签名
         }
     }
 
@@ -33,9 +29,6 @@ android {
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
             signingConfig signingConfigs.release
-        }
-        debug {
-            // 若需要调试版也用固定签名，可指定 signingConfig signingConfigs.release
         }
     }
 }
