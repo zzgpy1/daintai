@@ -15,7 +15,7 @@ function createWindow() {
       nodeIntegration: false,
       contextIsolation: true,
       preload: path.join(__dirname, 'preload.js'),
-      webSecurity: false,
+      webSecurity: true,                      // ✅ 启用安全策略
       allowRunningInsecureContent: false
     },
     icon: path.join(__dirname, 'build/icon.ico')
@@ -37,7 +37,7 @@ function createWindow() {
     setTimeout(() => mainWindow?.reload(), 3000)
   })
 
-  // ✅ 生产环境关闭DevTools（仅在开发环境启用）
+  // 生产环境关闭 DevTools
   if (process.env.NODE_ENV === 'development') {
     mainWindow.webContents.openDevTools()
   }
