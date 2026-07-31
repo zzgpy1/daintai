@@ -1,12 +1,13 @@
 {
   "home": {
-    "title": "全球电台",
-    "slogan": "聆听世界，音乐无界",
+    "title": "国内电台",
+    "slogan": "聆听中国，音乐无界",
     "random": "随机发现",
     "popular": "热门电台",
     "latest": "最新电台",
     "refresh": "刷新",
-    "china": "国内频道"
+    "china": "国内频道",
+    "provinces": "省份分类"
   },
   "nav": {
     "home": "首页",
@@ -17,7 +18,7 @@
   },
   "search": {
     "title": "搜索电台",
-    "placeholder": "搜索电台名称、国家或标签...",
+    "placeholder": "搜索电台名称、省份或标签...",
     "results": "搜索结果",
     "noResults": "未找到相关电台",
     "allCountries": "所有国家",
@@ -65,5 +66,40 @@
     "pause": "暂停",
     "favorite": "收藏",
     "favorited": "已收藏"
+  },
+  "province": {
+    "all": "全部",
+    "beijing": "北京",
+    "shanghai": "上海",
+    "guangdong": "广东",
+    "zhejiang": "浙江",
+    "jiangsu": "江苏",
+    "fujian": "福建",
+    "sichuan": "四川",
+    "hubei": "湖北",
+    "hunan": "湖南",
+    "henan": "河南",
+    "shandong": "山东",
+    "liaoning": "辽宁",
+    "heilongjiang": "黑龙江",
+    "jilin": "吉林",
+    "hebei": "河北",
+    "shanxi": "山西",
+    "shaanxi": "陕西",
+    "gansu": "甘肃",
+    "qinghai": "青海",
+    "yunnan": "云南",
+    "guizhou": "贵州",
+    "anhui": "安徽",
+    "jiangxi": "江西",
+    "hainan": "海南",
+    "neimenggu": "内蒙古",
+    "xinjiang": "新疆",
+    "xizang": "西藏",
+    "ningxia": "宁夏",
+    "guangxi": "广西",
+    "taiwan": "台湾",
+    "hongkong": "香港",
+    "macau": "澳门"
   }
 }
