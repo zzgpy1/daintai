@@ -110,7 +110,7 @@ jobs:
           name: electron-win
           path: dist-electron/*.exe
 
-    build-android:
+  build-android:
     name: Build Android APK
     needs: build-web
     runs-on: ubuntu-latest
@@ -176,7 +176,6 @@ jobs:
         run: |
           cd android
           chmod +x gradlew
-          # 设置签名环境变量，供 build.gradle 使用
           export KEYSTORE_FILE=app/release.keystore
           export KEYSTORE_PASSWORD="${{ secrets.KEYSTORE_PASSWORD }}"
           export KEY_ALIAS="${{ secrets.KEY_ALIAS }}"
@@ -192,6 +191,7 @@ jobs:
         with:
           name: android-apk
           path: android/app/build/outputs/apk/release/*.apk
+
   publish-docker:
     name: Publish Docker Image
     needs: build-web
