@@ -1,7 +1,15 @@
 apply plugin: 'com.android.application'
 
+// 从 package.json 动态读取版本号
+def packageJson = file('../package.json')
+def version = '2.0.0'
+if (packageJson.exists()) {
+    def json = new groovy.json.JsonSlurper().parseText(packageJson.text)
+    version = json.version
+}
+
 android {
-    namespace "com.chinaradio.app" // 改为与 package.json 的 appId 一致
+    namespace "com.chinaradio.app"
     compileSdk rootProject.ext.compileSdkVersion
 
     defaultConfig {
@@ -9,7 +17,7 @@ android {
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
         versionCode 1
-        versionName "2.0.3"  // 手动改为与 package.json 相同，或通过 gradle 读取
+        versionName version   // 使用动态版本号
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
     }
 
