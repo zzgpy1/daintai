@@ -2,7 +2,7 @@ import { CapacitorConfig } from '@capacitor/cli'
 
 const config: CapacitorConfig = {
   appId: 'com.globalradio.app',
-  appName: '全球电台',
+  appName: '国内电台',
   webDir: 'dist',
   server: { androidScheme: 'https' },
   plugins: {
