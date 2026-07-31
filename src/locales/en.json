@@ -1,4 +1,14 @@
 {
+  "home": {
+    "title": "China Radio",
+    "slogan": "Listen to China, Music without borders",
+    "random": "Random Discovery",
+    "popular": "Popular Stations",
+    "latest": "Latest Stations",
+    "refresh": "Refresh",
+    "china": "Domestic",
+    "provinces": "Provinces"
+  },
   "nav": {
     "home": "Home",
     "search": "Search",
@@ -6,26 +16,14 @@
     "history": "History",
     "settings": "Settings"
   },
-  "home": {
-    "title": "Global Radio",
-    "random": "Random Discovery",
-    "popular": "Popular Stations",
-    "latest": "Latest Stations",
-    "refresh": "Refresh"
-  },
   "search": {
     "title": "Search Stations",
-    "placeholder": "Search station name, country or tags",
+    "placeholder": "Search by name, province or tags",
     "results": "Search Results",
     "noResults": "No stations found",
-    "country": "Country",
-    "language": "Language",
-    "tags": "Tags",
     "allCountries": "All Countries",
     "allLanguages": "All Languages",
-    "allTags": "All Tags",
-    "search": "Search",
-    "reset": "Reset"
+    "allTags": "All Tags"
   },
   "favorites": {
     "title": "My Favorites",
@@ -53,8 +51,6 @@
     "setTimer": "Set Timer",
     "cancelTimer": "Cancel Timer",
     "autoPlayNext": "Auto Play Next",
-    "notifications": "Notifications",
-    "autoUpdate": "Auto Update",
     "about": "About",
     "version": "Version"
   },
@@ -62,8 +58,48 @@
     "loading": "Loading...",
     "error": "Error occurred",
     "retry": "Retry",
-    "cancel": "Cancel",
-    "confirm": "Confirm",
-    "save": "Save"
+    "back": "Back",
+    "noData": "No data"
+  },
+  "player": {
+    "play": "Play",
+    "pause": "Pause",
+    "favorite": "Favorite",
+    "favorited": "Favorited"
+  },
+  "province": {
+    "all": "All",
+    "beijing": "Beijing",
+    "shanghai": "Shanghai",
+    "guangdong": "Guangdong",
+    "zhejiang": "Zhejiang",
+    "jiangsu": "Jiangsu",
+    "fujian": "Fujian",
+    "sichuan": "Sichuan",
+    "hubei": "Hubei",
+    "hunan": "Hunan",
+    "henan": "Henan",
+    "shandong": "Shandong",
+    "liaoning": "Liaoning",
+    "heilongjiang": "Heilongjiang",
+    "jilin": "Jilin",
+    "hebei": "Hebei",
+    "shanxi": "Shanxi",
+    "shaanxi": "Shaanxi",
+    "gansu": "Gansu",
+    "qinghai": "Qinghai",
+    "yunnan": "Yunnan",
+    "guizhou": "Guizhou",
+    "anhui": "Anhui",
+    "jiangxi": "Jiangxi",
+    "hainan": "Hainan",
+    "neimenggu": "Inner Mongolia",
+    "xinjiang": "Xinjiang",
+    "xizang": "Tibet",
+    "ningxia": "Ningxia",
+    "guangxi": "Guangxi",
+    "taiwan": "Taiwan",
+    "hongkong": "Hong Kong",
+    "macau": "Macau"
   }
 }
