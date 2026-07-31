@@ -10,12 +10,12 @@
 
     <div class="max-w-6xl mx-auto px-4 py-6 space-y-6">
       <!-- 加载/错误状态 -->
-      <div v-if="loading" class="text-center py-8">
+      <div v-if="loading && !hasCachedData" class="text-center py-8">
         <div class="inline-block w-8 h-8 border-4 border-ios-blue border-t-transparent rounded-full animate-spin"></div>
         <p class="text-ios-gray dark:text-dark-secondary mt-2">{{ $t('common.loading') }}</p>
       </div>
 
-      <div v-else-if="error" class="text-center py-8">
+      <div v-else-if="error && !hasCachedData" class="text-center py-8">
         <p class="text-ios-red">{{ error }}</p>
         <button @click="retryLoad" class="mt-4 px-6 py-2 bg-ios-blue text-white rounded-ios hover:bg-blue-600">{{ $t('common.retry') }}</button>
       </div>
@@ -33,7 +33,7 @@
           </button>
         </div>
 
-        <!-- 分类标签（全部=国内频道，其他按标签搜索） -->
+        <!-- 分类标签 -->
         <div class="flex flex-wrap gap-2 overflow-x-auto pb-2">
           <button
             v-for="cat in categories"
@@ -59,7 +59,7 @@
           </div>
         </div>
 
-        <!-- 默认显示：国内频道（当无分类选中时） -->
+        <!-- 默认显示：国内频道 -->
         <div v-if="!currentCategory">
           <div class="flex items-center justify-between mb-4">
             <h2 class="text-lg font-semibold text-ios-dark-gray dark:text-dark-text">{{ $t('home.china') }}</h2>
@@ -94,11 +94,16 @@ const toastStore = useToastStore()
 const loading = ref(true)
 const error = ref<string | null>(null)
 const randomLoading = ref(false)
-const currentCategory = ref('')  // '' 表示显示国内频道
+const currentCategory = ref('')
 const chinaLoading = ref(false)
 const categoryLoading = ref(false)
 
-// 分类定义（空值代表全部/国内频道）
+const hasCachedData = computed(() => {
+  return radioStore.chinaStations.length > 0 || 
+         radioStore.topStations.length > 0 || 
+         radioStore.latestStations.length > 0
+})
+
 const categories = [
   { value: '', label: '全部' },
   { value: 'music', label: '音乐' },
@@ -115,7 +120,6 @@ const getCategoryLabel = (value: string) => {
   return found ? found.label : value
 }
 
-// 刷新国内频道
 const refreshChina = async () => {
   chinaLoading.value = true
   try {
@@ -128,7 +132,6 @@ const refreshChina = async () => {
   }
 }
 
-// 刷新分类
 const refreshCategory = async () => {
   if (!currentCategory.value) return
   categoryLoading.value = true
@@ -142,29 +145,24 @@ const refreshCategory = async () => {
   }
 }
 
-// 选择分类
 const selectCategory = async (tag: string) => {
   if (currentCategory.value === tag) {
-    // 取消选中，回到国内频道
     currentCategory.value = ''
     radioStore.categoryStations = []
     return
   }
   currentCategory.value = tag
   if (tag === '') {
-    // 全部 => 显示国内频道
     radioStore.categoryStations = []
     return
   }
   await radioStore.loadCategoryStations(tag)
 }
 
-// 随机发现（增强降级）
 const handleRandom = async () => {
   if (randomLoading.value) return
   randomLoading.value = true
   try {
-    // 先尝试获取随机列表
     const stations = await radioStore.searchStations({ order: 'random', limit: 30 })
     if (stations && stations.length > 0) {
       const random = stations[Math.floor(Math.random() * stations.length)]
@@ -172,7 +170,6 @@ const handleRandom = async () => {
       return
     }
     
-    // 降级：从国内频道随机选
     if (chinaStations.value.length > 0) {
       const random = chinaStations.value[Math.floor(Math.random() * chinaStations.value.length)]
       await playerStore.playStation(random)
@@ -180,7 +177,6 @@ const handleRandom = async () => {
       return
     }
     
-    // 再降级：从热门中选（如果有）
     if (radioStore.topStations.length > 0) {
       const random = radioStore.topStations[Math.floor(Math.random() * radioStore.topStations.length)]
       await playerStore.playStation(random)
@@ -191,7 +187,6 @@ const handleRandom = async () => {
     toastStore.showError('暂无可用电台，请稍后重试')
   } catch (err) {
     console.error('随机失败', err)
-    // 最终降级
     try {
       if (chinaStations.value.length > 0) {
         const random = chinaStations.value[Math.floor(Math.random() * chinaStations.value.length)]
@@ -221,12 +216,16 @@ const retryLoad = () => {
 }
 
 const initData = async () => {
+  loading.value = true
   try {
+    // 先尝试加载缓存（已在 store 的 load 方法中处理，但为了确保立即显示，这里并行调用并等待）
+    // 但 store 中的 load 方法会先读缓存并立即设置，所以这里直接调用即可
     await Promise.all([
       radioStore.loadChinaStations(),
       radioStore.loadTopStations(),
       radioStore.loadLatestStations(),
-      radioStore.loadCountries()
+      radioStore.loadCountries(),
+      radioStore.loadTags()
     ])
     error.value = null
   } catch (e) {
