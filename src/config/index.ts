@@ -1,6 +1,8 @@
+import pkg from '@/../package.json'
+
 export const API_CONFIG = {
   baseURL: 'https://de1.api.radio-browser.info',
-  fallbackBaseURL: 'https://at1.api.radio-browser.info', // 备用
+  fallbackBaseURL: 'https://at1.api.radio-browser.info',
   endpoints: {
     search: '/json/stations/search',
     top: '/json/stations/topvote',
@@ -19,8 +21,11 @@ export const API_CONFIG = {
 
 export const APP_CONFIG = {
   name: '国内电台',
-  version: '2.0.3',
+  version: pkg.version, // 从 package.json 动态获取
   maxHistoryItems: 500,
   sleepTimerOptions: [15, 30, 45, 60, 90, 120],
-  defaultVolume: 0.8
+  defaultVolume: 0.8,
+  maxFavorites: 1000,
+  cacheTTL: 600000, // 10 分钟
+  debounceDelay: 300
 }
