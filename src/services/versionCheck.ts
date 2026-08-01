@@ -12,10 +12,10 @@ export const getCurrentVersion = (): string => {
 }
 
 /**
- * 获取最新 Release 信息：优先使用 Electron IPC，否则使用 fetch 代理
+ * 获取最新 Release 信息
  */
 export const fetchLatestRelease = async (): Promise<ReleaseInfo | null> => {
-  // 1. 如果是 Electron 环境，尝试通过 IPC 获取（主进程无跨域限制）
+  // 1. 如果是 Electron 环境，优先通过 IPC 获取（主进程直接请求 GitHub）
   if (platform.isDesktop() && window.electronAPI?.fetchLatestRelease) {
     try {
       console.log('[更新] 使用 IPC 获取最新 Release')
@@ -29,23 +29,23 @@ export const fetchLatestRelease = async (): Promise<ReleaseInfo | null> => {
           if (apkAsset) downloadUrl = apkAsset.browser_download_url
         }
         return { version, downloadUrl, releaseNotes: data.body }
+      } else {
+        console.warn('[更新] IPC 返回 null')
       }
     } catch (error) {
-      console.error('[更新] IPC 请求失败，降级到 fetch', error)
+      console.error('[更新] IPC 请求失败:', error)
     }
   }
 
-  // 2. 降级方案：使用 fetch + 代理（与之前相同）
+  // 2. 降级方案：使用 fetch + 代理（备用）
   const proxyList = [
     'https://ghproxy.19860519.xyz/',
     'https://mirror.ghproxy.com/',
-    'https://gh-proxy.19860519.xyz/',
   ]
-
   for (const proxy of proxyList) {
     try {
       const url = proxy + 'https://api.github.com/repos/zzgpy1/diantai/releases/latest'
-      console.log(`[更新] 尝试 fetch: ${url}`)
+      console.log(`[更新] 尝试 fetch 代理: ${url}`)
       const response = await fetch(url, {
         headers: { 'Accept': 'application/vnd.github.v3+json', 'User-Agent': `国内电台/${pkg.version}` }
       })
