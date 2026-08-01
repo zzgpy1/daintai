@@ -1,15 +1,24 @@
 export const platform = {
   getPlatform(): 'web' | 'electron' | 'capacitor' {
+    // 检测 Electron（多重判断确保可靠性）
     if (typeof window !== 'undefined') {
-      // ① 检查 userAgent 是否包含 Electron
-      if (navigator.userAgent.indexOf('Electron') !== -1) {
+      // 1. 通过 process.versions.electron（Electron 官方推荐）
+      if (window.process?.versions?.electron) {
         return 'electron'
       }
-      // ② 检查 preload 暴露的 electronAPI
+      // 2. 通过 preload 暴露的 API（如果已暴露）
       if ((window as any).electronAPI) {
         return 'electron'
       }
-      // ③ 检测 Capacitor
+      // 3. 通过 userAgent
+      if (navigator.userAgent.includes('Electron')) {
+        return 'electron'
+      }
+      // 4. 通过 process.type（旧方式，保留兼容）
+      if (window.process?.type === 'renderer') {
+        return 'electron'
+      }
+      // 检测 Capacitor
       if ((window as any).Capacitor?.isNativePlatform()) {
         return 'capacitor'
       }
