@@ -1,12 +1,18 @@
 export const platform = {
   getPlatform(): 'web' | 'electron' | 'capacitor' {
-    // 检测 Electron（更可靠的方式）
-    if (typeof window !== 'undefined' && window.process?.versions?.electron) {
-      return 'electron'
-    }
-    // 检测 Capacitor
-    if (typeof window !== 'undefined' && (window as any).Capacitor?.isNativePlatform()) {
-      return 'capacitor'
+    if (typeof window !== 'undefined') {
+      // ① 检查 userAgent 是否包含 Electron
+      if (navigator.userAgent.indexOf('Electron') !== -1) {
+        return 'electron'
+      }
+      // ② 检查 preload 暴露的 electronAPI
+      if ((window as any).electronAPI) {
+        return 'electron'
+      }
+      // ③ 检测 Capacitor
+      if ((window as any).Capacitor?.isNativePlatform()) {
+        return 'capacitor'
+      }
     }
     return 'web'
   },
