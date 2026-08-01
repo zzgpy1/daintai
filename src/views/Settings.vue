@@ -91,7 +91,7 @@
           <p>© {{ currentYear }} 国内电台</p>
           
           <!-- 检查更新按钮与状态 -->
-          <div class="mt-3 flex items-center gap-3">
+          <div class="mt-3 flex items-center gap-3 flex-wrap">
             <button 
               @click="checkForUpdate"
               :disabled="checkingUpdate"
@@ -112,7 +112,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useSettingsStore } from '@/stores/settings'
 import { usePlayerStore } from '@/stores/player'
@@ -177,14 +177,18 @@ const checkForUpdate = async () => {
 
   try {
     const result = await checkForUpdate()
+    // 处理错误（网络问题等）
+    if (result.error) {
+      updateStatus.value = result.error
+      updateStatusClass.value = 'text-ios-red'
+      return
+    }
+
+    // 有更新
     if (result.hasUpdate && result.latest) {
-      // 有更新：提示并跳转下载页
       updateStatus.value = `发现新版本 v${result.latest.version}`
       updateStatusClass.value = 'text-ios-red'
-      
-      // 显示确认对话框（使用原生 confirm）
       if (confirm(`发现新版本 v${result.latest.version}，是否前往下载？`)) {
-        // 跳转到下载页（GitHub Release 或直接下载 asset）
         if (result.latest.downloadUrl) {
           window.open(result.latest.downloadUrl, '_blank')
         } else {
@@ -192,18 +196,16 @@ const checkForUpdate = async () => {
         }
       }
     } else {
+      // 无更新（版本一致）
       updateStatus.value = '已是最新版本'
       updateStatusClass.value = 'text-ios-green'
     }
   } catch (error) {
-    console.error('检查更新失败:', error)
+    console.error('检查更新异常:', error)
     updateStatus.value = '检查更新失败，请重试'
     updateStatusClass.value = 'text-ios-red'
   } finally {
     checkingUpdate.value = false
   }
 }
-
-// 进入页面时自动检查一次（但为了避免打扰用户，只静默检查，仅在按钮点击时显示状态）
-// 可选：可在此添加自动检查逻辑，但不强制提示
 </script>
