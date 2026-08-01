@@ -73,9 +73,37 @@
       <!-- 关于 -->
       <div class="ios-card p-4">
         <h3 class="font-medium text-ios-dark-gray dark:text-dark-text">{{ $t('settings.about') }}</h3>
-        <p class="text-sm text-ios-gray dark:text-dark-secondary mt-1">{{ $t('settings.version') }}: {{ appVersion }}</p>
-        <p class="text-sm text-ios-gray dark:text-dark-secondary">数据来源: Radio Browser</p>
-        <p class="text-sm text-ios-gray dark:text-dark-secondary">© {{ currentYear }} 国内电台</p>
+        <div class="mt-2 space-y-1 text-sm text-ios-gray dark:text-dark-secondary">
+          <p>{{ $t('settings.version') }}: {{ appVersion }}</p>
+          <p>设备类型: {{ deviceType }}</p>
+          <p>
+            <span>GitHub: </span>
+            <a 
+              href="https://github.com/zzgpy1/diantai" 
+              target="_blank" 
+              rel="noopener noreferrer"
+              class="text-ios-blue hover:underline"
+            >
+              zzgpy1/diantai
+            </a>
+          </p>
+          <p>数据来源: Radio Browser</p>
+          <p>© {{ currentYear }} 国内电台</p>
+          
+          <!-- 检查更新按钮与状态 -->
+          <div class="mt-3 flex items-center gap-3">
+            <button 
+              @click="checkForUpdate"
+              :disabled="checkingUpdate"
+              class="px-4 py-1.5 bg-ios-blue text-white rounded-ios text-sm hover:bg-blue-600 transition-colors disabled:opacity-50"
+            >
+              {{ checkingUpdate ? '检查中...' : '检查更新' }}
+            </button>
+            <span v-if="updateStatus" :class="updateStatusClass" class="text-sm">
+              {{ updateStatus }}
+            </span>
+          </div>
+        </div>
       </div>
     </div>
 
@@ -84,7 +112,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useSettingsStore } from '@/stores/settings'
 import { usePlayerStore } from '@/stores/player'
@@ -93,6 +121,8 @@ import ThemeToggle from '@/components/common/ThemeToggle.vue'
 import SleepTimer from '@/components/common/SleepTimer.vue'
 import PlayerBar from '@/components/common/PlayerBar.vue'
 import pkg from '@/../package.json'
+import { checkForUpdate, getCurrentVersion } from '@/services/versionCheck'
+import { platform } from '@/utils/platform'
 
 const { locale } = useI18n()
 const settingsStore = useSettingsStore()
@@ -101,8 +131,21 @@ const playerStore = usePlayerStore()
 const language = ref(settingsStore.language)
 const volume = ref(settingsStore.volume)
 const autoPlayNext = ref(settingsStore.autoPlayNext)
-const appVersion = pkg.version
+const appVersion = getCurrentVersion()
 const currentYear = new Date().getFullYear()
+
+// 设备类型
+const deviceType = computed(() => {
+  const plat = platform.getPlatform()
+  if (plat === 'electron') return '电脑端 (Electron)'
+  if (plat === 'capacitor') return '移动端 (Android)'
+  return '网页端'
+})
+
+// 更新相关
+const checkingUpdate = ref(false)
+const updateStatus = ref('')
+const updateStatusClass = ref('')
 
 const currentLanguageName = computed(() => {
   return language.value === 'zh' ? '中文' : 'English'
@@ -124,4 +167,43 @@ const saveSettings = () => {
   settingsStore.autoPlayNext = autoPlayNext.value
   localStorage.setItem('autoPlayNext', String(autoPlayNext.value))
 }
+
+// 检查更新逻辑
+const checkForUpdate = async () => {
+  if (checkingUpdate.value) return
+  checkingUpdate.value = true
+  updateStatus.value = ''
+  updateStatusClass.value = ''
+
+  try {
+    const result = await checkForUpdate()
+    if (result.hasUpdate && result.latest) {
+      // 有更新：提示并跳转下载页
+      updateStatus.value = `发现新版本 v${result.latest.version}`
+      updateStatusClass.value = 'text-ios-red'
+      
+      // 显示确认对话框（使用原生 confirm）
+      if (confirm(`发现新版本 v${result.latest.version}，是否前往下载？`)) {
+        // 跳转到下载页（GitHub Release 或直接下载 asset）
+        if (result.latest.downloadUrl) {
+          window.open(result.latest.downloadUrl, '_blank')
+        } else {
+          window.open('https://github.com/zzgpy1/diantai/releases/latest', '_blank')
+        }
+      }
+    } else {
+      updateStatus.value = '已是最新版本'
+      updateStatusClass.value = 'text-ios-green'
+    }
+  } catch (error) {
+    console.error('检查更新失败:', error)
+    updateStatus.value = '检查更新失败，请重试'
+    updateStatusClass.value = 'text-ios-red'
+  } finally {
+    checkingUpdate.value = false
+  }
+}
+
+// 进入页面时自动检查一次（但为了避免打扰用户，只静默检查，仅在按钮点击时显示状态）
+// 可选：可在此添加自动检查逻辑，但不强制提示
 </script>
