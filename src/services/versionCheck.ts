@@ -12,41 +12,101 @@ export const getCurrentVersion = (): string => {
 }
 
 /**
- * 从 GitHub API 获取最新 Release 信息（通过代理）
+ * 尝试通过代理获取 GitHub Release 信息
  */
-export const fetchLatestRelease = async (retries = 2): Promise<ReleaseInfo | null> => {
-  // ✅ 修正：使用正确的代理地址
-  const proxyBase = 'https://ghproxy.19860519.xyz/'
+const fetchWithProxy = async (proxyBase: string, timeout = 15000): Promise<Response | null> => {
   const apiUrl = 'https://api.github.com/repos/zzgpy1/diantai/releases/latest'
   const url = proxyBase + apiUrl
+  console.log(`[更新] 尝试请求: ${url}`)
 
   const controller = new AbortController()
-  const timeoutId = setTimeout(() => controller.abort(), 15000)
+  const timeoutId = setTimeout(() => controller.abort(), timeout)
 
-  for (let attempt = 0; attempt <= retries; attempt++) {
-    try {
-      const response = await fetch(url, {
-        signal: controller.signal,
-        headers: {
-          'Accept': 'application/vnd.github.v3+json',
-          'User-Agent': '国内电台/2.0'
-        }
-      })
-      clearTimeout(timeoutId)
-
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}`)
+  try {
+    const response = await fetch(url, {
+      signal: controller.signal,
+      headers: {
+        'Accept': 'application/vnd.github.v3+json',
+        'User-Agent': '国内电台/' + pkg.version
       }
+    })
+    clearTimeout(timeoutId)
+    if (response.ok) {
+      console.log(`[更新] 请求成功: ${url}`)
+      return response
+    } else {
+      console.warn(`[更新] 请求返回 ${response.status}: ${url}`)
+    }
+  } catch (error) {
+    console.warn(`[更新] 请求失败: ${url}`, error)
+  } finally {
+    clearTimeout(timeoutId)
+  }
+  return null
+}
 
+/**
+ * 获取最新 Release 信息（轮询多个代理）
+ */
+export const fetchLatestRelease = async (): Promise<ReleaseInfo | null> => {
+  // 代理列表（按可靠性排序）
+  const proxyList = [
+    'https://ghproxy.19860519.xyz/',      // ✅ 您确认可用的代理
+    'https://mirror.ghproxy.com/',        // 备用代理1
+    'https://gh-proxy.19860519.xyz/',     // 备用代理2（之前报404，但可能恢复）
+  ]
+
+  // 依次尝试代理
+  for (const proxy of proxyList) {
+    const response = await fetchWithProxy(proxy)
+    if (response) {
+      try {
+        const data = await response.json()
+        const tag = data.tag_name || 'v0.0.0'
+        const version = tag.startsWith('v') ? tag.substring(1) : tag
+
+        let downloadUrl = data.html_url
+        if (data.assets && data.assets.length > 0) {
+          const isElectron = platform.isDesktop()
+          const isMobile = platform.isMobile()
+          if (isMobile) {
+            const apkAsset = data.assets.find((a: any) => a.name.endsWith('.apk'))
+            if (apkAsset) downloadUrl = apkAsset.browser_download_url
+          } else if (isElectron) {
+            const exeAsset = data.assets.find((a: any) => a.name.endsWith('.exe'))
+            if (exeAsset) downloadUrl = exeAsset.browser_download_url
+          }
+        }
+        return {
+          version,
+          downloadUrl,
+          releaseNotes: data.body
+        }
+      } catch (error) {
+        console.error('[更新] 解析响应失败:', error)
+        // 继续尝试下一个代理
+        continue
+      }
+    }
+  }
+
+  // 所有代理失败，尝试直接请求（可能被CORS限制，但作为最后手段）
+  console.log('[更新] 所有代理失败，尝试直接请求 GitHub API')
+  try {
+    const response = await fetch('https://api.github.com/repos/zzgpy1/diantai/releases/latest', {
+      headers: {
+        'Accept': 'application/vnd.github.v3+json',
+        'User-Agent': '国内电台/' + pkg.version
+      }
+    })
+    if (response.ok) {
       const data = await response.json()
       const tag = data.tag_name || 'v0.0.0'
       const version = tag.startsWith('v') ? tag.substring(1) : tag
-
       let downloadUrl = data.html_url
       if (data.assets && data.assets.length > 0) {
         const isElectron = platform.isDesktop()
         const isMobile = platform.isMobile()
-
         if (isMobile) {
           const apkAsset = data.assets.find((a: any) => a.name.endsWith('.apk'))
           if (apkAsset) downloadUrl = apkAsset.browser_download_url
@@ -55,25 +115,17 @@ export const fetchLatestRelease = async (retries = 2): Promise<ReleaseInfo | nul
           if (exeAsset) downloadUrl = exeAsset.browser_download_url
         }
       }
-
-      return {
-        version,
-        downloadUrl,
-        releaseNotes: data.body
-      }
-    } catch (error) {
-      console.warn(`获取最新 Release 失败 (尝试 ${attempt+1}/${retries+1}):`, error)
-      if (attempt === retries) {
-        return null
-      }
-      await new Promise(resolve => setTimeout(resolve, 1000 * (attempt + 1)))
+      return { version, downloadUrl, releaseNotes: data.body }
     }
+  } catch (error) {
+    console.error('[更新] 直接请求失败:', error)
   }
+
   return null
 }
 
 /**
- * 版本号比较（支持 x.y.z）
+ * 版本号比较
  */
 const compareVersions = (v1: string, v2: string): number => {
   const p1 = v1.split('.').map(Number)
@@ -98,21 +150,21 @@ export const checkForUpdate = async (): Promise<{
 }> => {
   try {
     const current = getCurrentVersion()
+    console.log(`[更新] 当前版本: ${current}`)
     const latest = await fetchLatestRelease()
-
     if (!latest) {
       return { hasUpdate: false, error: '获取更新信息失败，请检查网络' }
     }
+    console.log(`[更新] 最新版本: ${latest.version}`)
 
     const comparison = compareVersions(current, latest.version)
-
     if (comparison < 0) {
       return { hasUpdate: true, latest }
     } else {
       return { hasUpdate: false, latest }
     }
   } catch (error) {
-    console.error('检查更新异常:', error)
+    console.error('[更新] 检查更新异常:', error)
     return { hasUpdate: false, error: '检查更新失败，请重试' }
   }
 }
