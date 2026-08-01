@@ -65,7 +65,7 @@ ipcMain.handle('install-update', () => {
 
 ipcMain.handle('get-version', () => app.getVersion())
 
-// ✅ 新增：通过主进程直接请求 GitHub API（带重试）
+// ✅ 通过主进程直接请求 GitHub API（带重试）
 ipcMain.handle('fetch-latest-release', async () => {
   const fetchRelease = (): Promise<any> => {
     return new Promise((resolve, reject) => {
@@ -93,7 +93,7 @@ ipcMain.handle('fetch-latest-release', async () => {
           }
         })
       })
-      req.on('error', reject)
+      req.on('error', (err) => reject(err))
       req.setTimeout(10000, () => {
         req.destroy()
         reject(new Error('请求超时'))
@@ -106,13 +106,13 @@ ipcMain.handle('fetch-latest-release', async () => {
     try {
       const result = await fetchRelease()
       return result
-    } catch (error) {
+    } catch (err) {
+      // 类型断言为 Error
+      const error = err as Error
       console.error(`[更新] 第 ${attempt} 次请求失败:`, error.message)
       if (attempt === 3) {
-        // 最后一次失败，返回 null
         return null
       }
-      // 等待后重试
       await new Promise(resolve => setTimeout(resolve, 2000 * attempt))
     }
   }
