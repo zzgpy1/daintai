@@ -12,12 +12,18 @@ export const getCurrentVersion = (): string => {
 }
 
 /**
- * 从 GitHub API 获取最新 Release 信息（带超时和重试）
+ * 从 GitHub API 获取最新 Release 信息（通过代理）
  */
 export const fetchLatestRelease = async (retries = 2): Promise<ReleaseInfo | null> => {
-  const url = 'https://api.github.com/repos/zzgpy1/diantai/releases/latest'
+  // 使用代理地址
+  const proxyBase = 'https://gh-proxy.19860519.xyz/'
+  // 原始 GitHub API 地址
+  const apiUrl = 'https://api.github.com/repos/zzgpy1/diantai/releases/latest'
+  // 代理后的完整地址
+  const url = proxyBase + apiUrl
+
   const controller = new AbortController()
-  const timeoutId = setTimeout(() => controller.abort(), 10000) // 10秒超时
+  const timeoutId = setTimeout(() => controller.abort(), 15000) // 15秒超时
 
   for (let attempt = 0; attempt <= retries; attempt++) {
     try {
@@ -25,13 +31,15 @@ export const fetchLatestRelease = async (retries = 2): Promise<ReleaseInfo | nul
         signal: controller.signal,
         headers: {
           'Accept': 'application/vnd.github.v3+json',
-          'User-Agent': '国内电台/2.0' // 必须设置 User-Agent
+          'User-Agent': '国内电台/2.0'
         }
       })
       clearTimeout(timeoutId)
+
       if (!response.ok) {
         throw new Error(`HTTP ${response.status}`)
       }
+
       const data = await response.json()
       const tag = data.tag_name || 'v0.0.0'
       const version = tag.startsWith('v') ? tag.substring(1) : tag
@@ -40,6 +48,7 @@ export const fetchLatestRelease = async (retries = 2): Promise<ReleaseInfo | nul
       if (data.assets && data.assets.length > 0) {
         const isElectron = platform.isDesktop()
         const isMobile = platform.isMobile()
+
         if (isMobile) {
           const apkAsset = data.assets.find((a: any) => a.name.endsWith('.apk'))
           if (apkAsset) downloadUrl = apkAsset.browser_download_url
@@ -48,6 +57,7 @@ export const fetchLatestRelease = async (retries = 2): Promise<ReleaseInfo | nul
           if (exeAsset) downloadUrl = exeAsset.browser_download_url
         }
       }
+
       return {
         version,
         downloadUrl,
@@ -56,10 +66,8 @@ export const fetchLatestRelease = async (retries = 2): Promise<ReleaseInfo | nul
     } catch (error) {
       console.warn(`获取最新 Release 失败 (尝试 ${attempt+1}/${retries+1}):`, error)
       if (attempt === retries) {
-        // 最后一次尝试失败，返回 null
         return null
       }
-      // 等待后重试
       await new Promise(resolve => setTimeout(resolve, 1000 * (attempt + 1)))
     }
   }
@@ -67,7 +75,7 @@ export const fetchLatestRelease = async (retries = 2): Promise<ReleaseInfo | nul
 }
 
 /**
- * 版本号比较（支持 x.y.z）
+ * 版本号比较
  */
 const compareVersions = (v1: string, v2: string): number => {
   const p1 = v1.split('.').map(Number)
@@ -93,14 +101,17 @@ export const checkForUpdate = async (): Promise<{
   try {
     const current = getCurrentVersion()
     const latest = await fetchLatestRelease()
+
     if (!latest) {
       return { hasUpdate: false, error: '获取更新信息失败，请检查网络' }
     }
+
     const comparison = compareVersions(current, latest.version)
+
     if (comparison < 0) {
       return { hasUpdate: true, latest }
     } else {
-      return { hasUpdate: false, latest } // 返回最新信息用于显示版本号
+      return { hasUpdate: false, latest }
     }
   } catch (error) {
     console.error('检查更新异常:', error)
