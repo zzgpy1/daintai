@@ -191,6 +191,7 @@ const performCheck = async (showResult = true) => {
     if (result.error) {
       updateStatus.value = result.error
       updateStatusClass.value = 'text-ios-red'
+      console.error('[UI] 检查更新错误:', result.error)
       return
     }
     if (result.hasUpdate && result.latest) {
@@ -208,7 +209,7 @@ const performCheck = async (showResult = true) => {
       }
     }
   } catch (error) {
-    console.error('检查更新异常:', error)
+    console.error('[UI] 检查更新异常:', error)
     updateStatus.value = '检查更新失败，请重试'
     updateStatusClass.value = 'text-ios-red'
   } finally {
@@ -218,6 +219,7 @@ const performCheck = async (showResult = true) => {
 
 // 手动点击检查更新
 const manualCheckUpdate = async () => {
+  console.log('[UI] 用户点击检查更新')
   await performCheck(true)
 }
 
@@ -236,6 +238,7 @@ const downloadUpdate = () => {
 
 // 页面加载时自动检查一次（静默）
 onMounted(async () => {
+  console.log('[UI] 页面加载，执行静默检查')
   await performCheck(false)
 })
 </script>
