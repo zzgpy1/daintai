@@ -18,7 +18,7 @@ export const useRadioStore = defineStore('radio', () => {
   const isLoading = ref(false)
   const error = ref<string | null>(null)
   const searchQuery = ref('')
-  const selectedCountry = ref('')
+  const selectedCountry = ref('CN')    // 默认中国
   const selectedLanguage = ref('')
   const selectedTag = ref('')
   const currentCategory = ref<string>('')
@@ -82,7 +82,6 @@ export const useRadioStore = defineStore('radio', () => {
   const loadTopStations = async () => {
     isLoading.value = true
     try {
-      // 使用 search 接口替代 top 接口，并限定国家
       const result = await radioAPI.searchStations({ 
         order: 'clickcount', 
         limit: 50, 
@@ -93,7 +92,6 @@ export const useRadioStore = defineStore('radio', () => {
       topStations.value = result
     } catch (err) {
       console.error('加载热门电台失败:', err)
-      // 降级：尝试直接搜索任意国内电台
       try {
         const result = await radioAPI.searchStations({ countrycode: 'CN', limit: 50, hidebroken: true })
         topStations.value = result
@@ -107,11 +105,10 @@ export const useRadioStore = defineStore('radio', () => {
     }
   }
 
-  // 最新：使用搜索按更新时间排序并过滤国内
+  // 最新：使用搜索按名称排序并过滤国内
   const loadLatestStations = async () => {
     isLoading.value = true
     try {
-      // 注意：search 接口没有 order by lastchange，使用 name 作为替代
       const result = await radioAPI.searchStations({ 
         order: 'name', 
         limit: 30, 
@@ -121,7 +118,6 @@ export const useRadioStore = defineStore('radio', () => {
       latestStations.value = result
     } catch (err) {
       console.error('加载最新电台失败:', err)
-      // 降级
       try {
         const result = await radioAPI.searchStations({ countrycode: 'CN', limit: 30, hidebroken: true })
         latestStations.value = result
@@ -186,7 +182,7 @@ export const useRadioStore = defineStore('radio', () => {
     }
   }
 
-  // 新增：按省份加载
+  // 修正：省份加载，支持降级搜索
   const loadProvinceStations = async (province: string) => {
     if (!province) {
       provinceStations.value = []
@@ -194,20 +190,44 @@ export const useRadioStore = defineStore('radio', () => {
     }
     isLoading.value = true
     try {
-      // 使用 state 参数，并且国家限定 CN
-      const result = await radioAPI.searchStations({ 
+      // 先尝试用 state 精确匹配
+      let result = await radioAPI.searchStations({ 
         state: province, 
         countrycode: 'CN', 
         limit: 50, 
         hidebroken: true 
       })
+      
+      // 如果为空，尝试用 name 模糊匹配（电台名可能包含省份）
+      if (result.length === 0) {
+        console.warn(`state 搜索“${province}”无结果，尝试 name 模糊匹配`)
+        result = await radioAPI.searchStations({ 
+          name: province, 
+          countrycode: 'CN', 
+          limit: 50, 
+          hidebroken: true 
+        })
+      }
+
+      // 如果还空，尝试用 tag（某些电台标签包含省份）
+      if (result.length === 0) {
+        console.warn(`name 搜索“${province}”无结果，尝试 tag 匹配`)
+        result = await radioAPI.searchStations({ 
+          tag: province, 
+          countrycode: 'CN', 
+          limit: 50, 
+          hidebroken: true 
+        })
+      }
+
       provinceStations.value = result
-      if (provinceStations.value.length === 0) {
+      if (result.length === 0) {
         toastStore.showInfo(`未找到 ${province} 的电台`)
       }
     } catch (err) {
       console.error(`加载省份 ${province} 失败:`, err)
       toastStore.showError(`加载 ${province} 电台失败`)
+      provinceStations.value = []
     } finally {
       isLoading.value = false
     }
@@ -248,7 +268,7 @@ export const useRadioStore = defineStore('radio', () => {
 
   const resetSearch = () => {
     searchQuery.value = ''
-    selectedCountry.value = ''
+    selectedCountry.value = 'CN'
     selectedLanguage.value = ''
     selectedTag.value = ''
     stations.value = []
@@ -260,7 +280,7 @@ export const useRadioStore = defineStore('radio', () => {
     latestStations,
     chinaStations,
     categoryStations,
-    provinceStations, // 新增
+    provinceStations,
     countries,
     languages,
     tags,
@@ -277,7 +297,7 @@ export const useRadioStore = defineStore('radio', () => {
     loadLatestStations,
     loadChinaStations,
     loadCategoryStations,
-    loadProvinceStations, // 新增
+    loadProvinceStations,
     loadCountries,
     loadLanguages,
     loadTags,
