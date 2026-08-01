@@ -15,15 +15,13 @@ export const getCurrentVersion = (): string => {
  * 从 GitHub API 获取最新 Release 信息（通过代理）
  */
 export const fetchLatestRelease = async (retries = 2): Promise<ReleaseInfo | null> => {
-  // 使用代理地址
+  // ✅ 修正：使用正确的代理地址
   const proxyBase = 'https://ghproxy.19860519.xyz/'
-  // 原始 GitHub API 地址
   const apiUrl = 'https://api.github.com/repos/zzgpy1/diantai/releases/latest'
-  // 代理后的完整地址
   const url = proxyBase + apiUrl
 
   const controller = new AbortController()
-  const timeoutId = setTimeout(() => controller.abort(), 15000) // 15秒超时
+  const timeoutId = setTimeout(() => controller.abort(), 15000)
 
   for (let attempt = 0; attempt <= retries; attempt++) {
     try {
@@ -75,7 +73,7 @@ export const fetchLatestRelease = async (retries = 2): Promise<ReleaseInfo | nul
 }
 
 /**
- * 版本号比较
+ * 版本号比较（支持 x.y.z）
  */
 const compareVersions = (v1: string, v2: string): number => {
   const p1 = v1.split('.').map(Number)
