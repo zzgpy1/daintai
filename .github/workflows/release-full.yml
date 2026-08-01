@@ -325,7 +325,7 @@ jobs:
         id: meta
         uses: docker/metadata-action@v5
         with:
-          images: ${{ secrets.DOCKER_USERNAME }}/global-radio-arm64
+          images: ${{ secrets.DOCKER_USERNAME }}/global-radio
           tags: |
             type=raw,value=${{ github.event_name == 'push' && github.ref_name || github.event.inputs.tag }}
             type=raw,value=latest,enable=true
