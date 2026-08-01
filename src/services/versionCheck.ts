@@ -16,7 +16,7 @@ export const getCurrentVersion = (): string => {
  */
 export const fetchLatestRelease = async (retries = 2): Promise<ReleaseInfo | null> => {
   // 使用代理地址
-  const proxyBase = 'https://gh-proxy.19860519.xyz/'
+  const proxyBase = 'https://ghproxy.19860519.xyz/'
   // 原始 GitHub API 地址
   const apiUrl = 'https://api.github.com/repos/zzgpy1/diantai/releases/latest'
   // 代理后的完整地址
