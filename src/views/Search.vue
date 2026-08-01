@@ -58,13 +58,11 @@ const isSearching = ref(false)
 let abortController: AbortController | null = null
 
 const onSearch = async () => {
-  // 取消之前的请求
   if (abortController) {
     abortController.abort()
     abortController = null
   }
   
-  // 若查询为空，清空结果并返回
   if (!searchQuery.value.trim()) {
     radioStore.stations = []
     return
@@ -72,10 +70,9 @@ const onSearch = async () => {
 
   isSearching.value = true
   abortController = new AbortController()
-  // 搜索时自动使用国家代码 CN（国内）
   radioStore.searchQuery = searchQuery.value
-  radioStore.selectedCountry = 'CN'      // 强制国内
-  radioStore.selectedLanguage = ''        // 不限制语言
+  radioStore.selectedCountry = 'CN'
+  radioStore.selectedLanguage = ''
 
   try {
     await radioStore.searchStations(undefined, abortController.signal)
