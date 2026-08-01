@@ -1,12 +1,10 @@
 export const platform = {
   getPlatform(): 'web' | 'electron' | 'capacitor' {
-    // 检测 Electron：通过 process.versions.electron 或 window.electronAPI
     if (typeof window !== 'undefined') {
-      // 方式1：Electron 渲染进程特有属性
+      // 检测 Electron
       if (window.process?.versions?.electron) {
         return 'electron'
       }
-      // 方式2：通过预加载脚本暴露的 API（如果有）
       if ((window as any).electronAPI) {
         return 'electron'
       }
