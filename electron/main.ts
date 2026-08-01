@@ -65,56 +65,29 @@ ipcMain.handle('install-update', () => {
 
 ipcMain.handle('get-version', () => app.getVersion())
 
-// ✅ 通过主进程直接请求 GitHub API（带重试）
+// ✅ IPC 处理：获取最新 Release 信息（主进程执行网络请求）
 ipcMain.handle('fetch-latest-release', async () => {
-  const fetchRelease = (): Promise<any> => {
-    return new Promise((resolve, reject) => {
-      const options = {
-        hostname: 'api.github.com',
-        path: '/repos/zzgpy1/diantai/releases/latest',
-        method: 'GET',
-        headers: {
-          'User-Agent': '国内电台/2.0',
-          'Accept': 'application/vnd.github.v3+json'
+  console.log('[主进程] 收到获取 Release 请求')
+  return new Promise((resolve) => {
+    const url = 'https://api.github.com/repos/zzgpy1/diantai/releases/latest'
+    console.log(`[主进程] 请求: ${url}`)
+    
+    https.get(url, (res) => {
+      let data = ''
+      res.on('data', chunk => data += chunk)
+      res.on('end', () => {
+        try {
+          const json = JSON.parse(data)
+          console.log('[主进程] 解析成功，最新版本:', json.tag_name)
+          resolve(json)
+        } catch (e) {
+          console.error('[主进程] 解析失败:', e)
+          resolve(null)
         }
-      }
-      const req = https.get(options, (res) => {
-        let data = ''
-        res.on('data', chunk => data += chunk)
-        res.on('end', () => {
-          if (res.statusCode === 200) {
-            try {
-              resolve(JSON.parse(data))
-            } catch (e) {
-              reject(new Error('解析响应失败'))
-            }
-          } else {
-            reject(new Error(`HTTP ${res.statusCode}`))
-          }
-        })
       })
-      req.on('error', (err) => reject(err))
-      req.setTimeout(10000, () => {
-        req.destroy()
-        reject(new Error('请求超时'))
-      })
+    }).on('error', (err) => {
+      console.error('[主进程] 请求失败:', err)
+      resolve(null)
     })
-  }
-
-  // 重试最多3次
-  for (let attempt = 1; attempt <= 3; attempt++) {
-    try {
-      const result = await fetchRelease()
-      return result
-    } catch (err) {
-      // 类型断言为 Error
-      const error = err as Error
-      console.error(`[更新] 第 ${attempt} 次请求失败:`, error.message)
-      if (attempt === 3) {
-        return null
-      }
-      await new Promise(resolve => setTimeout(resolve, 2000 * attempt))
-    }
-  }
-  return null
+  })
 })
