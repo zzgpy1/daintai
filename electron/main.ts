@@ -2,6 +2,7 @@ import { app, BrowserWindow, ipcMain } from 'electron'
 import { autoUpdater } from 'electron-updater'
 import * as path from 'path'
 import * as url from 'url'
+import https from 'https'
 
 let mainWindow: BrowserWindow | null = null
 
@@ -15,7 +16,7 @@ function createWindow() {
       nodeIntegration: false,
       contextIsolation: true,
       preload: path.join(__dirname, 'preload.js'),
-      webSecurity: true,                      // ✅ 启用安全策略
+      webSecurity: false,       // 可保持 false 避免其他限制
       allowRunningInsecureContent: false
     },
     icon: path.join(__dirname, 'build/icon.ico')
@@ -37,7 +38,6 @@ function createWindow() {
     setTimeout(() => mainWindow?.reload(), 3000)
   })
 
-  // 生产环境关闭 DevTools
   if (process.env.NODE_ENV === 'development') {
     mainWindow.webContents.openDevTools()
   }
@@ -64,3 +64,26 @@ ipcMain.handle('install-update', () => {
 })
 
 ipcMain.handle('get-version', () => app.getVersion())
+
+// ✅ 新增：通过主进程获取最新 Release 信息（使用代理）
+ipcMain.handle('fetch-latest-release', async () => {
+  return new Promise((resolve) => {
+    const proxyUrl = 'https://ghproxy.19860519.xyz/https://api.github.com/repos/zzgpy1/diantai/releases/latest'
+    https.get(proxyUrl, (res) => {
+      let data = ''
+      res.on('data', chunk => data += chunk)
+      res.on('end', () => {
+        try {
+          const json = JSON.parse(data)
+          resolve(json)
+        } catch (e) {
+          console.error('解析 Release 信息失败:', e)
+          resolve(null)
+        }
+      })
+    }).on('error', (err) => {
+      console.error('获取 Release 信息失败:', err)
+      resolve(null)
+    })
+  })
+})
