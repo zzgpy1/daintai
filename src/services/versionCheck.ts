@@ -12,43 +12,30 @@ export const getCurrentVersion = (): string => {
 }
 
 /**
- * 尝试通过代理获取 GitHub Release 信息
- */
-const fetchWithProxy = async (proxyBase: string, timeout = 15000): Promise<Response | null> => {
-  const apiUrl = 'https://api.github.com/repos/zzgpy1/diantai/releases/latest'
-  const url = proxyBase + apiUrl
-  console.log(`[更新] 尝试请求: ${url}`)
-
-  const controller = new AbortController()
-  const timeoutId = setTimeout(() => controller.abort(), timeout)
-
-  try {
-    const response = await fetch(url, {
-      signal: controller.signal,
-      headers: {
-        'Accept': 'application/vnd.github.v3+json',
-        'User-Agent': `国内电台/${pkg.version}`
-      }
-    })
-    clearTimeout(timeoutId)
-    if (response.ok) {
-      console.log(`[更新] 请求成功: ${url}`)
-      return response
-    } else {
-      console.warn(`[更新] 请求返回 ${response.status}: ${url}`)
-    }
-  } catch (error) {
-    console.warn(`[更新] 请求失败: ${url}`, error)
-  } finally {
-    clearTimeout(timeoutId)
-  }
-  return null
-}
-
-/**
- * 获取最新 Release 信息（轮询多个代理）
+ * 获取最新 Release 信息：优先使用 Electron IPC，否则使用 fetch 代理
  */
 export const fetchLatestRelease = async (): Promise<ReleaseInfo | null> => {
+  // 1. 如果是 Electron 环境，尝试通过 IPC 获取（主进程无跨域限制）
+  if (platform.isDesktop() && window.electronAPI?.fetchLatestRelease) {
+    try {
+      console.log('[更新] 使用 IPC 获取最新 Release')
+      const data = await window.electronAPI.fetchLatestRelease()
+      if (data) {
+        const tag = data.tag_name || 'v0.0.0'
+        const version = tag.startsWith('v') ? tag.substring(1) : tag
+        let downloadUrl = data.html_url
+        if (data.assets && data.assets.length > 0) {
+          const apkAsset = data.assets.find((a: any) => a.name.endsWith('.apk'))
+          if (apkAsset) downloadUrl = apkAsset.browser_download_url
+        }
+        return { version, downloadUrl, releaseNotes: data.body }
+      }
+    } catch (error) {
+      console.error('[更新] IPC 请求失败，降级到 fetch', error)
+    }
+  }
+
+  // 2. 降级方案：使用 fetch + 代理（与之前相同）
   const proxyList = [
     'https://ghproxy.19860519.xyz/',
     'https://mirror.ghproxy.com/',
@@ -56,63 +43,26 @@ export const fetchLatestRelease = async (): Promise<ReleaseInfo | null> => {
   ]
 
   for (const proxy of proxyList) {
-    const response = await fetchWithProxy(proxy)
-    if (response) {
-      try {
+    try {
+      const url = proxy + 'https://api.github.com/repos/zzgpy1/diantai/releases/latest'
+      console.log(`[更新] 尝试 fetch: ${url}`)
+      const response = await fetch(url, {
+        headers: { 'Accept': 'application/vnd.github.v3+json', 'User-Agent': `国内电台/${pkg.version}` }
+      })
+      if (response.ok) {
         const data = await response.json()
         const tag = data.tag_name || 'v0.0.0'
         const version = tag.startsWith('v') ? tag.substring(1) : tag
-
         let downloadUrl = data.html_url
         if (data.assets && data.assets.length > 0) {
-          const isElectron = platform.isDesktop()
-          const isMobile = platform.isMobile()
-          if (isMobile) {
-            const apkAsset = data.assets.find((a: any) => a.name.endsWith('.apk'))
-            if (apkAsset) downloadUrl = apkAsset.browser_download_url
-          } else if (isElectron) {
-            const exeAsset = data.assets.find((a: any) => a.name.endsWith('.exe'))
-            if (exeAsset) downloadUrl = exeAsset.browser_download_url
-          }
-        }
-        console.log(`[更新] 解析成功，最新版本: ${version}`)
-        return { version, downloadUrl, releaseNotes: data.body }
-      } catch (error) {
-        console.error('[更新] 解析响应失败:', error)
-        continue
-      }
-    }
-  }
-
-  console.log('[更新] 所有代理失败，尝试直接请求 GitHub API')
-  try {
-    const response = await fetch('https://api.github.com/repos/zzgpy1/diantai/releases/latest', {
-      headers: {
-        'Accept': 'application/vnd.github.v3+json',
-        'User-Agent': `国内电台/${pkg.version}`
-      }
-    })
-    if (response.ok) {
-      const data = await response.json()
-      const tag = data.tag_name || 'v0.0.0'
-      const version = tag.startsWith('v') ? tag.substring(1) : tag
-      let downloadUrl = data.html_url
-      if (data.assets && data.assets.length > 0) {
-        const isElectron = platform.isDesktop()
-        const isMobile = platform.isMobile()
-        if (isMobile) {
           const apkAsset = data.assets.find((a: any) => a.name.endsWith('.apk'))
           if (apkAsset) downloadUrl = apkAsset.browser_download_url
-        } else if (isElectron) {
-          const exeAsset = data.assets.find((a: any) => a.name.endsWith('.exe'))
-          if (exeAsset) downloadUrl = exeAsset.browser_download_url
         }
+        return { version, downloadUrl, releaseNotes: data.body }
       }
-      console.log(`[更新] 直接请求成功，最新版本: ${version}`)
-      return { version, downloadUrl, releaseNotes: data.body }
+    } catch (e) {
+      console.warn('[更新] fetch 代理失败:', e)
     }
-  } catch (error) {
-    console.error('[更新] 直接请求失败:', error)
   }
 
   return null
@@ -144,7 +94,6 @@ export const checkForUpdate = async (): Promise<{
       return { hasUpdate: false, error: '获取更新信息失败，请检查网络' }
     }
     console.log(`[更新] 最新版本: ${latest.version}`)
-
     const comparison = compareVersions(current, latest.version)
     if (comparison < 0) {
       return { hasUpdate: true, latest }
