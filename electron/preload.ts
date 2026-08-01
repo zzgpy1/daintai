@@ -10,5 +10,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   onUpdateDownloaded: (cb: () => void) => {
     ipcRenderer.on('update-downloaded', cb)
     return () => ipcRenderer.removeListener('update-downloaded', cb)
-  }
+  },
+  // ✅ 新增：获取最新 Release
+  fetchLatestRelease: () => ipcRenderer.invoke('fetch-latest-release')
 })
