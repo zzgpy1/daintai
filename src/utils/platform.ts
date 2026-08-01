@@ -1,8 +1,10 @@
 export const platform = {
   getPlatform(): 'web' | 'electron' | 'capacitor' {
-    if (typeof window !== 'undefined' && window.process?.type === 'renderer') {
+    // 检测 Electron（更可靠的方式）
+    if (typeof window !== 'undefined' && window.process?.versions?.electron) {
       return 'electron'
     }
+    // 检测 Capacitor
     if (typeof window !== 'undefined' && (window as any).Capacitor?.isNativePlatform()) {
       return 'capacitor'
     }
