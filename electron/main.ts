@@ -2,7 +2,7 @@ import { app, BrowserWindow, ipcMain } from 'electron'
 import { autoUpdater } from 'electron-updater'
 import * as path from 'path'
 import * as url from 'url'
-import https from 'https'
+import https from 'https'   // 改为 import
 
 let mainWindow: BrowserWindow | null = null
 
@@ -29,7 +29,7 @@ function createWindow() {
     slashes: true
   })
 
-  mainWindow.loadURL(startUrl).catch(err => {
+  mainWindow.loadURL(startUrl).catch((err: Error) => {
     console.error('加载失败:', err)
     setTimeout(() => mainWindow?.reload(), 2000)
   })
@@ -65,26 +65,29 @@ ipcMain.handle('install-update', () => {
 
 ipcMain.handle('get-version', () => app.getVersion())
 
-// ✅ IPC 处理：获取最新 Release 信息（主进程执行网络请求）
+// ✅ IPC 处理：获取最新 Release（主进程执行网络请求）
 ipcMain.handle('fetch-latest-release', async () => {
   console.log('[主进程] 收到获取 Release 请求')
   return new Promise((resolve) => {
     const url = 'https://api.github.com/repos/zzgpy1/diantai/releases/latest'
-    const https = require('https')
-    https.get(url, (res: any) => {
+    console.log(`[主进程] 请求: ${url}`)
+
+    https.get(url, (res: import('http').IncomingMessage) => {
       let data = ''
-      res.on('data', chunk => data += chunk)
+      res.on('data', (chunk: string | Buffer) => {
+        data += chunk
+      })
       res.on('end', () => {
         try {
           const json = JSON.parse(data)
-          console.log('[主进程] 解析成功:', json.tag_name)
+          console.log('[主进程] 解析成功，最新版本:', json.tag_name)
           resolve(json)
         } catch (e) {
           console.error('[主进程] 解析失败:', e)
           resolve(null)
         }
       })
-    }).on('error', (err: any) => {
+    }).on('error', (err: Error) => {
       console.error('[主进程] 请求失败:', err)
       resolve(null)
     })
