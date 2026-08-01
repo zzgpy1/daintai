@@ -90,10 +90,10 @@
           <p>数据来源: Radio Browser</p>
           <p>© {{ currentYear }} 国内电台</p>
           
-          <!-- 检查更新按钮与状态 -->
+          <!-- 更新状态显示 -->
           <div class="mt-3 flex items-center gap-3 flex-wrap">
             <button 
-              @click="checkForUpdate"
+              @click="manualCheckUpdate"
               :disabled="checkingUpdate"
               class="px-4 py-1.5 bg-ios-blue text-white rounded-ios text-sm hover:bg-blue-600 transition-colors disabled:opacity-50"
             >
@@ -102,6 +102,13 @@
             <span v-if="updateStatus" :class="updateStatusClass" class="text-sm">
               {{ updateStatus }}
             </span>
+            <button 
+              v-if="hasNewVersion"
+              @click="downloadUpdate"
+              class="px-4 py-1.5 bg-ios-green text-white rounded-ios text-sm hover:bg-green-600 transition-colors"
+            >
+              去更新 (v{{ latestVersion }})
+            </button>
           </div>
         </div>
       </div>
@@ -112,7 +119,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useSettingsStore } from '@/stores/settings'
 import { usePlayerStore } from '@/stores/player'
@@ -120,8 +127,7 @@ import BackButton from '@/components/common/BackButton.vue'
 import ThemeToggle from '@/components/common/ThemeToggle.vue'
 import SleepTimer from '@/components/common/SleepTimer.vue'
 import PlayerBar from '@/components/common/PlayerBar.vue'
-import pkg from '@/../package.json'
-import { checkForUpdate, getCurrentVersion } from '@/services/versionCheck'
+import { getCurrentVersion, checkForUpdate, type ReleaseInfo } from '@/services/versionCheck'
 import { platform } from '@/utils/platform'
 
 const { locale } = useI18n()
@@ -146,6 +152,9 @@ const deviceType = computed(() => {
 const checkingUpdate = ref(false)
 const updateStatus = ref('')
 const updateStatusClass = ref('')
+const hasNewVersion = ref(false)
+const latestVersion = ref('')
+let latestReleaseInfo: ReleaseInfo | null = null
 
 const currentLanguageName = computed(() => {
   return language.value === 'zh' ? '中文' : 'English'
@@ -168,37 +177,36 @@ const saveSettings = () => {
   localStorage.setItem('autoPlayNext', String(autoPlayNext.value))
 }
 
-// 检查更新逻辑
-const checkForUpdate = async () => {
+// 核心更新检测逻辑
+const performCheck = async (showResult = true) => {
   if (checkingUpdate.value) return
   checkingUpdate.value = true
   updateStatus.value = ''
   updateStatusClass.value = ''
+  hasNewVersion.value = false
+  latestVersion.value = ''
 
   try {
     const result = await checkForUpdate()
-    // 处理错误（网络问题等）
     if (result.error) {
       updateStatus.value = result.error
       updateStatusClass.value = 'text-ios-red'
       return
     }
-
-    // 有更新
     if (result.hasUpdate && result.latest) {
+      hasNewVersion.value = true
+      latestVersion.value = result.latest.version
+      latestReleaseInfo = result.latest
       updateStatus.value = `发现新版本 v${result.latest.version}`
       updateStatusClass.value = 'text-ios-red'
-      if (confirm(`发现新版本 v${result.latest.version}，是否前往下载？`)) {
-        if (result.latest.downloadUrl) {
-          window.open(result.latest.downloadUrl, '_blank')
-        } else {
-          window.open('https://github.com/zzgpy1/diantai/releases/latest', '_blank')
-        }
-      }
     } else {
-      // 无更新（版本一致）
+      // 无更新
       updateStatus.value = '已是最新版本'
       updateStatusClass.value = 'text-ios-green'
+      if (result.latest) {
+        // 即使无更新，也可以显示最新版本号
+        latestVersion.value = result.latest.version
+      }
     }
   } catch (error) {
     console.error('检查更新异常:', error)
@@ -208,4 +216,28 @@ const checkForUpdate = async () => {
     checkingUpdate.value = false
   }
 }
+
+// 手动点击检查更新
+const manualCheckUpdate = async () => {
+  await performCheck(true)
+}
+
+// 点击“去更新”按钮，跳转下载
+const downloadUpdate = () => {
+  if (latestReleaseInfo) {
+    if (latestReleaseInfo.downloadUrl) {
+      window.open(latestReleaseInfo.downloadUrl, '_blank')
+    } else {
+      window.open('https://github.com/zzgpy1/diantai/releases/latest', '_blank')
+    }
+  } else {
+    window.open('https://github.com/zzgpy1/diantai/releases/latest', '_blank')
+  }
+}
+
+// 页面加载时自动检查一次（静默）
+onMounted(async () => {
+  // 静默检查，不显示中间状态（只在完成后更新状态文字）
+  await performCheck(false)
+})
 </script>
