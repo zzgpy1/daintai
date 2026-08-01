@@ -20,22 +20,6 @@
         />
       </div>
 
-      <!-- 筛选条件 -->
-      <div class="grid grid-cols-2 gap-3 mb-4">
-        <select v-model="selectedCountry" @change="onSearch" class="px-3 py-2 rounded-ios border border-gray-200 dark:border-dark-gray bg-white dark:bg-dark-card text-ios-dark-gray dark:text-dark-text">
-          <option value="">{{ $t('search.allCountries') }}</option>
-          <option v-for="country in countries" :key="country.iso_3166_1" :value="country.iso_3166_1">
-            {{ country.name }}
-          </option>
-        </select>
-        <select v-model="selectedLanguage" @change="onSearch" class="px-3 py-2 rounded-ios border border-gray-200 dark:border-dark-gray bg-white dark:bg-dark-card text-ios-dark-gray dark:text-dark-text">
-          <option value="">{{ $t('search.allLanguages') }}</option>
-          <option v-for="lang in languages" :key="lang.iso_639" :value="lang.name">
-            {{ lang.name }}
-          </option>
-        </select>
-      </div>
-
       <!-- 加载状态 -->
       <div v-if="isSearching" class="text-center py-8">
         <div class="inline-block w-8 h-8 border-4 border-ios-blue border-t-transparent rounded-full animate-spin"></div>
@@ -58,7 +42,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, watch, onBeforeUnmount } from 'vue'
+import { ref, watch, onBeforeUnmount } from 'vue'
 import { useRadioStore } from '@/stores/radio'
 import { useToastStore } from '@/stores/toast'
 import BackButton from '@/components/common/BackButton.vue'
@@ -69,12 +53,7 @@ const radioStore = useRadioStore()
 const toastStore = useToastStore()
 
 const searchQuery = ref('')
-const selectedCountry = ref('')
-const selectedLanguage = ref('')
 const isSearching = ref(false)
-
-const countries = ref<any[]>([])
-const languages = ref<any[]>([])
 
 let abortController: AbortController | null = null
 
@@ -86,16 +65,17 @@ const onSearch = async () => {
   }
   
   // 若查询为空，清空结果并返回
-  if (!searchQuery.value.trim() && !selectedCountry.value && !selectedLanguage.value) {
+  if (!searchQuery.value.trim()) {
     radioStore.stations = []
     return
   }
 
   isSearching.value = true
   abortController = new AbortController()
+  // 搜索时自动使用国家代码 CN（国内）
   radioStore.searchQuery = searchQuery.value
-  radioStore.selectedCountry = selectedCountry.value
-  radioStore.selectedLanguage = selectedLanguage.value
+  radioStore.selectedCountry = 'CN'      // 强制国内
+  radioStore.selectedLanguage = ''        // 不限制语言
 
   try {
     await radioStore.searchStations(undefined, abortController.signal)
@@ -118,21 +98,7 @@ watch(searchQuery, () => {
   debounceTimer = setTimeout(onSearch, 500)
 })
 
-// 当筛选条件变化时立即搜索
-watch([selectedCountry, selectedLanguage], () => {
-  onSearch()
-})
-
 onBeforeUnmount(() => {
   if (abortController) abortController.abort()
-})
-
-onMounted(async () => {
-  await Promise.all([
-    radioStore.loadCountries(),
-    radioStore.loadLanguages()
-  ])
-  countries.value = radioStore.countries
-  languages.value = radioStore.languages
 })
 </script>
