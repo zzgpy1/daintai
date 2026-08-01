@@ -204,7 +204,6 @@ const performCheck = async (showResult = true) => {
       updateStatus.value = '已是最新版本'
       updateStatusClass.value = 'text-ios-green'
       if (result.latest) {
-        // 即使无更新，也可以显示最新版本号
         latestVersion.value = result.latest.version
       }
     }
@@ -222,7 +221,7 @@ const manualCheckUpdate = async () => {
   await performCheck(true)
 }
 
-// 点击“去更新”按钮，跳转下载
+// 点击"去更新"按钮，跳转下载
 const downloadUpdate = () => {
   if (latestReleaseInfo) {
     if (latestReleaseInfo.downloadUrl) {
@@ -237,7 +236,6 @@ const downloadUpdate = () => {
 
 // 页面加载时自动检查一次（静默）
 onMounted(async () => {
-  // 静默检查，不显示中间状态（只在完成后更新状态文字）
   await performCheck(false)
 })
 </script>
