@@ -4,7 +4,7 @@ import { radioAPI } from '@/services/radioApi'
 import type { RadioStation, Country, Language, Tag } from '@/types/radio'
 import { useToastStore } from './toast'
 
-// 省份 → 地级市列表（用于全覆盖搜索）
+// 省份 → 地级市列表（全面覆盖，含县级市及自治州）
 const PROVINCE_CITIES: Record<string, string[]> = {
   '北京': ['北京'],
   '上海': ['上海'],
@@ -214,7 +214,7 @@ export const useRadioStore = defineStore('radio', () => {
     }
   }
 
-  // 省份加载：遍历地级市 + 模糊匹配，全覆盖
+  // ✅ 省份全覆盖优化版（多维度并发搜索）
   const loadProvinceStations = async (province: string) => {
     if (!province) {
       provinceStations.value = []
@@ -223,68 +223,70 @@ export const useRadioStore = defineStore('radio', () => {
     isLoading.value = true
     try {
       const cities = PROVINCE_CITIES[province] || []
-      let allStations: RadioStation[] = []
+      const searchPromises: Promise<RadioStation[]>[] = []
 
-      // 策略1: 如果城市列表存在，遍历每个城市精确搜索 state
-      if (cities.length > 0) {
-        const cityRequests = cities.map(city =>
+      // 1. 省份名多种变体搜索
+      const provinceVariants = [province, province + '省', province + '市']
+      for (const pName of provinceVariants) {
+        searchPromises.push(
+          radioAPI.searchStations({
+            state: pName,
+            countrycode: 'CN',
+            limit: 500,
+            hidebroken: true
+          }).catch(() => [])
+        )
+        searchPromises.push(
+          radioAPI.searchStations({
+            name: pName,
+            countrycode: 'CN',
+            limit: 500,
+            hidebroken: true
+          }).catch(() => [])
+        )
+        searchPromises.push(
+          radioAPI.searchStations({
+            tag: pName,
+            countrycode: 'CN',
+            limit: 500,
+            hidebroken: true
+          }).catch(() => [])
+        )
+      }
+
+      // 2. 地级市搜索（覆盖县级台）
+      for (const city of cities) {
+        searchPromises.push(
           radioAPI.searchStations({
             state: city,
             countrycode: 'CN',
-            limit: 200,
+            limit: 500,
             hidebroken: true
-          }).catch(() => []) // 单个城市失败不影响其他
+          }).catch(() => [])
         )
-        const cityResults = await Promise.all(cityRequests)
-        // 合并所有城市结果
-        cityResults.forEach(result => {
-          allStations = allStations.concat(result)
-        })
-        // 去重
-        const unique = allStations.filter((item, index, self) =>
-          index === self.findIndex(s => s.stationuuid === item.stationuuid)
+        searchPromises.push(
+          radioAPI.searchStations({
+            name: city,
+            countrycode: 'CN',
+            limit: 500,
+            hidebroken: true
+          }).catch(() => [])
         )
-        allStations = unique
       }
 
-      // 策略2: 如果结果少于30，再尝试 name 模糊匹配省份名
-      if (allStations.length < 30) {
-        console.warn(`城市搜索“${province}”结果较少 (${allStations.length})，尝试 name 模糊匹配`)
-        const nameResults = await radioAPI.searchStations({
-          name: province,
-          countrycode: 'CN',
-          limit: 200,
-          hidebroken: true
-        })
-        // 合并去重
-        const merged = [...allStations, ...nameResults]
-        const unique = merged.filter((item, index, self) =>
-          index === self.findIndex(s => s.stationuuid === item.stationuuid)
-        )
-        allStations = unique
-      }
+      // 并行执行
+      const results = await Promise.all(searchPromises)
+      const allStations = results.flat()
+      // 去重
+      const unique = allStations.filter((item, index, self) =>
+        index === self.findIndex(s => s.stationuuid === item.stationuuid)
+      )
 
-      // 策略3: 如果仍少，尝试 tag 模糊匹配
-      if (allStations.length < 30) {
-        console.warn(`name 搜索“${province}”结果仍较少，尝试 tag 匹配`)
-        const tagResults = await radioAPI.searchStations({
-          tag: province,
-          countrycode: 'CN',
-          limit: 200,
-          hidebroken: true
-        })
-        const merged = [...allStations, ...tagResults]
-        const unique = merged.filter((item, index, self) =>
-          index === self.findIndex(s => s.stationuuid === item.stationuuid)
-        )
-        allStations = unique
-      }
-
-      provinceStations.value = allStations
-      if (allStations.length === 0) {
+      provinceStations.value = unique
+      if (unique.length === 0) {
         toastStore.showInfo(`未找到 ${province} 的电台`)
       } else {
-        toastStore.showInfo(`找到 ${allStations.length} 个 ${province} 的电台`)
+        toastStore.showInfo(`找到 ${unique.length} 个 ${province} 的电台`)
       }
     } catch (err) {
       console.error(`加载省份 ${province} 失败:`, err)
