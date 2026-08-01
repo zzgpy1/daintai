@@ -11,21 +11,21 @@ export const useRadioStore = defineStore('radio', () => {
   const latestStations = ref<RadioStation[]>([])
   const chinaStations = ref<RadioStation[]>([])
   const categoryStations = ref<RadioStation[]>([])
-  const provinceStations = ref<RadioStation[]>([]) // 新增
+  const provinceStations = ref<RadioStation[]>([])
   const countries = ref<Country[]>([])
   const languages = ref<Language[]>([])
   const tags = ref<Tag[]>([])
   const isLoading = ref(false)
   const error = ref<string | null>(null)
   const searchQuery = ref('')
-  const selectedCountry = ref('CN')    // 默认中国
+  const selectedCountry = ref('CN')
   const selectedLanguage = ref('')
   const selectedTag = ref('')
   const currentCategory = ref<string>('')
 
   const filteredStations = computed(() => {
     let filtered = stations.value
-    // 始终只显示国内电台（countrycode 为 CN 或 country 包含 China）
+    // 始终只显示国内电台
     filtered = filtered.filter(s => s.countrycode === 'CN' || s.country.toLowerCase().includes('china'))
     if (searchQuery.value) {
       const q = searchQuery.value.toLowerCase().trim()
@@ -49,13 +49,12 @@ export const useRadioStore = defineStore('radio', () => {
     return filtered
   })
 
-  // 搜索始终带国家过滤
   const searchStations = async (query?: string, signal?: AbortSignal) => {
     if (query) searchQuery.value = query
     isLoading.value = true
     error.value = null
     try {
-      const params: any = { limit: 100, hidebroken: true, countrycode: 'CN' } // 强制国内
+      const params: any = { limit: 100, hidebroken: true, countrycode: 'CN' }
       if (searchQuery.value) params.name = searchQuery.value
       if (selectedCountry.value) params.countrycode = selectedCountry.value
       if (selectedLanguage.value) params.language = selectedLanguage.value
@@ -78,7 +77,6 @@ export const useRadioStore = defineStore('radio', () => {
     return stations.value
   }
 
-  // 热门：使用搜索按点击量排序并过滤国内
   const loadTopStations = async () => {
     isLoading.value = true
     try {
@@ -105,7 +103,6 @@ export const useRadioStore = defineStore('radio', () => {
     }
   }
 
-  // 最新：使用搜索按名称排序并过滤国内
   const loadLatestStations = async () => {
     isLoading.value = true
     try {
@@ -131,7 +128,6 @@ export const useRadioStore = defineStore('radio', () => {
     }
   }
 
-  // 国内频道
   const loadChinaStations = async () => {
     isLoading.value = true
     try {
@@ -155,7 +151,6 @@ export const useRadioStore = defineStore('radio', () => {
     }
   }
 
-  // 分类（已含国内过滤）
   const loadCategoryStations = async (tag: string) => {
     if (!tag) {
       categoryStations.value = []
@@ -182,7 +177,7 @@ export const useRadioStore = defineStore('radio', () => {
     }
   }
 
-  // 修正：省份加载，支持降级搜索
+  // ✅ 关键修正：省份加载支持多策略、大 limit
   const loadProvinceStations = async (province: string) => {
     if (!province) {
       provinceStations.value = []
@@ -190,39 +185,52 @@ export const useRadioStore = defineStore('radio', () => {
     }
     isLoading.value = true
     try {
-      // 先尝试用 state 精确匹配
+      // 策略1：使用 state 精确匹配（省份名）
       let result = await radioAPI.searchStations({ 
         state: province, 
         countrycode: 'CN', 
-        limit: 50, 
+        limit: 200,        // 加大 limit 获取尽可能多
         hidebroken: true 
       })
       
-      // 如果为空，尝试用 name 模糊匹配（电台名可能包含省份）
-      if (result.length === 0) {
-        console.warn(`state 搜索“${province}”无结果，尝试 name 模糊匹配`)
-        result = await radioAPI.searchStations({ 
+      // 如果结果太少（可能 state 字段缺失或不标准），尝试 name 模糊匹配
+      if (result.length < 5) {
+        console.warn(`state 搜索“${province}”结果较少 (${result.length})，尝试 name 模糊匹配`)
+        const nameResults = await radioAPI.searchStations({ 
           name: province, 
           countrycode: 'CN', 
-          limit: 50, 
+          limit: 200,
           hidebroken: true 
         })
+        // 合并并去重
+        const merged = [...result, ...nameResults]
+        const unique = merged.filter((item, index, self) => 
+          index === self.findIndex(s => s.stationuuid === item.stationuuid)
+        )
+        result = unique
       }
 
-      // 如果还空，尝试用 tag（某些电台标签包含省份）
-      if (result.length === 0) {
-        console.warn(`name 搜索“${province}”无结果，尝试 tag 匹配`)
-        result = await radioAPI.searchStations({ 
+      // 如果还少，尝试 tag 匹配（某些电台标签含省份）
+      if (result.length < 5) {
+        console.warn(`name 搜索“${province}”结果仍较少，尝试 tag 匹配`)
+        const tagResults = await radioAPI.searchStations({ 
           tag: province, 
           countrycode: 'CN', 
-          limit: 50, 
+          limit: 200,
           hidebroken: true 
         })
+        const merged = [...result, ...tagResults]
+        const unique = merged.filter((item, index, self) => 
+          index === self.findIndex(s => s.stationuuid === item.stationuuid)
+        )
+        result = unique
       }
 
       provinceStations.value = result
       if (result.length === 0) {
         toastStore.showInfo(`未找到 ${province} 的电台`)
+      } else {
+        toastStore.showInfo(`找到 ${result.length} 个 ${province} 的电台`)
       }
     } catch (err) {
       console.error(`加载省份 ${province} 失败:`, err)
