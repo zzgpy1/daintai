@@ -166,7 +166,6 @@ jobs:
       - name: Sync Capacitor
         run: npx cap sync android
 
-      # 🔑 解码签名密钥
       - name: Decode keystore
         run: |
           mkdir -p android/app
@@ -178,7 +177,6 @@ jobs:
           fi
           echo "✅ Keystore decoded"
 
-      # 🛠 生成缺失的 Android 资源
       - name: Create missing Android resources
         run: |
           mkdir -p android/app/src/main/res/values
@@ -207,7 +205,6 @@ jobs:
           EOF
           echo "✅ Android resources created"
 
-      # 📝 覆盖 build.gradle（使用环境变量 versionName）
       - name: Generate build.gradle with dynamic version
         run: |
           cat > android/app/build.gradle << 'EOF'
@@ -258,7 +255,6 @@ jobs:
           apply from: 'capacitor.build.gradle'
           EOF
 
-      # 🏷️ 设置版本号环境变量（供 gradle 读取）
       - name: Set version from package.json
         run: echo "VERSION_NAME=$(node -p "require('./package.json').version")" >> $GITHUB_ENV
 
@@ -271,7 +267,6 @@ jobs:
           KEYSTORE_FILE: app/release.keystore
           VERSION_NAME: ${{ env.VERSION_NAME }}
 
-      # ✅ 验证 APK
       - name: Verify APK integrity
         run: |
           APK_PATH="android/app/build/outputs/apk/release/app-release.apk"
@@ -315,6 +310,8 @@ jobs:
       - name: Set up Docker Buildx
         if: steps.check.outputs.available == 'true'
         uses: docker/setup-buildx-action@v3
+        with:
+          platforms: linux/amd64,linux/arm64
 
       - name: Login to Docker Hub
         if: steps.check.outputs.available == 'true'
@@ -328,18 +325,19 @@ jobs:
         id: meta
         uses: docker/metadata-action@v5
         with:
-          images: ${{ secrets.DOCKER_USERNAME }}/global-radio
+          images: ${{ secrets.DOCKER_USERNAME }}/global-radio-arm64
           tags: |
             type=raw,value=${{ github.event_name == 'push' && github.ref_name || github.event.inputs.tag }}
-            type=raw,value=latest,enable=${{ github.ref == 'refs/heads/main' }}
+            type=raw,value=latest,enable=true
 
-      - name: Build and push Docker image
+      - name: Build and push multi-arch Docker image
         if: steps.check.outputs.available == 'true'
         uses: docker/build-push-action@v5
         with:
           context: .
           file: docker/Dockerfile
           push: true
+          platforms: linux/amd64,linux/arm64
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
