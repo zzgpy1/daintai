@@ -3,8 +3,9 @@ import { ref, computed } from 'vue'
 import { radioAPI } from '@/services/radioApi'
 import type { RadioStation, Country, Language, Tag } from '@/types/radio'
 import { useToastStore } from './toast'
+import { localStations } from '@/config/localStations'
 
-// 省份 → 地级市列表（全面覆盖，含县级市及自治州）
+// 省份 → 地级市列表
 const PROVINCE_CITIES: Record<string, string[]> = {
   '北京': ['北京'],
   '上海': ['上海'],
@@ -61,12 +62,66 @@ export const useRadioStore = defineStore('radio', () => {
   const selectedTag = ref('')
   const currentCategory = ref<string>('')
 
+  // ---------- 失效列表管理 ----------
+  const getInvalidUrls = (): Set<string> => {
+    try {
+      const data = localStorage.getItem('invalid_stations')
+      if (data) {
+        const urls = JSON.parse(data)
+        return new Set(urls)
+      }
+    } catch {}
+    return new Set()
+  }
+
+  const saveInvalidUrls = (urls: Set<string>) => {
+    localStorage.setItem('invalid_stations', JSON.stringify(Array.from(urls)))
+  }
+
+  const markInvalid = (station: RadioStation) => {
+    const invalid = getInvalidUrls()
+    invalid.add(station.url)
+    saveInvalidUrls(invalid)
+    // 从当前显示列表中移除
+    const filterList = (list: RadioStation[]) => list.filter(s => s.url !== station.url)
+    chinaStations.value = filterList(chinaStations.value)
+    categoryStations.value = filterList(categoryStations.value)
+    provinceStations.value = filterList(provinceStations.value)
+    topStations.value = filterList(topStations.value)
+    latestStations.value = filterList(latestStations.value)
+    stations.value = filterList(stations.value)
+    // 如果当前播放的就是该电台，停止
+    // 由 player 处理，不在此处停止
+  }
+
+  // ---------- 本地源合并辅助 ----------
+  const mergeWithLocal = (apiStations: RadioStation[]): RadioStation[] => {
+    const invalid = getInvalidUrls()
+    // 先取本地源（过滤掉失效的）
+    let merged = localStations.filter(s => !invalid.has(s.url))
+    // 追加 API 中未失效且不在本地的
+    const localUrls = new Set(merged.map(s => s.url))
+    for (const api of apiStations) {
+      if (!invalid.has(api.url) && !localUrls.has(api.url)) {
+        merged.push(api)
+      }
+    }
+    return merged
+  }
+
+  // 过滤本地源中匹配标签的（用于分类）
+  const filterLocalByTag = (tag: string): RadioStation[] => {
+    const invalid = getInvalidUrls()
+    return localStations.filter(s => s.tags.includes(tag) && !invalid.has(s.url))
+  }
+
+  // ---------- 核心数据加载 ----------
   const filteredStations = computed(() => {
     let filtered = stations.value
     filtered = filtered.filter(s => s.countrycode === 'CN' || s.country.toLowerCase().includes('china'))
     if (searchQuery.value) {
       const q = searchQuery.value.toLowerCase().trim()
-      filtered = filtered.filter(s => 
+      filtered = filtered.filter(s =>
         s.name.toLowerCase().includes(q) ||
         s.country.toLowerCase().includes(q) ||
         s.tags.toLowerCase().includes(q) ||
@@ -96,7 +151,37 @@ export const useRadioStore = defineStore('radio', () => {
       if (selectedCountry.value) params.countrycode = selectedCountry.value
       if (selectedLanguage.value) params.language = selectedLanguage.value
       if (selectedTag.value) params.tag = selectedTag.value
-      stations.value = await radioAPI.searchStations(params, signal)
+      const apiResults = await radioAPI.searchStations(params, signal)
+      // 合并本地源（如果搜索关键词为空则返回所有本地源，但搜索时我们只返回匹配的）
+      // 这里我们使用 filteredStations 做最终过滤，但为了让搜索包含本地源，我们可以手动合并
+      const invalid = getInvalidUrls()
+      let merged = localStations.filter(s => !invalid.has(s.url))
+      // 对本地源进行关键词过滤（因为本地源没有搜索参数，需要手动过滤）
+      if (searchQuery.value) {
+        const q = searchQuery.value.toLowerCase().trim()
+        merged = merged.filter(s =>
+          s.name.toLowerCase().includes(q) ||
+          s.country.toLowerCase().includes(q) ||
+          s.tags.toLowerCase().includes(q)
+        )
+      }
+      if (selectedCountry.value) {
+        merged = merged.filter(s => s.countrycode === selectedCountry.value)
+      }
+      if (selectedLanguage.value) {
+        merged = merged.filter(s => s.language?.toLowerCase().includes(selectedLanguage.value.toLowerCase()))
+      }
+      if (selectedTag.value) {
+        merged = merged.filter(s => s.tags.toLowerCase().includes(selectedTag.value.toLowerCase()))
+      }
+      // 合并 API 结果（去重）
+      const apiUrls = new Set(apiResults.map(s => s.url))
+      for (const api of apiResults) {
+        if (!merged.some(s => s.url === api.url)) {
+          merged.push(api)
+        }
+      }
+      stations.value = merged
       if (stations.value.length === 0) {
         toastStore.showInfo('没有找到匹配的国内电台')
       }
@@ -117,23 +202,23 @@ export const useRadioStore = defineStore('radio', () => {
   const loadTopStations = async () => {
     isLoading.value = true
     try {
-      const result = await radioAPI.searchStations({ 
-        order: 'clickcount', 
-        limit: 50, 
-        reverse: true, 
-        countrycode: 'CN', 
-        hidebroken: true 
+      const result = await radioAPI.searchStations({
+        order: 'clickcount',
+        limit: 50,
+        reverse: true,
+        countrycode: 'CN',
+        hidebroken: true
       })
-      topStations.value = result
+      topStations.value = mergeWithLocal(result)
     } catch (err) {
       console.error('加载热门电台失败:', err)
       try {
         const result = await radioAPI.searchStations({ countrycode: 'CN', limit: 50, hidebroken: true })
-        topStations.value = result
+        topStations.value = mergeWithLocal(result)
         toastStore.showInfo('使用备用方式加载热门电台')
       } catch (e) {
         toastStore.showError('加载热门电台失败')
-        topStations.value = []
+        topStations.value = localStations.filter(s => !getInvalidUrls().has(s.url))
       }
     } finally {
       isLoading.value = false
@@ -143,22 +228,22 @@ export const useRadioStore = defineStore('radio', () => {
   const loadLatestStations = async () => {
     isLoading.value = true
     try {
-      const result = await radioAPI.searchStations({ 
-        order: 'name', 
-        limit: 30, 
-        countrycode: 'CN', 
-        hidebroken: true 
+      const result = await radioAPI.searchStations({
+        order: 'name',
+        limit: 30,
+        countrycode: 'CN',
+        hidebroken: true
       })
-      latestStations.value = result
+      latestStations.value = mergeWithLocal(result)
     } catch (err) {
       console.error('加载最新电台失败:', err)
       try {
         const result = await radioAPI.searchStations({ countrycode: 'CN', limit: 30, hidebroken: true })
-        latestStations.value = result
+        latestStations.value = mergeWithLocal(result)
         toastStore.showInfo('使用备用方式加载最新电台')
       } catch (e) {
         toastStore.showError('加载最新电台失败')
-        latestStations.value = []
+        latestStations.value = localStations.filter(s => !getInvalidUrls().has(s.url))
       }
     } finally {
       isLoading.value = false
@@ -168,21 +253,23 @@ export const useRadioStore = defineStore('radio', () => {
   const loadChinaStations = async () => {
     isLoading.value = true
     try {
-      chinaStations.value = await radioAPI.getStationsByCountry('CN', 50)
+      let apiStations: RadioStation[] = []
+      try {
+        apiStations = await radioAPI.getStationsByCountry('CN', 50)
+      } catch (e) {
+        console.warn('API 获取国内电台失败，仅使用本地源', e)
+      }
+      chinaStations.value = mergeWithLocal(apiStations)
       if (chinaStations.value.length === 0) {
-        const results = await radioAPI.searchStations({ country: 'China', limit: 50 })
-        chinaStations.value = results
+        // 尝试备用搜索
+        const fallback = await radioAPI.searchStations({ country: 'China', limit: 50 })
+        chinaStations.value = mergeWithLocal(fallback)
       }
     } catch (err) {
       console.error('加载国内电台失败:', err)
-      try {
-        const results = await radioAPI.searchStations({ country: 'China', limit: 50 })
-        chinaStations.value = results
-        toastStore.showInfo('使用备用方式加载国内频道')
-      } catch (e) {
-        toastStore.showError('加载国内电台失败')
-        chinaStations.value = []
-      }
+      // 至少显示本地源（过滤失效）
+      chinaStations.value = localStations.filter(s => !getInvalidUrls().has(s.url))
+      toastStore.showError('加载国内电台失败，已显示本地源')
     } finally {
       isLoading.value = false
     }
@@ -196,14 +283,30 @@ export const useRadioStore = defineStore('radio', () => {
     isLoading.value = true
     currentCategory.value = tag
     try {
-      const result = await radioAPI.searchStations({ 
-        tag, 
-        countrycode: 'CN', 
-        limit: 50, 
-        hidebroken: true 
-      })
+      // 本地过滤
+      const localFiltered = filterLocalByTag(tag)
+      let apiStations: RadioStation[] = []
+      try {
+        apiStations = await radioAPI.searchStations({
+          tag,
+          countrycode: 'CN',
+          limit: 50,
+          hidebroken: true
+        })
+      } catch (e) {
+        console.warn(`API 加载分类 ${tag} 失败，仅使用本地源`, e)
+      }
+      // 合并
+      const result = [...localFiltered]
+      const localUrls = new Set(result.map(s => s.url))
+      const invalid = getInvalidUrls()
+      for (const api of apiStations) {
+        if (!invalid.has(api.url) && !localUrls.has(api.url) && api.tags.includes(tag)) {
+          result.push(api)
+        }
+      }
       categoryStations.value = result
-      if (categoryStations.value.length === 0) {
+      if (result.length === 0) {
         toastStore.showInfo(`未找到国内“${tag}”分类的电台`)
       }
     } catch (err) {
@@ -214,7 +317,6 @@ export const useRadioStore = defineStore('radio', () => {
     }
   }
 
-  // ✅ 省份全覆盖优化版（多维度并发搜索）
   const loadProvinceStations = async (province: string) => {
     if (!province) {
       provinceStations.value = []
@@ -224,8 +326,7 @@ export const useRadioStore = defineStore('radio', () => {
     try {
       const cities = PROVINCE_CITIES[province] || []
       const searchPromises: Promise<RadioStation[]>[] = []
-
-      // 1. 省份名多种变体搜索
+      // 省份名多种变体
       const provinceVariants = [province, province + '省', province + '市']
       for (const pName of provinceVariants) {
         searchPromises.push(
@@ -253,8 +354,6 @@ export const useRadioStore = defineStore('radio', () => {
           }).catch(() => [])
         )
       }
-
-      // 2. 地级市搜索（覆盖县级台）
       for (const city of cities) {
         searchPromises.push(
           radioAPI.searchStations({
@@ -273,15 +372,15 @@ export const useRadioStore = defineStore('radio', () => {
           }).catch(() => [])
         )
       }
-
-      // 并行执行
       const results = await Promise.all(searchPromises)
       const allStations = results.flat()
-      // 去重
+      // 去重并过滤失效
+      const invalid = getInvalidUrls()
       const unique = allStations.filter((item, index, self) =>
-        index === self.findIndex(s => s.stationuuid === item.stationuuid)
+        index === self.findIndex(s => s.stationuuid === item.stationuuid) &&
+        !invalid.has(item.url)
       )
-
+      // 尝试合并本地源（但本地源无 state 信息，跳过）
       provinceStations.value = unique
       if (unique.length === 0) {
         toastStore.showInfo(`未找到 ${province} 的电台`)
@@ -322,6 +421,9 @@ export const useRadioStore = defineStore('radio', () => {
   }
 
   const getStationByUUID = async (uuid: string): Promise<RadioStation | null> => {
+    // 先查找本地源
+    const local = localStations.find(s => s.stationuuid === uuid)
+    if (local) return local
     try {
       return await radioAPI.getStationByUUID(uuid)
     } catch (err) {
@@ -336,6 +438,16 @@ export const useRadioStore = defineStore('radio', () => {
     selectedLanguage.value = ''
     selectedTag.value = ''
     stations.value = []
+  }
+
+  // 清除所有失效记录
+  const clearInvalid = () => {
+    localStorage.removeItem('invalid_stations')
+    // 重新加载所有数据
+    loadChinaStations()
+    loadTopStations()
+    loadLatestStations()
+    toastStore.showInfo('已重置失效列表')
   }
 
   return {
@@ -366,6 +478,8 @@ export const useRadioStore = defineStore('radio', () => {
     loadLanguages,
     loadTags,
     getStationByUUID,
-    resetSearch
+    resetSearch,
+    markInvalid,
+    clearInvalid
   }
 })
