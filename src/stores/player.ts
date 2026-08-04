@@ -6,12 +6,14 @@ import { useHistoryStore } from './history'
 import { useToastStore } from './toast'
 import { useSettingsStore } from './settings'
 import { radioAPI } from '@/services/radioApi'
+import { useRadioStore } from './radio'
 
 export const usePlayerStore = defineStore('player', () => {
   const favoritesStore = useFavoritesStore()
   const historyStore = useHistoryStore()
   const toastStore = useToastStore()
   const settingsStore = useSettingsStore()
+  const radioStore = useRadioStore()
 
   const audio = ref<HTMLAudioElement | null>(null)
   const currentStation = ref<RadioStation | null>(null)
@@ -92,22 +94,25 @@ export const usePlayerStore = defineStore('player', () => {
         if (!audio.value?.src || audio.value?.src === '') return
         const mediaError = (e.target as HTMLAudioElement).error
         if (mediaError) {
-          // 对于不支持的格式，静默处理，不显示错误
-          if (mediaError.code === MediaError.MEDIA_ERR_SRC_NOT_SUPPORTED) {
-            console.warn('不支持的音频格式:', currentStation.value?.name)
-            isPlaying.value = false
-            isLoading.value = false
-            isBuffering.value = false
+          // 如果是网络错误或解码错误，认为该源不可用 -> 标记失效
+          if (mediaError.code === MediaError.MEDIA_ERR_NETWORK ||
+              mediaError.code === MediaError.MEDIA_ERR_SRC_NOT_SUPPORTED ||
+              mediaError.code === MediaError.MEDIA_ERR_DECODE) {
+            if (currentStation.value) {
+              const station = currentStation.value
+              console.warn('播放失败，标记失效:', station.name)
+              radioStore.markInvalid(station)
+              toastStore.showError('该电台源已失效，已自动移除')
+              // 停止播放
+              stopStation()
+            }
             return
           }
-          // 其他错误仅记录日志，开发环境显示提示
+          // 其他错误仅记录日志
           let msg = '播放失败'
           switch (mediaError.code) {
-            case MediaError.MEDIA_ERR_NETWORK:
-              msg = '网络错误，请检查连接'
-              break
-            case MediaError.MEDIA_ERR_DECODE:
-              msg = '音频解码失败，可能是不支持的格式'
+            case MediaError.MEDIA_ERR_ABORTED:
+              msg = '播放被中止'
               break
             default:
               msg = `播放错误 (${mediaError.code})`
@@ -167,7 +172,7 @@ export const usePlayerStore = defineStore('player', () => {
       if ('mediaSession' in navigator) {
         navigator.mediaSession.metadata = new MediaMetadata({
           title: station.name,
-          artist: station.country || '全球电台'
+          artist: station.country || '国内电台'
         })
       }
 
