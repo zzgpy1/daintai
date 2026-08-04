@@ -20,6 +20,8 @@ export interface RadioStation {
   clicktrend: number
   geo_lat: number | null
   geo_long: number | null
+  // 新增：所有可用 URL 列表（包括备用源）
+  allUrls?: string[]
 }
 
 export interface RadioSearchParams {
