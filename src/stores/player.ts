@@ -17,6 +17,7 @@ export const usePlayerStore = defineStore('player', () => {
 
   const audio = ref<HTMLAudioElement | null>(null)
   const currentStation = ref<RadioStation | null>(null)
+  const currentUrlIndex = ref(0)
   const isPlaying = ref(false)
   const isLoading = ref(false)
   const error = ref<string | null>(null)
@@ -90,41 +91,52 @@ export const usePlayerStore = defineStore('player', () => {
         duration.value = audio.value?.duration || 0
       })
 
+      // 错误处理：尝试切换备用源
       audio.value.addEventListener('error', (e) => {
         if (!audio.value?.src || audio.value?.src === '') return
         const mediaError = (e.target as HTMLAudioElement).error
-        if (mediaError) {
-          // 如果是网络错误或解码错误，认为该源不可用 -> 标记失效
+        if (mediaError && currentStation.value) {
+          const station = currentStation.value
+          // 只对网络错误、不支持的格式、解码错误进行重试
           if (mediaError.code === MediaError.MEDIA_ERR_NETWORK ||
               mediaError.code === MediaError.MEDIA_ERR_SRC_NOT_SUPPORTED ||
               mediaError.code === MediaError.MEDIA_ERR_DECODE) {
-            if (currentStation.value) {
-              const station = currentStation.value
-              console.warn('播放失败，标记失效:', station.name)
-              radioStore.markInvalid(station)
-              toastStore.showError('该电台源已失效，已自动移除')
-              // 停止播放
-              stopStation()
+            console.warn(`播放失败 (${mediaError.code})，尝试备用源`)
+            const urls = station.allUrls || [station.url]
+            if (currentUrlIndex.value < urls.length - 1) {
+              currentUrlIndex.value++
+              const nextUrl = urls[currentUrlIndex.value]
+              if (nextUrl) {
+                audio.value!.src = nextUrl
+                audio.value!.load()
+                audio.value!.play().catch(() => {})
+                return
+              }
             }
-            return
+            // 所有备用源均失败，标记失效
+            console.warn('所有备用源均失败，标记失效:', station.name)
+            radioStore.markInvalid(station)
+            toastStore.showError('该电台所有源均失效，已移除')
+            stopStation()
+          } else {
+            // 其他错误仅记录
+            let msg = '播放失败'
+            switch (mediaError.code) {
+              case MediaError.MEDIA_ERR_ABORTED:
+                msg = '播放被中止'
+                break
+              default:
+                msg = `播放错误 (${mediaError.code})`
+            }
+            error.value = msg
+            isPlaying.value = false
+            isLoading.value = false
+            isBuffering.value = false
+            if (import.meta.env.DEV) {
+              toastStore.showError(msg)
+            }
+            console.warn('播放错误:', msg)
           }
-          // 其他错误仅记录日志
-          let msg = '播放失败'
-          switch (mediaError.code) {
-            case MediaError.MEDIA_ERR_ABORTED:
-              msg = '播放被中止'
-              break
-            default:
-              msg = `播放错误 (${mediaError.code})`
-          }
-          error.value = msg
-          isPlaying.value = false
-          isLoading.value = false
-          isBuffering.value = false
-          if (import.meta.env.DEV) {
-            toastStore.showError(msg)
-          }
-          console.warn('播放错误:', msg)
         }
       })
     }
@@ -137,6 +149,8 @@ export const usePlayerStore = defineStore('player', () => {
       error.value = null
       isLoading.value = true
       isBuffering.value = false
+      // 重置索引
+      currentUrlIndex.value = 0
 
       if (currentStation.value?.stationuuid === station.stationuuid && isPlaying.value) {
         pauseStation()
@@ -153,12 +167,13 @@ export const usePlayerStore = defineStore('player', () => {
       }
 
       currentStation.value = station
-      const streamUrl = station.url_resolved || station.url
-      if (!streamUrl) {
-        throw new Error('电台流地址无效')
+      const urls = station.allUrls || [station.url]
+      const firstUrl = urls[0]
+      if (!firstUrl) {
+        throw new Error('无可用流地址')
       }
 
-      audio.value.src = streamUrl
+      audio.value.src = firstUrl
       audio.value.volume = volume.value
       audio.value.muted = isMuted.value
       audio.value.crossOrigin = 'anonymous'
@@ -242,6 +257,7 @@ export const usePlayerStore = defineStore('player', () => {
     currentStation.value = null
     error.value = null
     isBuffering.value = false
+    currentUrlIndex.value = 0
   }
 
   const setVolume = (value: number) => {
